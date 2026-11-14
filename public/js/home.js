@@ -19,17 +19,6 @@
     ['abyss', 'Otchłań Zmierzchu', 'Poziomy 49–60', 'Kraina wiecznego zmierzchu: cienie, bestie pustki i upadli rycerze. Na końcu czeka Pan Otchłani. Loch: Serce Otchłani.', 'Morgath, Pan Otchłani'],
   ];
   document.getElementById('regions').innerHTML = REG.map((r) => `<article class="card hover region"><img src="/img/${r[0]}_m.jpg" alt="${r[1]}" loading="lazy" width="640" height="360"><div class="body"><h3>${r[1]}</h3><p class="muted" style="margin-bottom:10px">${r[3]}</p><span class="tag">${r[2]}</span>${r[4] ? `<span class="tag boss">Boss: ${r[4]}</span>` : ''}</div></article>`).join('');
-  const GAL = [
-    ['mount.jpg', 'Szczyty Szronu – walka ze Szronogrzbietem'], ['desert.jpg', 'Ruiny Piasków – Sethar, Król Cieni'], ['cave.jpg', 'Jaskinia Cieni – Upiór Mgieł'],
-    ['town.jpg', 'Srebrnogród'], ['swamp.jpg', 'Bagna Żałoby'], ['forest.jpg', 'Mroczny Bór'], ['village.jpg', 'Osada Brzozowa'],
-    ['phone_play.jpg', 'Na telefonie – strzałki i przyciski', true], ['phone_map.jpg', 'Pełna mapa krainy', true], ['phone_world.jpg', 'Mapa świata', true],
-  ];
-  const g = document.getElementById('gallery');
-  g.innerHTML = GAL.map((x, i) => `<a href="/img/${x[0]}" class="${x[2] ? 'tall' : ''}" data-i="${i}"><img src="/img/${x[2] || i === 0 ? x[0] : x[0].replace('.jpg', '_m.jpg')}" alt="${x[1]}" loading="lazy"><span>${x[1]}</span></a>`).join('');
-  const lb = document.getElementById('lb');
-  g.addEventListener('click', (e) => { const a = e.target.closest('a'); if (!a) return; e.preventDefault(); const x = GAL[+a.dataset.i]; lb.querySelector('img').src = '/img/' + x[0]; lb.querySelector('p').textContent = x[1]; lb.classList.add('open'); });
-  lb.addEventListener('click', (e) => { if (e.target.tagName !== 'IMG') lb.classList.remove('open'); });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') lb.classList.remove('open'); });
   // ranking graczy
   function rankHtml(R, tab, esc) {
     const CN = { war: 'Wojownik', arc: 'Łucznik', mag: 'Mag' };
