@@ -17,7 +17,7 @@ const qGet = db.prepare('SELECT * FROM characters WHERE id = ? AND user_id = ?')
 const qSave = db.prepare('UPDATE characters SET data = ?, lvl = ?, area = ?, updated = ? WHERE id = ?');
 
 function newState(cls) {
-  return { v: 2, cls, lvl: 1, xp: 0, hp: 9999, mp: 9999, gold: 20, area: 'village', x: 18, y: 17, inv: [{ id: 'pot', n: 3 }], eq: { w: START_WEAPON[cls], a: 'shirt' }, q: {}, kills: 0, intro: false, track: '', seen: { village: 1 }, mmz: 1 };
+  return { v: 2, cls, lvl: 1, xp: 0, hp: 9999, mp: 9999, gold: Math.max(0, Math.min(100000, Number(process.env.START_GOLD) || 20)), area: 'village', x: 18, y: 17, inv: [{ id: 'pot', n: 3 }], eq: { w: START_WEAPON[cls], a: 'shirt' }, q: {}, kills: 0, intro: false, track: '', seen: { village: 1 }, mmz: 1 };
 }
 
 function router(isOnline) {

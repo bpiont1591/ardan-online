@@ -68,13 +68,15 @@ client, n = re.subn(r'new WebSocket\(`[^`]*`\)', 'new DemoSocket(charId)', clien
 client = "window.DEMO_GAME_CLIENT = function () {\n" + client + "\n};"
 
 engine = rd(os.path.join(PUB, 'js/engine.js'))
+gameui = rd(os.path.join(PUB, 'js/game-ui.js'))
 mods = {}
-for m in ['chat', 'party', 'game']:
+for m in ['chat', 'party', 'items', 'gear', 'battle', 'market', 'trade', 'guild', 'game']:
     mods[m] = rd(os.path.join(SRV, m + '.js'))
 require_js = """(function(){
 const defs = {}, cache = {};
 %s
-const builtins = { './engine': () => ({ createArdan: window.createArdan }), './characters': () => window.DEMO.charsMock, './config': () => ({ tickMs: 50 }) };
+const builtins = { './engine': () => ({ createArdan: window.createArdan }), './characters': () => window.DEMO.charsMock, './config': () => ({ tickMs: 50 }), './store': () => STORE };
+const STORE = (function () { const P = 'ardan_demo_kv_', cache = {}; return { get(k, def) { if (!(k in cache)) { let v = def; try { const r = localStorage.getItem(P + k); if (r) v = JSON.parse(r); } catch (e) {} cache[k] = v; } return cache[k]; }, set(k, v) { cache[k] = v; try { localStorage.setItem(P + k, JSON.stringify(v)); } catch (e) {} } }; })();
 function req(n) { if (cache[n]) return cache[n].exports; if (builtins[n]) return builtins[n](); const module = cache[n] = { exports: {} }; defs[n](module, module.exports, req); return module.exports; }
 window.DEMO_REQUIRE = req;
 })();""" % '\n'.join("defs['./%s'] = function (module, exports, require) {\n%s\n};" % (k, v) for k, v in mods.items())
@@ -106,6 +108,7 @@ window.DEMO_GAME_HTML = {safe(json.dumps(game_html, ensure_ascii=False))};
 </script>
 <script>{safe(engine)}</script>
 <script>{safe(require_js)}</script>
+<script>{safe(gameui)}</script>
 <script>{safe(client)}</script>
 <script>{safe(app)}</script>
 </body>

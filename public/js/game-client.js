@@ -23,7 +23,7 @@
     if (on) { if (NET) NET.unread = 0; msgs.scrollTop = msgs.scrollHeight; if (window.matchMedia('(pointer:fine)').matches) setTimeout(() => input.focus(), 0); }
     else { input.blur(); canvas.focus({ preventScroll: true }); }
   }
-  function visible(l) { return tab === 'all' || l.ch === tab || ((tab === 'w' || tab === 'p') && l.ch === 's'); }
+  function visible(l) { return tab === 'all' || l.ch === tab || (tab === 'p' && l.ch === 'gu') || ((tab === 'w' || tab === 'p') && l.ch === 's'); }
   function render(l) {
     const d = document.createElement('div');
     d.className = 'm c-' + l.ch; d.dataset.ch = l.ch;
@@ -32,7 +32,7 @@
     // l.text is already HTML-escaped by the server; nicks are restricted to [A-Za-z0-9_ + PL letters]
     if (l.ch === 's') h += l.text;
     else if (l.ch === 'w') h += l.from === NET.nick ? `do <span class="n" data-n="${escN(l.to)}">${escN(l.to)}</span>: ${l.text}` : `od <span class="n" data-n="${escN(l.from)}">${escN(l.from)}</span>: ${l.text}`;
-    else h += `<span class="ch">${{ g: 'Glob', r: 'Kraina', p: 'Drużyna' }[l.ch] || ''}</span><span class="n" data-n="${escN(l.from)}">${escN(l.from)}</span>: ${l.text}`;
+    else h += `<span class="ch">${{ g: 'Glob', r: 'Kraina', p: 'Drużyna', gu: 'Gildia' }[l.ch] || ''}</span><span class="n" data-n="${escN(l.from)}">${escN(l.from)}</span>: ${l.text}`;
     d.innerHTML = h;
     d.style.display = visible(l) ? '' : 'none';
     return d;
@@ -44,8 +44,8 @@
     if (atBottom || l.from === (NET && NET.nick)) msgs.scrollTop = msgs.scrollHeight;
     if (NET && NET.api) {
       const t = decode(l.text);
-      const col = { g: '#f1e3b8', r: '#a6e6a6', w: '#e7b6ff', s: '#9fc6e8', p: '#aef5ae' }[l.ch];
-      const pre = l.ch === 's' ? '' : l.ch === 'w' ? (l.from === NET.nick ? `[do ${l.to}] ` : `[od ${l.from}] `) : l.ch === 'p' ? `[drużyna] ${l.from}: ` : `${l.from}: `;
+      const col = { g: '#f1e3b8', r: '#a6e6a6', w: '#e7b6ff', s: '#9fc6e8', p: '#aef5ae', gu: '#ffc98a' }[l.ch];
+      const pre = l.ch === 's' ? '' : l.ch === 'w' ? (l.from === NET.nick ? `[do ${l.to}] ` : `[od ${l.from}] `) : l.ch === 'p' ? `[drużyna] ${l.from}: ` : l.ch === 'gu' ? `[gildia] ${l.from}: ` : `${l.from}: `;
       const line = pre + t;
       NET.api.log(line.length > 90 ? line.slice(0, 88) + '…' : line, col);
     }
@@ -86,6 +86,7 @@
       if (msg.t === 'party') { DBG.party = msg; return party(msg); }
       if (msg.t === 'kick') { kicked = true; overlay('Rozłączono', msg.reason || 'Połączenie zostało zakończone.', '<a href="/postacie">Moje postacie</a>'); return; }
       if (msg.t === 'pong') { $('ping').textContent = `ping ${Date.now() - msg.ts} ms · online ${msg.online}`; return; }
+      if (window.ARDAN_UI && started && ARDAN_UI.onMsg(msg)) return;
       if (msg.t === 's') DBG.last = msg; else if (msg.t === 'me') DBG.me = msg.me; else if (msg.t === 'dlg') DBG.dlg = msg.d;
       if (NET && NET.api) NET.api.recv(msg);
     };
@@ -105,6 +106,14 @@
     };
   }
   document.addEventListener('click', (e) => { if (e.target.matches('[data-reload]')) location.reload(); });
+  // the game page must stay put on phones: no pinch/double-tap zoom, no rubber-band scrolling
+  ['gesturestart', 'gesturechange', 'gestureend'].forEach((t) => document.addEventListener(t, (e) => e.preventDefault(), { passive: false }));
+  document.addEventListener('touchmove', (e) => {
+    if (e.touches.length > 1) { e.preventDefault(); return; }
+    const sc = e.target.closest && e.target.closest('.scroll, .msgs, .bt-log');
+    if (!sc || sc.scrollHeight <= sc.clientHeight) e.preventDefault();
+  }, { passive: false });
+  window.addEventListener('scroll', () => { if (window.scrollX || window.scrollY) window.scrollTo(0, 0); });
 
   // ---------- party (drużyna) ----------
   const partyEl = $('party');
@@ -129,7 +138,16 @@
       send: (m) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); },
       onChat: () => setOpen(!chat.classList.contains('open')),
     };
+    if (window.ARDAN_UI) {
+      NET.onPanel = (k) => ARDAN_UI.panel(k);
+      NET.onKey = (k) => ARDAN_UI.key(k);
+      NET.onPlayerTap = (o) => ARDAN_UI.playerTap(o);
+    }
     createArdan(canvas, { net: NET, font: "Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" });
+    if (window.ARDAN_UI) {
+      ARDAN_UI.init({ NET, send: NET.send, cmd: command, openChat: (pre, ch) => { setOpen(true); if (ch) chan.value = ch; if (pre !== undefined) input.value = pre; setTimeout(() => input.focus(), 0); } });
+      DBG.ui = ARDAN_UI.state;
+    }
     hideOverlay();
     canvas.focus({ preventScroll: true });
     setInterval(() => { if (ws.readyState === 1) ws.send(JSON.stringify({ t: 'ping', ts: Date.now() })); }, 5000);

@@ -25,7 +25,7 @@ async function main() {
   const dbPath = `/tmp/ardan-e2e-${Date.now()}.db`;
   let log = '';
   const srv = spawn(process.execPath, [path.join(__dirname, '..', 'server', 'index.js')], {
-    env: { ...process.env, PORT: String(PORT), DATABASE_PATH: dbPath, BASE_URL: BASE, NODE_ENV: 'development', BCRYPT_COST: '10', SMTP_HOST: '' },
+    env: { ...process.env, PORT: String(PORT), DATABASE_PATH: dbPath, BASE_URL: BASE, NODE_ENV: 'development', BCRYPT_COST: '10', SMTP_HOST: '', START_GOLD: '200' },
   });
   srv.stdout.on('data', (d) => { log += d; }); srv.stderr.on('data', (d) => { log += d; process.stderr.write(d); });
   for (let i = 0; i < 50 && !log.includes('Serwer działa'); i++) await W(100);
@@ -201,29 +201,161 @@ async function main() {
     ok(!!tgt, `cel: potwór #${tgt && tgt.i} na (${tgt && tgt.x},${tgt && tgt.y})`);
     const near = await walkTo(pb, tgt.x, tgt.y, 20000);
     ok(near, 'B podchodzi do potwora');
+    { const m1 = (await snap(pa)).m.map((r) => r[0] + ',' + r[1]).join(';'); await W(2500); const m2 = (await snap(pa)).m.map((r) => r[0] + ',' + r[1]).join(';');
+      ok(m1 === m2, 'potwory stoją w miejscu (nie chodzą i nie gonią gracza)'); if (m1 !== m2) console.log('   ', JSON.stringify((await snap(pa)).m), JSON.stringify((await snap(pa)).p)); }
     sa = await snap(pa); sb = await snap(pb);
     ok(sa.m.length === sb.m.length && sa.m.every((r, i) => r[2] === sb.m[i][2] && (r[3] & 1) === (sb.m[i][3] & 1)), 'obaj widzą identyczne HP i stan wszystkich potworów');
-    const hp0 = sb.m[tgt.i][2];
-    let killed = false, hpSeenByA = [], hpSeenByB = [];
-    for (let k = 0; k < 40 && !killed; k++) {
-      const s = await snap(pb); const r = s.m[tgt.i];
-      if (Math.max(Math.abs(r[0] - s.p.x), Math.abs(r[1] - s.p.y)) > 4.5) await walkTo(pb, r[0], r[1], 3000);
-      await pb.keyboard.press('f'); await W(350);
-      const a = (await snap(pa)).m[tgt.i], b = (await snap(pb)).m[tgt.i];
-      hpSeenByA.push(a[2]); hpSeenByB.push(b[2]);
-      if (b[3] & 1) killed = true;
+    async function walkExact(pg, tx, ty, maxMs) {
+      const t0 = Date.now();
+      while (Date.now() - t0 < maxMs) {
+        const s = await snap(pg); const dx = tx - s.p.x, dy = ty - s.p.y;
+        if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) return true;
+        if (Math.abs(dx) > 1) { const k = dx < 0 ? 'ArrowLeft' : 'ArrowRight'; await pg.keyboard.down(k); await W(Math.min(400, Math.abs(dx) * 120)); await pg.keyboard.up(k); }
+        if (Math.abs(dy) > 1) { const k = dy < 0 ? 'ArrowUp' : 'ArrowDown'; await pg.keyboard.down(k); await W(Math.min(400, Math.abs(dy) * 120)); await pg.keyboard.up(k); }
+        await W(80);
+      }
+      return false;
     }
+    // ---------- turn-based battle ----------
+    console.log('Walka turowa');
+    const ui = (pg) => pg.evaluate(() => { const S = window.ARDAN_UI_STATE; return JSON.parse(JSON.stringify({ open: S.open, gear: S.gear, mk: S.mk, gd: S.gd, tr: S.tr, pvp: S.pvp, bt: S.bt })); });
+    const hp0 = sb.m[tgt.i][2];
+    for (let k = 0; k < 6; k++) { const s = await snap(pb); const r = s.m[tgt.i]; if (Math.max(Math.abs(r[0] - s.p.x), Math.abs(r[1] - s.p.y)) <= 2) break; await walkExact(pb, r[0], r[1], 3000); }
+    await pb.keyboard.press('f');
+    const btOpen = await pb.waitForSelector('#battle', { timeout: 4000 }).then(() => true).catch(() => false);
+    ok(btOpen, 'atak obok potwora otwiera ekran walki turowej');
+    await W(400);
+    ok((await pb.$$eval('#battle .bf.en', (e) => e.length)) >= 1 && (await pb.$$eval('#battle .bf.al', (e) => e.length)) >= 1, 'ekran walki: przeciwnicy i sojusznicy z paskami HP');
+    ok(((await snap(pa)).m[tgt.i][3] & 32) === 32, 'A widzi, że potwór jest w walce (stan z serwera)');
+    const aJoined = await pa.$('#battle').then((e) => !!e);
+    ok((await pb.$$eval('#battle [data-ba]', (e) => e.map((x) => x.dataset.ba))).join(',').match(/atk.*sk.*pot.*flee/), 'akcje: atak, umiejętności, mikstura, ucieczka');
+    await pb.screenshot({ path: `${SHOTS}/10_combat_phone.png` });
+    await pb.tap('#battle [data-ba="atk"]');
+    if (aJoined) { await pa.waitForSelector('#battle [data-ba="atk"]:not([disabled])', { timeout: 5000 }).catch(() => {}); await pa.click('#battle [data-ba="atk"]').catch(() => {}); }
+    await pb.waitForFunction(() => document.querySelectorAll('#btLog .l').length >= 3, { timeout: 25000 }).catch(() => {});
+    await W(1500);
+    const log1 = await pb.$$eval('#btLog .l', (e) => e.map((x) => x.textContent));
+    ok(log1.some((l) => /traci \d+ pż|unika/.test(l)), `runda rozegrana, dziennik walki (${log1.length} wpisów)`);
+    await pa.screenshot({ path: `${SHOTS}/10_combat_desktop.png` });
+    // auto fight + speed ×3 until the end
+    await pb.tap('#btAuto'); await pb.tap('#battle [data-spd="3"]');
+    if (aJoined) { await pa.click('#btAuto'); }
     await W(300);
+    ok((await ui(pb)).bt && (await pb.$eval('#btAuto', (e) => e.checked)), 'walka automatyczna włączona');
+    await pb.waitForSelector('#btEnd:not([hidden])', { timeout: 60000 }).catch(() => {});
+    const endTxt = await pb.$eval('#btEnd', (e) => e.textContent).catch(() => '');
+    ok(/Zwycięstwo/.test(endTxt), 'walka wygrana (automatycznie)');
+    await pb.screenshot({ path: `${SHOTS}/11_combat_win_phone.png` });
+    await W(500);
     const fa = (await snap(pa)).m[tgt.i], fb = (await snap(pb)).m[tgt.i];
-    ok(hpSeenByB.some((h) => h < hp0), `B zadaje obrażenia (HP ${hp0} → ${Math.min(...hpSeenByB)})`);
-    ok(hpSeenByA.some((h) => h < hp0), 'A widzi spadek HP tego samego potwora');
-    ok(killed && (fa[3] & 1) === 1, 'potwór pokonany – A też widzi go jako martwego');
+    ok((fb[3] & 1) === 1 && (fa[3] & 1) === 1, 'potwór pokonany – A też widzi go jako martwego');
     const meB = await pb.evaluate(() => window.ARDAN_DEBUG.me);
     ok(meB && (meB.xp > 0 || meB.lvl > 1), `B dostaje doświadczenie z serwera (xp ${meB && meB.xp})`);
     const meA = await pa.evaluate(() => window.ARDAN_DEBUG.me);
-    ok(meA && meA.xp > xpA0, `drużyna: A dostaje część PD za zabójstwo B (${xpA0} → ${meA && meA.xp})`);
-    await pb.screenshot({ path: `${SHOTS}/06_monster_fight_phone.png` });
-    await pa.screenshot({ path: `${SHOTS}/06_monster_fight_desktop.png` });
+    ok(meA && (meA.xp > xpA0 || meA.lvl > 1), `drużyna: A ${aJoined ? 'walczy razem z B' : 'dostaje część PD'} (${xpA0} → ${meA && meA.xp})`);
+    await pb.tap('#btEnd [data-ba="close"]'); if (aJoined) await pa.waitForSelector('#btEnd:not([hidden])', { timeout: 20000 }).then(() => pa.click('#btEnd [data-ba="close"]')).catch(() => {});
+    await W(300);
+    ok(!(await pb.$('#battle')), 'ekran walki zamknięty');
+    // ---------- equipment ----------
+    console.log('Ekwipunek');
+    await pa.keyboard.press('i'); await W(600);
+    ok((await pa.$$eval('.doll .slot', (e) => e.length)) === 9, 'panel postaci: 9 miejsc (hełm, zbroja, rękawice, buty, broń, druga ręka, 2 pierścienie, amulet)');
+    let gA = (await ui(pa)).gear;
+    ok(gA && gA.gear.weapon && gA.gear.weapon.c === 'war', `broń startowa w slocie broni (${gA && gA.gear.weapon && gA.gear.weapon.n})`);
+    ok(gA && gA.st && gA.st.atk > 0 && (await pa.$eval('.eq-st', (e) => e.textContent)).includes('Obrona'), 'sumy statystyk w panelu');
+    await pa.click('.slot[data-slot="weapon"]'); await W(300);
+    ok(await pa.$eval('.ui-detail', (e) => /Wymagany poziom/.test(e.textContent) && /Klasa: Wojownik/.test(e.textContent)), 'karta przedmiotu: klasa, poziom, rzadkość');
+    await pa.click('.ui-detail [data-ia="unequip"]'); await W(1400);
+    gA = (await ui(pa)).gear;
+    ok(gA && !gA.gear.weapon && gA.bag.length >= 1, 'zdjęcie broni → trafia do torby');
+    await pa.screenshot({ path: `${SHOTS}/12_equipment_desktop.png` });
+    // ---------- market ----------
+    console.log('Rynek');
+    const wpn = gA.bag.find((x) => x.s === 'weapon'); const goldA0 = gA.gold;
+    await pa.click(`.bi[data-bag="${wpn.u}"]`); await W(300);
+    await pa.$eval('#mkPrice', (e) => { e.value = '7'; });
+    await pa.click('.ui-detail [data-ia="list"]'); await W(700);
+    await pa.keyboard.press('Escape'); await W(200);
+    await pa.keyboard.press('r'); await W(800);
+    let mA = (await ui(pa)).mk;
+    ok(mA && mA.mine.some((x) => x.it.u === wpn.u && x.pr === 7), 'A wystawia broń na rynek za 7 zł');
+    // B opens the market from the menu (phone)
+    await pb.evaluate(() => window.ARDAN_UI.panel('menu')); await W(300);
+    await pb.tap('[data-open="mk"]'); await W(900);
+    let mB = (await ui(pb)).mk;
+    ok(mB && mB.list.some((x) => x.it.u === wpn.u), 'B widzi ofertę na rynku');
+    await pb.select('[data-f="cls"]', 'mag'); await W(700);
+    ok(!(await ui(pb)).mk.list.some((x) => x.it.u === wpn.u), 'filtr klasy (Mag) ukrywa broń wojownika');
+    await pb.select('[data-f="cls"]', ''); await W(700);
+    await pb.screenshot({ path: `${SHOTS}/13_market_phone.png` });
+    const goldB0 = (await ui(pb)).mk.gold;
+    await pb.tap(`[data-mk]`); await W(300);
+    await pb.tap('.ui-detail [data-ia="buy"]'); await W(1500);
+    const gB = (await ui(pb)).gear;
+    ok(gB && gB.bag.some((x) => x.u === wpn.u) && gB.gold === goldB0 - 7, `B kupuje przedmiot (złoto ${goldB0} → ${gB && gB.gold})`);
+    await W(1200);
+    gA = (await ui(pa)).gear;
+    ok(gA && gA.gold > goldA0 && !gA.bag.some((x) => x.u === wpn.u), `A dostaje złoto ze sprzedaży (${goldA0} → ${gA && gA.gold}, podatek 5%)`);
+    await pa.keyboard.press('Escape'); await pb.tap('.ui-x[data-close]').catch(() => {}); await W(300);
+    // ---------- guild ----------
+    console.log('Gildia');
+    await pa.keyboard.press('u'); await W(600);
+    await pa.type('#gdCreate input[name=name]', 'Strażnicy Testu'); await pa.type('#gdCreate input[name=tag]', 'ST');
+    await pa.click('#gdCreate button[type=submit]'); await W(900);
+    let gdA = (await ui(pa)).gd;
+    ok(gdA && gdA.g && gdA.g.tag === 'ST' && gdA.g.my === 2, 'A zakłada gildię [ST] (Mistrz)');
+    if (!(gdA && gdA.g)) console.log('    ', JSON.stringify(gdA), (await msgsOf(pa)).slice(-4).join(' | '), await pa.evaluate(() => window.ARDAN_UI_STATE.open));
+    await pa.type('#gdInv input[name=n]', B.nick); await pa.click('#gdInv button[type=submit]'); await W(900);
+    ok(await pb.$eval('#uiToasts', (e) => e.textContent.includes('zaprasza cię do gildii')).catch(() => false), 'B dostaje zaproszenie do gildii');
+    await pb.tap('#uiToasts [data-ga="accept"]'); await W(1200);
+    const gdB = (await ui(pb)).gd;
+    ok(gdB && gdB.g && gdB.g.members.length === 2, 'B dołącza – gildia ma 2 członków');
+    await W(3500);
+    ok(((await snap(pa)).o.find((o) => o.n === B.nick) || {}).gt === 'ST', 'tag gildii [ST] nad głową B');
+    await cmd(pb, '/gi Witaj w gildii!'); await W(600);
+    ok((await msgsOf(pa)).some((m) => m.includes('c-gu') && m.includes('Witaj w gildii')), 'czat gildii działa');
+    await pa.click('.ui-x[data-close]').catch(() => {});
+    await pb.evaluate(() => window.ARDAN_UI.panel('gd')); await W(700);
+    await pb.screenshot({ path: `${SHOTS}/14_guild_phone.png` });
+    await pb.tap('.ui-x[data-close]').catch(() => {}); await W(200);
+    // ---------- trade ----------
+    console.log('Handel');
+    await pa.evaluate((n) => { const o = window.ARDAN_DEBUG && Object.values(window.ARDAN_DEBUG.last.o).find((x) => x.n === n); window.ARDAN_UI.playerTap({ i: o.i, n: o.n, c: o.c, l: o.l, area: window.ARDAN_DEBUG.last.a, x: o.x, y: o.y, gt: o.gt }); }, B.nick); await W(300);
+    await pa.click('[data-pa="trade"]'); await W(700);
+    ok(await pb.$eval('#uiToasts', (e) => e.textContent.includes('handlować')).catch(() => false), 'B dostaje prośbę o handel');
+    await pb.tap('#uiToasts [data-ta="accept"]'); await W(900);
+    ok(await pa.$('#trGold').then((e) => !!e) && await pb.$('#trGold').then((e) => !!e), 'okno wymiany otwarte u obu graczy');
+    const goldA1 = (await ui(pa)).gear.gold, goldB1 = (await ui(pb)).gear.gold;
+    await pa.$eval('#trGold', (e) => { e.value = '5'; e.dispatchEvent(new Event('change', { bubbles: true })); }); await W(500);
+    await pa.click('[data-tr="ok"]'); await W(300); await pb.tap('[data-tr="ok"]'); await W(1800);
+    ok((await ui(pa)).gear.gold === goldA1 - 5 && (await ui(pb)).gear.gold === goldB1 + 5, 'wymiana: 5 zł od A do B');
+    // ---------- PvP ----------
+    console.log('PvP');
+    const okA = await walkTo(pa, 19, 22, 20000) && await walkExact(pa, 19, 22, 15000);
+    const okB = await walkTo(pb, 20, 22, 20000) && await walkExact(pb, 20, 22, 15000);
+    ok(okA && okB, 'obaj gracze na Arenie Osady (strefa PvP)');
+    await W(500);
+    ok(await pa.$eval('#uiZone', (e) => !e.hidden && e.textContent.includes('Arena')), 'oznaczenie strefy PvP na ekranie');
+    await pa.keyboard.press('p'); await W(800);
+    const duelBtn = await pa.$(`[data-duel]`);
+    ok(!!duelBtn, 'panel PvP: B na liście do wyzwania');
+    await cmd(pa, '/opusc'); await W(500);
+    if (duelBtn) await pa.click('[data-duel]');
+    await W(400); await pa.click('[data-duel]').catch(() => {});
+    const duel = await pa.waitForSelector('#battle', { timeout: 4000 }).then(() => true).catch(() => false) && await pb.waitForSelector('#battle', { timeout: 4000 }).then(() => true).catch(() => false);
+    ok(duel, 'pojedynek turowy u obu graczy');
+    ok(await pb.$eval('#battle', (e) => e.textContent.includes('Pojedynek')), 'ekran pojedynku PvP');
+    await pa.click('#btAuto'); await pb.tap('#btAuto'); await pa.click('#battle [data-spd="3"]');
+    await pa.waitForSelector('#btEnd:not([hidden])', { timeout: 90000 }).catch(() => {});
+    await pb.waitForSelector('#btEnd:not([hidden])', { timeout: 10000 }).catch(() => {});
+    const eA = await pa.$eval('#btEnd', (e) => e.textContent).catch(() => ''), eB = await pb.$eval('#btEnd', (e) => e.textContent).catch(() => '');
+    ok(/pkt rankingu/.test(eA) && /pkt rankingu/.test(eB) && (/Zwycięstwo/.test(eA) !== /Zwycięstwo/.test(eB)), 'pojedynek rozstrzygnięty, punkty rankingu');
+    await pa.click('#btEnd [data-ba="close"]').catch(() => {}); await pb.tap('#btEnd [data-ba="close"]').catch(() => {});
+    await pa.keyboard.press('p'); await W(900);
+    const pv = (await ui(pa)).pvp;
+    ok(pv && pv.rank.length === 2 && pv.rank[0].pts + pv.rank[1].pts === 2000 && pv.rank[0].pts > 1000, `ranking PvP (${pv && pv.rank.map((x) => x.n + ' ' + x.pts).join(', ')})`);
+    await pa.screenshot({ path: `${SHOTS}/15_pvp_ranking_desktop.png` });
+    await pa.keyboard.press('Escape');
     // ---------- persistence ----------
     console.log('Zapis postaci');
     const posB = (await snap(pb)).p;

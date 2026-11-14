@@ -43,7 +43,7 @@
   const CLASSES = { war: 'Wojownik', arc: 'Łucznik', mag: 'Mag' };
   const START_WEAPON = { war: 'club', arc: 'sbow', mag: 'wand' };
   const AREA_NAMES = { village: 'Osada Brzozowa', forest: 'Mroczny Bór', cave: 'Jaskinia Cieni', swamp: 'Bagna Żałoby', town: 'Srebrnogród', mount: 'Szczyty Szronu', desert: 'Ruiny Piasków' };
-  const newState = (cls) => ({ v: 2, cls, lvl: 1, xp: 0, hp: 9999, mp: 9999, gold: 20, area: 'village', x: 18, y: 17, inv: [{ id: 'pot', n: 3 }], eq: { w: START_WEAPON[cls], a: 'shirt' }, q: {}, kills: 0, intro: false, track: '', seen: { village: 1 }, mmz: 1 });
+  const newState = (cls) => ({ v: 2, cls, lvl: 1, xp: 0, hp: 9999, mp: 9999, gold: 150, area: 'village', x: 18, y: 17, inv: [{ id: 'pot', n: 3 }], eq: { w: START_WEAPON[cls], a: 'shirt' }, q: {}, kills: 0, intro: false, track: '', seen: { village: 1 }, mmz: 1 });
   const NEWS = [
     { date: '2026-11-14', title: 'ARDAN wchodzi w świat wieloosobowy!', text: 'Od dziś wędrujesz po Ardanie razem z innymi graczami. Wspólne potwory, wspólne krainy i czat – globalny, regionalny oraz prywatne szepty (/w nick).' },
     { date: '2026-11-14', title: 'Drużyny', text: 'Zaproś znajomych do drużyny (/zapros nick) – do 5 osób, wspólne doświadczenie i postęp zadań, własny czat drużyny.' },
@@ -334,7 +334,7 @@
     load(charId, userId) {
       if (typeof charId === 'string' && charId[0] === 'b') {
         const i = +charId.slice(1), b = BOT_DEFS[i]; if (!b) return null;
-        const st = newState(b.cls); st.lvl = b.lvl; st.intro = true; st.gold = 300;
+        const st = newState(b.cls); st.lvl = b.lvl; st.intro = true; st.gold = 5000;
         return { id: charId, nick: b.nick, cls: b.cls, data: st, bot: i };
       }
       const c = db().chars.find((x) => x.id === charId && x.user === userId); if (!c) return null;
@@ -372,7 +372,12 @@
     function join(i) {
       const ws = { readyState: 1, send() {}, close() {} };
       const p = world.join(ws, { id: 0 }, 'b' + i); if (!p) return;
-      p.bot = { home: { x: 18, y: 17 }, t: 0, party: false, recv(msg) {
+      const arena = i === 3 || i === 4;
+      p.bot = { home: arena ? { x: 18 + i - 3, y: 22 } : { x: 18, y: 17 }, rad: arena ? 2 : 9, t: 0, party: false,
+        onTrade(q) { setTimeout(() => { if (world.players.get(p.pid) !== p) return; world.trade.onMsg(p, { t: 'tr', a: 'accept' }); say(p, 'g', `/w ${q.nick} Jasne, pohandlujmy! Zaakceptuję, gdy będziesz gotów.`); }, 1200); },
+        onGuildInvite(q, g) { setTimeout(() => { if (world.players.get(p.pid) !== p) return; world.guilds.onMsg(p, { t: 'gd', a: 'accept' }); setTimeout(() => world.chat.commands.gi && world.chat.commands.gi(p, 'Dzięki za zaproszenie do gildii! :)'), 800); }, 2000); },
+        recv(msg) {
+        if (msg.t === 'tr' && msg.open && msg.them && msg.them.ok && !msg.me.ok) setTimeout(() => { if (p.trade) world.trade.onMsg(p, { t: 'tr', a: 'ok' }); }, 900);
         if (msg.t === 'chat' && msg.ch === 'w' && msg.to === p.nick && msg.from !== p.nick) setTimeout(() => say(p, 'g', `/w ${msg.from} ${WHISPER_REPLIES[Math.floor(Math.random() * WHISPER_REPLIES.length)]}`), 1800 + Math.random() * 1500);
         if (msg.t === 'party') {
           const inP = msg.m.length > 1;
@@ -381,7 +386,26 @@
         }
       } };
       bots.push(p);
+      seedBot(p, i);
     }
+    const store = window.DEMO_REQUIRE('./store'), items = window.DEMO_REQUIRE('./items');
+    const SEED_PVP = [[1086, 7, 2], [1012, 3, 3], [1052, 5, 2], [968, 2, 4], [941, 1, 5]];
+    function seedBot(p, i) {
+      if (i === 3 || i === 4) { const P = p.api.P(); const x = i === 3 ? 17 : 21; if (!p.api.solid('village', x, 22)) { P.x = x; P.y = 22; } }
+      const rk = store.get('pvp', {});
+      if (!rk[p.ckey]) { const [pts, w, l] = SEED_PVP[i]; rk[p.ckey] = { n: p.nick, cls: BOT_DEFS[i].cls, lvl: BOT_DEFS[i].lvl, pts, w, l }; store.set('pvp', rk); }
+      if (i === 0 || i === 2) {
+        const gd = world.guilds.data(); let g = Object.values(gd.g).find((x) => x.tag === 'SM');
+        if (!g && i === 0) g = world.guilds.create(p, 'Strażnicy Mgły', 'SM', true);
+        else if (g && !g.m[p.ckey]) world.guilds.add(p, g, i === 0 ? 2 : 1);
+        else if (g) { p.guildId = g.id; p.guildTag = g.tag; }
+      }
+      const mk = world.market.data();
+      if (mk.list.filter((x) => x.s === p.ckey).length < 2 && mk.list.length < 14) {
+        for (let k = 0; k < 2; k++) { const it = items.randomItem(Math.max(1, BOT_DEFS[i].lvl - 3 + k * 3), k === 1 && Math.random() < 0.5 ? 1 : 0); if (it) world.market.list(p, it, Math.max(5, Math.round(it.v * (1.4 + Math.random())))); }
+      }
+    }
+    let buyT = 40;
     return {
       name: 'bots',
       start() { join(0); join(1); join(2); setTimeout(() => join(3), 7000); setTimeout(() => join(4), 16000); },
@@ -391,6 +415,11 @@
         t += dt;
         if (player && !greeted && t > 4 && bots[0]) { greeted = true; say(bots[0], 'g', `Cześć ${player.nick}! Witaj w Ardanie :)`); setTimeout(() => bots[2] && say(bots[2], 'g', 'Zacznij od Sołtysa Radomira, da ci pierwsze zadanie. Strzałka pokaże drogę'), 4500); }
         if (player && inviteAt > 0 && t > inviteAt && bots[1]) { inviteAt = t > 100 ? -1 : t + 70; if (!player.partyId) say(bots[1], 'g', '/zapros ' + player.nick); else inviteAt = -1; }
+        if (player && t > buyT && bots.length) {
+          buyT = t + 35 + Math.random() * 30;
+          const mine = world.market.data().list.filter((x) => x.s === player.ckey);
+          if (mine.length && Math.random() < 0.6) { const L = mine[Math.floor(Math.random() * mine.length)]; const b = bots[Math.floor(Math.random() * bots.length)]; if (world.players.get(b.pid) === b && L.pr <= Math.max(400, L.it.v * 4)) world.market.buy(b, L.id); }
+        }
         if (t > nextLine && bots.length) { nextLine = t + 14 + Math.random() * 16; const [ch, text] = BOT_LINES[lineIdx++ % BOT_LINES.length]; say(bots[Math.floor(Math.random() * bots.length)], ch, text); }
         for (const b of bots) {
           if (world.players.get(b.pid) !== b) continue;
@@ -398,7 +427,7 @@
           B.t -= dt; if (B.t > 0) continue;
           let tx = null, ty = null;
           if (B.party && player) { const Q = player.api.P(); if (Q.area === P.area && Math.max(Math.abs(Q.x - P.x), Math.abs(Q.y - P.y)) > 2) { tx = Q.x; ty = Q.y; } }
-          if (tx === null && P.area === 'village' && Math.max(Math.abs(B.home.x - P.x), Math.abs(B.home.y - P.y)) > 9) { tx = B.home.x; ty = B.home.y; }
+          if (tx === null && P.area === 'village' && Math.max(Math.abs(B.home.x - P.x), Math.abs(B.home.y - P.y)) > B.rad) { tx = B.home.x; ty = B.home.y; }
           if (tx !== null) { b.mx = Math.sign(tx - P.x); b.my = Math.sign(ty - P.y); if (Math.random() < 0.25) b.mx = b.mx ? b.mx : (Math.random() < 0.5 ? -1 : 1); B.t = 0.35; }
           else if (Math.random() < 0.35) { b.mx = 0; b.my = 0; B.t = 1 + Math.random() * 2.5; }
           else { b.mx = [-1, 0, 1][Math.floor(Math.random() * 3)]; b.my = [-1, 0, 1][Math.floor(Math.random() * 3)]; B.t = 0.5 + Math.random() * 1.6; }

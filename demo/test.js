@@ -74,6 +74,106 @@ async function flow(browser, label, vp, shots) {
   await pg.waitForFunction(() => document.querySelectorAll('#party .pm').length >= 2, { timeout: 5000 }).then(() => ok(true, `${label}: dołączono do drużyny`)).catch(() => ok(false, `${label}: drużyna`));
   await W(4000);
   if (shots) await pg.screenshot({ path: `shots/${shots}_5_party.png` });
+  // ---------- nowa runda: walka turowa, ekwipunek, rynek, gildia, PvP ----------
+  const snap = () => pg.evaluate(() => JSON.parse(JSON.stringify(window.ARDAN_DEBUG.last)));
+  const ui = () => pg.evaluate(() => JSON.parse(JSON.stringify(window.ARDAN_UI_STATE)));
+  const tap = async (sel) => { if (vp.hasTouch) await pg.tap(sel); else await pg.click(sel); };
+  async function walkExact(tx, ty, maxMs, tol) {
+    const t0 = Date.now(); tol = tol || 1; let side = 0;
+    while (Date.now() - t0 < maxMs) {
+      const s = await snap(); const dx = tx - s.p.x, dy = ty - s.p.y;
+      if (Math.abs(dx) <= tol && Math.abs(dy) <= tol) return true;
+      const before = [s.p.x, s.p.y];
+      const ks = [];
+      if (Math.abs(dx) > tol) ks.push(dx < 0 ? 'ArrowLeft' : 'ArrowRight');
+      if (Math.abs(dy) > tol) ks.push(dy < 0 ? 'ArrowUp' : 'ArrowDown');
+      const k = ks[side % ks.length]; await pg.keyboard.down(k); await W(260); await pg.keyboard.up(k); await W(60);
+      const s2 = await snap(); if (s2.p.x === before[0] && s2.p.y === before[1]) side++;
+    }
+    return false;
+  }
+  { const m1 = (await snap()).m.map((r) => r[0] + ',' + r[1]).join(';'); await W(3000); const m2 = (await snap()).m.map((r) => r[0] + ',' + r[1]).join(';');
+    ok(m1 === m2, `${label}: potwory stoją w miejscu`); }
+  let s0 = await snap();
+  const alive = s0.m.map((r, i) => ({ i, x: r[0], y: r[1], dead: r[3] & 1 })).filter((m) => !m.dead).sort((a, b) => Math.hypot(a.x - s0.p.x, a.y - s0.p.y) - Math.hypot(b.x - s0.p.x, b.y - s0.p.y));
+  const tg = alive[0];
+  await walkExact(tg.x, tg.y, 20000, 2);
+  await pg.keyboard.press('f');
+  ok(await pg.waitForSelector('#battle', { timeout: 5000 }).then(() => true).catch(() => false), `${label}: walka turowa otwarta`);
+  await W(700);
+  ok((await pg.$$('#battle .bf.al')).length >= 2, `${label}: członek drużyny (bot) dołącza do walki`);
+  if (shots) await pg.screenshot({ path: `shots/${shots}_6_combat.png` });
+  await tap('#battle [data-ba="atk"]').catch(() => {});
+  await pg.waitForFunction(() => document.querySelectorAll('#btLog .l').length >= 3, { timeout: 25000 }).catch(() => {});
+  ok((await pg.$$('#btLog .l')).length >= 3, `${label}: runda rozegrana (dziennik walki)`);
+  await tap('#btAuto'); await tap('#battle [data-spd="3"]');
+  await pg.waitForSelector('#btEnd:not([hidden])', { timeout: 60000 }).catch(() => {});
+  ok(/Zwycięstwo/.test(await pg.$eval('#btEnd', (e) => e.textContent).catch(() => '')), `${label}: zwycięstwo w walce automatycznej`);
+  if (shots) await pg.screenshot({ path: `shots/${shots}_7_combat_win.png` });
+  await tap('#btEnd [data-ba="close"]'); await W(300);
+  // equipment
+  await pg.evaluate(() => window.ARDAN_UI.panel('menu')); await W(300);
+  await tap('[data-open="eq"]'); await W(700);
+  ok((await pg.$$('.doll .slot')).length === 9, `${label}: panel postaci z 9 miejscami`);
+  let G = (await ui()).gear;
+  ok(G && G.gear.weapon && G.gear.weapon.c === 'mag', `${label}: broń maga w slocie (${G && G.gear.weapon && G.gear.weapon.n})`);
+  if (shots) await pg.screenshot({ path: `shots/${shots}_8_equipment.png` });
+  await tap('.slot[data-slot="weapon"]'); await W(300);
+  if (shots) await pg.screenshot({ path: `shots/${shots}_8b_item_card.png` });
+  await tap('.ui-detail [data-ia="unequip"]'); await W(1300);
+  G = (await ui()).gear;
+  const wp = G.bag.find((x) => x.s === 'weapon');
+  ok(!!wp, `${label}: broń zdjęta do torby`);
+  await tap(`.bi[data-bag="${wp.u}"]`); await W(300);
+  await pg.$eval('#mkPrice', (e) => { e.value = '9'; });
+  await tap('.ui-detail [data-ia="list"]'); await W(700);
+  // market
+  await tap('.ui-x[data-close]'); await W(200);
+  await pg.evaluate(() => window.ARDAN_UI.panel('mk')); await W(900);
+  let M = (await ui()).mk;
+  ok(M && M.list.length >= 4, `${label}: rynek – oferty botów: ${M && M.list.length}`);
+  ok(M && M.mine.some((x) => x.it.u === wp.u), `${label}: moja oferta na rynku`);
+  if (shots) await pg.screenshot({ path: `shots/${shots}_9_market.png` });
+  const cheap = M.list.filter((x) => x.pr <= M.gold).sort((a, b) => a.pr - b.pr)[0];
+  if (cheap) { await tap(`[data-mk="${cheap.id}"]`); await W(300); await tap('.ui-detail [data-ia="buy"]'); await W(1500); }
+  G = (await ui()).gear;
+  ok(cheap && G.bag.some((x) => x.u === cheap.it.u), `${label}: kupiono ${cheap && cheap.it.n} za ${cheap && cheap.pr} zł`);
+  await tap('.ui-x[data-close]'); await W(200);
+  // guild
+  await pg.evaluate(() => window.ARDAN_UI.panel('gd')); await W(600);
+  await pg.type('#gdCreate input[name=name]', 'Bractwo Burzy'); await pg.type('#gdCreate input[name=tag]', 'BB');
+  await tap('#gdCreate button[type=submit]'); await W(900);
+  ok(((await ui()).gd || {}).g && (await ui()).gd.g.tag === 'BB', `${label}: założono gildię [BB]`);
+  await pg.type('#gdInv input[name=n]', 'Wilczyca'); await tap('#gdInv button[type=submit]');
+  await pg.waitForFunction(() => window.ARDAN_UI_STATE.gd && window.ARDAN_UI_STATE.gd.g && window.ARDAN_UI_STATE.gd.g.members.length >= 2, { timeout: 9000 }).catch(() => {});
+  ok(((await ui()).gd.g.members || []).length >= 2, `${label}: bot Wilczyca dołącza do gildii`);
+  await W(1200);
+  if (shots) await pg.screenshot({ path: `shots/${shots}_10_guild.png` });
+  await tap('.ui-x[data-close]'); await W(200);
+  // PvP
+  await pg.evaluate(() => { const c = document.getElementById('chatIn'); c.value = '/opusc'; document.getElementById('chatForm').requestSubmit(); });
+  ok(await walkExact(19, 22, 30000, 1), `${label}: na Arenie Osady`);
+  await W(600);
+  await pg.evaluate(() => window.ARDAN_UI.panel('pvp')); await W(900);
+  ok(await pg.$eval('#uiZone', (e) => !e.hidden), `${label}: oznaczenie strefy PvP`);
+  const pv = (await ui()).pvp;
+  ok(pv && pv.rank.length >= 5, `${label}: ranking PvP (${pv && pv.rank.length} graczy)`);
+  let duel = await pg.$('[data-duel]');
+  ok(!!duel, `${label}: bot do wyzwania na arenie`);
+  if (duel) {
+    let started = false;
+    for (let k = 0; k < 4 && !started; k++) {
+      if (k) { await pg.evaluate(() => window.ARDAN_UI.close()); await W(1500); await pg.evaluate(() => window.ARDAN_UI.panel('pvp')); await W(700); }
+      if (await pg.$('[data-duel]')) await tap('[data-duel]');
+      started = await pg.waitForSelector('#battle', { timeout: 3000 }).then(() => true).catch(() => false);
+    }
+    ok(started, `${label}: pojedynek PvP z botem`);
+    await W(500); if (!(await pg.$eval('#btAuto', (e) => e.checked).catch(() => true))) await tap('#btAuto').catch(() => {});
+    await pg.waitForSelector('#btEnd:not([hidden])', { timeout: 90000 }).catch(() => {});
+    ok(/pkt rankingu/.test(await pg.$eval('#btEnd', (e) => e.textContent).catch(() => '')), `${label}: wynik pojedynku i punkty rankingu`);
+    if (shots) await pg.screenshot({ path: `shots/${shots}_11_pvp_result.png` });
+    await tap('#btEnd [data-ba="close"]').catch(() => {});
+  }
   // reload keeps character saved
   await pg.evaluate(() => { location.hash = '#/postacie'; });
   await pg.waitForSelector('body[data-page=chars] .char', { timeout: 10000 });

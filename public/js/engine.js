@@ -3,11 +3,13 @@ function createArdan(canvas, opts) {
     // SRV: headless authoritative instance on the server (one per connected player, shared mobs).
     // NET: online client - renders server state and only sends intents.
     const SRV = opts.server || null, NET = opts.net || null;
+    // TB: turn-based combat (online): monsters never attack on the map, fights happen on the battle screen.
+    const TB = !!(SRV || NET);
     const FONT = opts.font || "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
     const c2 = canvas.getContext("2d");
     if (!c2)
         return () => { };
-    const ctx = c2;
+    let ctx = c2;
     const TS = 32;
     let destroyed = false;
     let raf = 0;
@@ -1579,6 +1581,14 @@ function createArdan(canvas, opts) {
         st(a, d.x, d.y, a.base); });
     if (!SRV)
         Object.keys(AREAS).forEach((k) => renderMini(AREAS[k]));
+    const PVPZ = [
+        { area: "village", x0: 14, y0: 19, x1: 24, y1: 25, n: "Arena Osady" },
+        { area: "town", x0: 12, y0: 21, x1: 26, y1: 28, n: "Arena Srebrnogrodu" },
+        { area: "desert", x0: 0, y0: 0, x1: 99, y1: 99, n: "Ruiny Piasków (cała kraina)" },
+    ];
+    const pvpAt = (area, x, y) => { for (const z of PVPZ)
+        if (z.area === area && x >= z.x0 && x <= z.x1 && y >= z.y0 && y <= z.y1)
+            return z; return null; };
     const SHOPN = { smith: "Kuźnia Bogumiła", herbs: "Chata Zielarki", swamp: "Zapasy Rybaka", armory: "Zbrojownia Wojsława", alch: "Pracownia Alchemiczki", nomad: "Kram Nomady" };
     const SHOPS = { smith: ["$w2", "$w3", "$a2", "$a3", "$a4"], herbs: ["pot", "bigpot", "mpot"], swamp: ["pot", "bigpot", "mpot"], armory: ["$w4", "$w5", "$a4", "$a5"], alch: ["bigpot", "elix", "mpot"], nomad: ["bigpot", "elix", "mpot"] };
     const QORDER = ["rats", "wolves", "tusks", "wraith", "letter", "drown", "wisps", "witchq", "swolves", "hearts", "dragonq", "stings", "mummies", "kingq"];
@@ -1742,10 +1752,20 @@ function createArdan(canvas, opts) {
         skcd: [0, 0, 0], buffDef: 0, haste: 0, combat: 0, nomp: 0, resp: ["village", 18, 17] };
     const C = () => CLS[P.cls || "war"];
     const xpNext = (l) => Math.floor(40 * Math.pow(l, 1.65));
-    const maxHp = () => Math.round(C().hp0 + (P.lvl - 1) * C().hpL + (P.eq.a ? ITEMS[P.eq.a].def * 2 : 0));
-    const maxMp = () => Math.round(C().mp0 + (P.lvl - 1) * C().mpL + (P.eq.a && ITEMS[P.eq.a].mp ? ITEMS[P.eq.a].mp : 0));
-    const atk = () => Math.round(C().atk0 + P.lvl * C().atkL + (P.eq.w ? ITEMS[P.eq.w].atk : 0));
-    const def = () => Math.round((P.lvl * C().defL + (P.eq.a ? ITEMS[P.eq.a].def : 0)) * (pl.buffDef > 0 ? 1.6 : 1));
+    const GEARON = () => !!(P.gear && typeof P.gear === "object");
+    const gs = (k) => { let s0 = 0; const g = P.gear; if (g)
+        for (const sl of Object.keys(g)) {
+            const it = g[sl];
+            if (it && it.st && typeof it.st[k] === "number")
+                s0 += it.st[k];
+        } return s0; };
+    const maxHp = () => Math.round(C().hp0 + (P.lvl - 1) * C().hpL + (GEARON() ? gs("hp") : (P.eq.a ? ITEMS[P.eq.a].def * 2 : 0)));
+    const maxMp = () => Math.round(C().mp0 + (P.lvl - 1) * C().mpL + (GEARON() ? gs("mp") : (P.eq.a && ITEMS[P.eq.a].mp ? ITEMS[P.eq.a].mp : 0)));
+    const atk = () => Math.round(C().atk0 + P.lvl * C().atkL + (GEARON() ? gs("atk") : (P.eq.w ? ITEMS[P.eq.w].atk : 0)));
+    const def = () => Math.round((P.lvl * C().defL + (GEARON() ? gs("def") : (P.eq.a ? ITEMS[P.eq.a].def : 0))) * (pl.buffDef > 0 ? 1.6 : 1));
+    const critC = () => C().crit + (GEARON() ? gs("crit") / 100 : 0);
+    const dodgeC = () => C().dodge + (GEARON() ? gs("dodge") / 100 : 0);
+    const statsAll = () => ({ atk: atk(), def: def(), hp: maxHp(), mp: maxMp(), crit: Math.round(critC() * 100), dodge: Math.round(dodgeC() * 100), res: C().res });
     const canUse = (id) => { const it = ITEMS[id]; return !it.cls || !P.cls || it.cls.split(" ").indexOf(P.cls) >= 0; };
     const resolve = (id) => { if (id.charAt(0) !== "$")
         return id; const g = GEAR[P.cls || "war"]; return g[id.charAt(1)][Number(id.charAt(2)) - 1]; };
@@ -2242,8 +2262,13 @@ function createArdan(canvas, opts) {
             if (R() < dr[1])
                 items.push([resolve(dr[0]), 1]);
         const gold = ri(m.d.gold[0], m.d.gold[1]);
-        if (items.length || gold > 0)
-            bags.push({ area: P.area, x: m.x, y: m.y, items, gold, life: 90 });
+        if (items.length || gold > 0) {
+            const bg = { area: P.area, x: m.x, y: m.y, items, gold, life: 90 };
+            if (TB)
+                pickBag(bg);
+            else
+                bags.push(bg);
+        }
         guideT = 0;
     }
     function hurtPlayer(m, raw, mult) {
@@ -2929,6 +2954,8 @@ function createArdan(canvas, opts) {
                 continue;
             m.hit = Math.max(0, m.hit - dt);
             m.anim = Math.max(0, m.anim - dt);
+            if (m.inB && !m.dead)
+                continue;
             if (m.dead) {
                 m.rt -= dt;
                 if (m.rt <= 0 && cheb(m.hx, m.hy, P.x, P.y) > 5 && !mobAt(m.hx, m.hy)) {
@@ -2947,6 +2974,10 @@ function createArdan(canvas, opts) {
                 m.mt = Math.min(1, m.mt + dt * m.d.spd * (m.frz > 0 ? 0.3 : 1));
                 continue;
             }
+            if (TB) {
+                m.aggro = false;
+                continue;
+            }
             if (m.frz > 0) {
                 m.frz -= dt;
                 continue;
@@ -2956,7 +2987,7 @@ function createArdan(canvas, opts) {
             const home = cheb(m.x, m.y, m.hx, m.hy);
             if (pl.dead)
                 m.aggro = false;
-            if (!m.aggro && !pl.dead && m.d.aggro > 0 && dist <= m.d.aggro && P.lvl < m.d.lvl + 6)
+            if (!TB && !m.aggro && !pl.dead && m.d.aggro > 0 && dist <= m.d.aggro && P.lvl < m.d.lvl + 6)
                 m.aggro = true;
             if (m.aggro && (home > (m.d.boss ? 8 : 11) || dist > 12)) {
                 m.aggro = false;
@@ -3338,6 +3369,7 @@ function createArdan(canvas, opts) {
                     m.dead = dead;
                     m.aggro = (r[3] & 2) === 2;
                     m.frz = (r[3] & 4) ? 1 : 0;
+                    m.inB = (r[3] & 32) === 32;
                     if ((r[3] & 8) && m.hit <= 0)
                         m.hit = 0.15;
                     if ((r[3] & 16) && m.anim <= 0)
@@ -3364,6 +3396,9 @@ function createArdan(canvas, opts) {
                 e.dead = o.dd;
                 e.area = msg.a;
                 e.bd = o.bd;
+                e.gt = o.gt;
+                e.fb = o.fb;
+                e.i = o.i;
                 if (o.an > e.an + 0.05)
                     e.an = o.an;
                 if (o.ht > e.hit + 0.05)
@@ -3488,8 +3523,8 @@ function createArdan(canvas, opts) {
         if (!P.intro && !dlg && !netIntro) {
             netIntro = true;
             dlg = { name: "ARDAN", text: (touchMode
-                    ? "Witaj w świecie ARDAN! Chodzisz strzałkami w lewym dolnym rogu (przytrzymaj; dwie naraz – po skosie). Złota strzałka i kropki wskazują drogę do celu zadania. Dotknij potwora, by go wybrać, i bij przyciskiem ataku. Z postacią porozmawiasz, stojąc obok niej. Czat otworzysz przyciskiem z dymkiem."
-                    : "Witaj w świecie ARDAN! WASD/strzałki – ruch, klik na potwora – wybór celu, Spacja/F – atak, 1/2/3 – umiejętności, E – rozmowa (stojąc obok), I – torba, Q – zadania, M – mapa, H/G – mikstury, C – czat. Inni gracze są tu razem z tobą!"),
+                    ? "Witaj w świecie ARDAN! Chodzisz strzałkami w lewym dolnym rogu (przytrzymaj; dwie naraz – po skosie). Złota strzałka i kropki wskazują drogę do celu zadania. Dotknij potwora (lub przycisk ataku obok niego), aby rozpocząć walkę turową – możesz włączyć walkę automatyczną. Dotknij innego gracza, by handlować, zaprosić go lub wyzwać na arenie PvP. Menu (☰) otwiera ekwipunek, rynek, gildię i ranking PvP."
+                    : "Witaj w świecie ARDAN! WASD/strzałki – ruch. Klik na potwora albo Spacja/E obok niego – walka turowa (z opcją walki automatycznej). Klik na gracza – handel, drużyna, gildia, pojedynek PvP. I – ekwipunek, R – rynek, U – gildia, P – PvP, Q – zadania, M – mapa, C – czat."),
                 opts: [{ l: "Zaczynajmy!", fn: () => { dlg = null; act({ a: "intro" }); } }] };
         }
     }
@@ -3505,7 +3540,10 @@ function createArdan(canvas, opts) {
         }
         drawHuman(op[0], op[1], o.dir || 0, o.mt < 1 ? o.phase : 0, c.look, w, ar, o.hit > 0, o.an, c.wk);
         const inParty = !!(NET && NET.party && NET.party[o.i]);
-        label(op[0] + 16, op[1] - 8, (inParty ? "◆ " : "") + o.n + " · " + o.l, inParty ? "#8fff8f" : "#9fe0ff");
+        const inZ = !!pvpAt(P.area, o.x, o.y) && !!pvpAt(P.area, P.x, P.y);
+        if (o.fb)
+            label(op[0] + 16, op[1] - 22, "⚔ walczy", "#ffb347");
+        label(op[0] + 16, op[1] - 8, (inParty ? "◆ " : "") + (o.gt ? "[" + o.gt + "] " : "") + o.n + " · " + o.l, inParty ? "#8fff8f" : inZ ? "#ff9a8a" : "#9fe0ff");
         const hpk = o.mh ? clamp(o.hp / o.mh, 0, 1) : 1;
         ctx.fillStyle = "rgba(0,0,0,0.6)";
         ctx.fillRect(op[0] + 4, op[1] - 4, 24, 4);
@@ -4801,6 +4839,18 @@ function createArdan(canvas, opts) {
             }
             ctx.globalAlpha = 1;
         }
+        for (const z of PVPZ)
+            if (z.area === P.area && z.x1 < 99) {
+                const zx = z.x0 * TS, zy = z.y0 * TS, zw = (z.x1 - z.x0 + 1) * TS, zh = (z.y1 - z.y0 + 1) * TS;
+                ctx.fillStyle = "rgba(190,40,40,0.13)";
+                ctx.fillRect(zx, zy, zw, zh);
+                ctx.strokeStyle = "rgba(255,90,70,0.75)";
+                ctx.lineWidth = 2;
+                ctx.setLineDash([8, 6]);
+                ctx.strokeRect(zx + 1, zy + 1, zw - 2, zh - 2);
+                ctx.setLineDash([]);
+                label(zx + zw / 2, zy + 14, "⚔ " + z.n + " – strefa PvP", "#ffb0a0");
+            }
         for (const b of bags)
             if (b.area === P.area)
                 drawBag(b);
@@ -4813,7 +4863,10 @@ function createArdan(canvas, opts) {
                 ents.push({ y: d.y * TS, f: () => drawDecor(d) });
         for (const m of mobs[P.area])
             if (!m.dead)
-                ents.push({ y: rpos(m)[1], f: () => drawMob(m) });
+                ents.push({ y: rpos(m)[1], f: () => { drawMob(m); if (m.inB) {
+                        const mp = rpos(m);
+                        label(mp[0] + 16, mp[1] - 12 - (m.d.sc ? (m.d.sc - 1) * 26 : 0), "⚔ walka", "#ffb347");
+                    } } });
         if (NET)
             for (const k of Object.keys(others)) {
                 const o = others[k];
@@ -4835,7 +4888,7 @@ function createArdan(canvas, opts) {
                         fx.push({ k: "p", x: pp[0] + 6 + R() * 20, y: pp[1] + 10 + R() * 16, vx: 0, vy: -30, c: "#9dff9a", life: 0.4, max: 0.8 });
                     drawPlayerAt(pp[0], pp[1], pl.dir, pl.mt < 1 ? pl.phase : 0, pl.hit > 0, pl.anim);
                     if (NET && NET.nick)
-                        label(pp[0] + 16, pp[1] - 8, NET.nick + " · " + P.lvl, "#ffe9a8");
+                        label(pp[0] + 16, pp[1] - 8, (NET.gtag ? "[" + NET.gtag + "] " : "") + NET.nick + " · " + P.lvl, "#ffe9a8");
                 } });
         ents.sort((p, q) => p.y - q.y);
         for (const e of ents)
@@ -5133,6 +5186,11 @@ function createArdan(canvas, opts) {
             for (let i = 0; i < 3; i++)
                 g.fillRect(cx - r * 0.32 + i * r * 0.26, cy - r * 0.1, 3, 3);
         }
+        else if (kind === "menu") {
+            g.fillStyle = "#ffd25a";
+            for (let i = 0; i < 3; i++)
+                g.fillRect(cx - r * 0.45, cy - r * 0.38 + i * r * 0.32, r * 0.9, Math.max(2, r * 0.14));
+        }
         else if (kind === "quest") {
             g.fillStyle = "#efe0b8";
             g.fillRect(cx - r * 0.4, cy - r * 0.45, r * 0.8, r * 0.9);
@@ -5413,7 +5471,16 @@ function createArdan(canvas, opts) {
         const hintOn = !touchMode;
         circleBtn(W - 10 - ur, uy, ur, "map", () => { panel = panel === "map" ? "" : "map"; mapTab = "area"; }, hintOn ? "M" : "");
         circleBtn(W - 10 - ur * 3 - 8, uy, ur, "quest", () => { panel = panel === "quest" ? "" : "quest"; }, hintOn ? "Q" : "");
-        circleBtn(W - 10 - ur * 5 - 16, uy, ur, "bag", () => { panel = panel === "inv" ? "" : "inv"; invSel = -1; }, hintOn ? "I" : "");
+        circleBtn(W - 10 - ur * 5 - 16, uy, ur, "bag", () => { if (NET && NET.onPanel) {
+            panel = "";
+            NET.onPanel("inv");
+        }
+        else {
+            panel = panel === "inv" ? "" : "inv";
+            invSel = -1;
+        } }, hintOn ? "I" : "");
+        if (NET && NET.onPanel)
+            circleBtn(W - 10 - ur, uy + ur * 2 + 8, ur, "menu", () => { panel = ""; NET.onPanel("menu"); }, hintOn ? "R/U/P" : "");
         if (NET && NET.onChat)
             circleBtn(W - 10 - ur * 7 - 24, uy, ur, "chat", () => { NET.onChat(); }, hintOn ? "C" : "", NET.unread ? String(Math.min(9, NET.unread)) : undefined);
         if (banner > 0) {
@@ -6169,6 +6236,17 @@ function createArdan(canvas, opts) {
             return;
         const w = worldAt(p[0], p[1]);
         const tx = Math.floor(w[0] / TS), ty = Math.floor(w[1] / TS);
+        if (NET && NET.onPlayerTap)
+            for (const k of Object.keys(others)) {
+                const o = others[k];
+                if (o.area !== P.area || o.dead)
+                    continue;
+                const op = rpos(o);
+                if (Math.abs(op[0] + 16 - w[0]) < 15 && Math.abs(op[1] + 14 - w[1]) < 19) {
+                    NET.onPlayerTap(o);
+                    return;
+                }
+            }
         const m = mobUnder(w);
         if (m) {
             act({ a: "target", area: P.area, i: mobs[P.area].indexOf(m) });
@@ -6230,6 +6308,11 @@ function createArdan(canvas, opts) {
                 selCls = CLSORDER[(CLSORDER.indexOf(selCls) + 1) % 3];
             else if (k === "Enter" || k === " ")
                 pickClass(selCls);
+            for (const kk of Object.keys(keys))
+                keys[kk] = false;
+            return;
+        }
+        if (NET && NET.onKey && !dlg && NET.onKey(k)) {
             for (const kk of Object.keys(keys))
                 keys[kk] = false;
             return;
@@ -6338,6 +6421,13 @@ function createArdan(canvas, opts) {
     if (SRV)
         SRV.api = {
             tick: srvTick, pl, P: () => P, maxHp, maxMp,
+            stats: statsAll, items: ITEMS, mon: MON, gearIds: GEAR, sk: SK, cls: CLS, zones: PVPZ, pvpAt, npcs: NPCS, areas: AREAS,
+            kill: (m) => { if (m && !m.dead) {
+                m.hp = 0;
+                killMob(m);
+            } }, die: () => { if (!pl.dead)
+                die(); },
+            countItem, removeItem, addItem, log, solid: (a, x, y) => solidT(AREAS[a], x, y),
             drain: () => ({ fx: fx.splice(0, fx.length), msgs: msgs.splice(0, msgs.length) }),
             shots: () => shots, warns: () => warns, bags: () => bags,
             dlgView: () => dlg ? { name: dlg.name, text: dlg.text, opts: dlg.opts.map((o) => o.l) } : null,
@@ -6370,8 +6460,21 @@ function createArdan(canvas, opts) {
                 save();
             },
         };
+    const withCtx = (g, fn) => { const o = ctx; ctx = g; try {
+        fn();
+    }
+    finally {
+        ctx = o;
+    } };
     if (NET)
-        NET.api = { recv: netRecv, clearKeys: onBlur, log };
+        NET.api = { recv: netRecv, clearKeys: onBlur, log,
+            P: () => P, stats: statsAll, items: ITEMS, mon: MON, sk: SK, cls: CLS, zones: PVPZ, pvpAt, others: () => others, gearIds: GEAR,
+            drawMob: (g, k) => { if (MON[k])
+                withCtx(g, () => drawMob({ k, d: MON[k], x: 0, y: 0, fx: 0, fy: 0, mt: 1, hit: 0, anim: 0, dir: 0, hp: MON[k].hp, cd: 0, frz: 0 })); },
+            drawChar: (g, cls, w, a, dir) => { const c = CLS[cls] || CLS.war; withCtx(g, () => drawHuman(0, 0, dir || 0, 0, c.look, w && ITEMS[w] ? ITEMS[w].c : null, a && a !== "shirt" && ITEMS[a] ? ITEMS[a].c : null, false, 0, c.wk)); },
+            drawIcon: (g, id, x, y, sz) => { if (ITEMS[id])
+                withCtx(g, () => drawIcon(id, x, y, sz)); },
+        };
     return () => {
         destroyed = true;
         if (!SRV)

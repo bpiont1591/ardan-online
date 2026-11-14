@@ -9,7 +9,7 @@ const filter = (s) => BAD.reduce((t, re) => t.replace(re, (m) => m[0] + '*'.repe
 function createChat(world) {
   const sys = (p, text) => world.send(p, { t: 'chat', ch: 's', text: esc(text), ts: Date.now() });
   const commands = {
-    pomoc: (p) => sys(p, 'Komendy: /w nick wiadomość – prywatna, /r wiadomość – odpowiedz, /gracze – kto jest w tej krainie, /online – liczba graczy. Drużyna: /zapros nick, /akceptuj, /odrzuc, /opusc, /wyrzuc nick, /druzyna, /p wiadomość.'),
+    pomoc: (p) => sys(p, 'Komendy: /w nick wiadomość – prywatna, /r wiadomość – odpowiedz, /gracze – kto jest w tej krainie, /online – liczba graczy. Drużyna: /zapros nick, /akceptuj, /odrzuc, /opusc, /wyrzuc nick, /druzyna, /p wiadomość. Gildia: /gi wiadomość, /gzapros nick. Skróty: I – ekwipunek, R – rynek, U – gildia, P – PvP.'),
     gracze: (p) => { const list = world.inArea(p.area).map((o) => o.nick); sys(p, `W tej krainie (${list.length}): ${list.join(', ')}`); },
     online: (p) => sys(p, `Graczy online: ${world.players.size}.`),
     w: (p, rest) => {
@@ -31,7 +31,7 @@ function createChat(world) {
     if (!text) return;
     if (text.length > MAX_LEN) text = text.slice(0, MAX_LEN);
     const now = Date.now();
-    const isCmd = text[0] === '/' && !/^\/(w|r|p|d)\s/i.test(text);
+    const isCmd = text[0] === '/' && !/^\/(w|r|p|d|gi)\s/i.test(text);
     if (p.muteUntil > now && !isCmd) return sys(p, `Jesteś wyciszony jeszcze ${Math.ceil((p.muteUntil - now) / 1000)} s.`);
     p.chatT = (p.chatT || []).filter((t) => now - t < 6000);
     if (p.chatT.length >= 4) {
@@ -50,6 +50,7 @@ function createChat(world) {
       return cmd(p, m[2] || '');
     }
     if (msg.ch === 'p' && commands.p) return commands.p(p, text);
+    if (msg.ch === 'gu' && commands.gi) return commands.gi(p, text);
     const ch = msg.ch === 'r' ? 'r' : 'g';
     const out = { t: 'chat', ch, from: p.nick, cls: p.cls, text: esc(filter(text)), ts: now, area: ch === 'r' ? p.area : undefined };
     if (ch === 'g') world.broadcast(out); else for (const o of world.inArea(p.area)) world.send(o, out);

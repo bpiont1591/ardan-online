@@ -6,6 +6,11 @@ const { createArdan } = require('./engine');
 const chars = require('./characters');
 const { createChat } = require('./chat');
 const { createParties } = require('./party');
+const { createGear } = require('./gear');
+const { createBattles } = require('./battle');
+const { createMarket } = require('./market');
+const { createTrade } = require('./trade');
+const { createGuilds } = require('./guild');
 const cfg = require('./config');
 
 const stub = new Proxy(function () {}, { get: (t, k) => (k === 'canvas' ? {} : stub), apply: () => stub, set: () => true });
@@ -34,6 +39,11 @@ class World {
     this.chat = createChat(this);
     this.use(this.chat);
     this.parties = this.use(createParties(this));
+    this.gear = this.use(createGear(this));
+    this.battle = this.use(createBattles(this));
+    this.market = this.use(createMarket(this));
+    this.trade = this.use(createTrade(this));
+    this.guilds = this.use(createGuilds(this));
     this.lastSave = Date.now();
     this.timer = null;
   }
@@ -61,7 +71,7 @@ class World {
     const api = srv.api;
     const P = api.P();
     const p = {
-      pid, charId: ch.id, userId: user.id, nick: ch.nick, cls: ch.cls, ws, srv, api, area: P.area,
+      pid, charId: ch.id, ckey: typeof ch.id === 'string' ? ch.id : 'c' + ch.id, userId: user.id, nick: ch.nick, cls: ch.cls, ws, srv, api, area: P.area,
       mx: 0, my: 0, acts: [], actBudget: 20, msgN: 0, msgT: Date.now(), lastMe: '', lastDlg: 'null', lastBags: '', saveT: Date.now(),
     };
     this.players.set(pid, p);
@@ -87,13 +97,16 @@ class World {
     let msg; try { msg = JSON.parse(data); } catch (e) { return; }
     if (!msg || typeof msg !== 'object') return;
     if (msg.t === 'in') {
-      p.mx = dir1(msg.mx); p.my = dir1(msg.my);
+      p.mx = p.battle ? 0 : dir1(msg.mx); p.my = p.battle ? 0 : dir1(msg.my);
       if (Array.isArray(msg.acts)) for (const a of msg.acts.slice(0, 8)) {
         const s = sanitizeAct(a);
-        if (s && p.acts.length < 12 && p.actBudget-- > 0) p.acts.push(s);
+        if (!s || p.actBudget-- <= 0) continue;
+        if (this.battle.intercept(p, s)) continue;
+        if (p.acts.length < 12) p.acts.push(s);
       }
     } else if (msg.t === 'chat') this.chat.handle(p, msg);
     else if (msg.t === 'ping') this.send(p, { t: 'pong', ts: msg.ts, online: this.players.size });
+    else if (typeof msg.t === 'string') { for (const f of this.features) if (typeof f.onMsg === 'function' && f.onMsg(p, msg)) break; }
   }
 
   // Assign every monster to the player whose engine instance simulates it (nearest / current aggro target).
@@ -111,7 +124,7 @@ class World {
           for (const p of ps) { const P = p.api.P(); const d = cheb(m.x, m.y, P.x, P.y); if (d < bd && d <= 14) { bd = d; best = p; } }
           if (best) m.own = best.pid; else { m.own = null; if (m.aggro && !m.dead) m.aggro = false; }
         }
-        if (!m.own) {
+        if (!m.own && !m.inB) {
           m.hit = Math.max(0, m.hit - dt); m.anim = Math.max(0, m.anim - dt);
           if (m.mt < 1) m.mt = Math.min(1, m.mt + dt * m.d.spd);
           if (m.dead) {
@@ -127,7 +140,7 @@ class World {
 
   tick(dt) {
     for (const p of this.players.values()) {
-      try { p.api.tick(dt, { mx: p.mx, my: p.my, acts: p.acts.splice(0, 6) }); }
+      try { if (p.battle) { p.acts.length = 0; p.api.tick(dt, { mx: 0, my: 0, acts: [] }); } else p.api.tick(dt, { mx: p.mx, my: p.my, acts: p.acts.splice(0, 6) }); }
       catch (e) { console.error('[ARDAN] player tick', p.nick, e); }
     }
     this.mobOwnership(dt);
@@ -151,10 +164,10 @@ class World {
     const nowMs = Date.now();
     for (const a of Object.keys(groups)) {
       const ml = this.mobs[a] || [];
-      const mp = ml.map((m) => [m.x, m.y, Math.max(0, Math.round(m.hp)), (m.dead ? 1 : 0) | (m.aggro ? 2 : 0) | (m.frz > 0 ? 4 : 0) | (m.hit > 0 ? 8 : 0) | (m.anim > 0 ? 16 : 0), m.dir | 0]);
+      const mp = ml.map((m) => [m.x, m.y, Math.max(0, Math.round(m.hp)), (m.dead ? 1 : 0) | (m.aggro ? 2 : 0) | (m.frz > 0 ? 4 : 0) | (m.hit > 0 ? 8 : 0) | (m.anim > 0 ? 16 : 0) | (m.inB ? 32 : 0), m.dir | 0]);
       const plist = groups[a].map((p) => {
         const P = p.api.P(), pl = p.api.pl;
-        return { i: p.pid, n: p.nick, c: P.cls, l: P.lvl, x: P.x, y: P.y, d: pl.dir | 0, hp: Math.max(0, Math.round(P.hp)), mh: p.api.maxHp(), w: P.eq.w, a: P.eq.a, an: r2(pl.anim), ht: r2(pl.hit), dd: pl.dead > 0 ? 1 : 0, bd: pl.buffDef > 0 ? 1 : 0 };
+        return { i: p.pid, n: p.nick, c: P.cls, l: P.lvl, x: P.x, y: P.y, d: pl.dir | 0, hp: Math.max(0, Math.round(P.hp)), mh: p.api.maxHp(), w: P.eq.w, a: P.eq.a, an: r2(pl.anim), ht: r2(pl.hit), dd: pl.dead > 0 ? 1 : 0, bd: pl.buffDef > 0 ? 1 : 0, gt: p.guildTag || undefined, fb: p.battle ? 1 : undefined };
       });
       for (const p of groups[a]) {
         const P = p.api.P(), pl = p.api.pl;
