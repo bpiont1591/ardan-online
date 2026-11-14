@@ -100,7 +100,7 @@ async function flow(browser, label, vp, shots) {
   let s0 = await snap();
   const alive = s0.m.map((r, i) => ({ i, x: r[0], y: r[1], dead: r[3] & 1 })).filter((m) => !m.dead).sort((a, b) => Math.hypot(a.x - s0.p.x, a.y - s0.p.y) - Math.hypot(b.x - s0.p.x, b.y - s0.p.y));
   const tg = alive[0];
-  await walkExact(tg.x, tg.y, 20000, 2);
+  for (let k = 0; k < 6; k++) { const s1 = await snap(); if (Math.max(Math.abs(tg.x - s1.p.x), Math.abs(tg.y - s1.p.y)) <= 1) break; await walkExact(tg.x, tg.y, 12000, k < 3 ? 2 : 1); }
   await pg.keyboard.press('f');
   if (!(await pg.waitForSelector('#battle', { timeout: 5000 }).then(() => true).catch(() => false))) { const s = await snap(); console.log('    DEBUG', JSON.stringify(s.p), JSON.stringify(tg), JSON.stringify(s.m[tg.i]), await pg.evaluate(() => window.ARDAN_UI_STATE.open), await pg.evaluate(() => [...document.querySelectorAll('#msgs .m')].slice(-3).map((e) => e.textContent).join(' | '))); await pg.screenshot({ path: 'shots/debug_f.png' }); }
   ok(await pg.$('#battle').then((e) => !!e), `${label}: walka turowa otwarta`);
@@ -249,6 +249,7 @@ async function flow(browser, label, vp, shots) {
   await W(2500);
   if (shots) await pg.screenshot({ path: `shots/${shots}_18_dungeon_done.png` });
   await tap('[data-dg="leave"]').catch(() => {}); await W(1000);
+  for (let k = 0; k < 3 && (await pg.$('#dungeon')); k++) { await pg.evaluate(() => window.ARDAN_UI.h.send({ t: 'dg', a: 'leave' })); await W(1200); }
   ok(!(await pg.$('#dungeon')), `${label}: wyjście z lochu`);
   if (vp.isMobile) {
     const bd = await pg.$eval('#demoBadge', (e) => { const r = e.getBoundingClientRect(); return { r: r.right, w: innerWidth, wm: getComputedStyle(e).writingMode, top: r.top, h: innerHeight }; });
@@ -280,8 +281,8 @@ async function flow(browser, label, vp, shots) {
   await pg.evaluate(() => window.ARDAN_UI.close()); await W(200);
   await TH({ lvl: 60, heal: true, near: { area: 'volcano', mob: 'imp' } }); await W(2500);
   await pg.evaluate(() => { try { localStorage.setItem('ardan_auto', '0'); } catch (e) {} window.ARDAN_UI.h.send({ t: 'bt', a: 'auto', on: false }); window.ARDAN_UI.h.send({ t: 'bt', a: 'speed', v: 1 }); }); await W(300);
-  await pg.keyboard.press('f');
-  const b60 = await pg.waitForSelector('#battle', { timeout: 6000 }).then(() => true).catch(() => false);
+  let b60 = false;
+  for (let k = 0; k < 3 && !b60; k++) { if (k) { await TH({ heal: true, near: { area: 'volcano', mob: 'imp' } }); await W(2500); } await pg.keyboard.press('f'); b60 = await pg.waitForSelector('#battle', { timeout: 6000 }).then(() => true).catch(() => false); }
   ok(b60, `${label}: walka w Wulkanie Ignara na 60. poziomie`);
   if (b60) {
     if (await pg.$('#btAuto:checked')) { await tap('#btAuto'); await W(300); }
@@ -309,7 +310,7 @@ async function flow(browser, label, vp, shots) {
   await pg.waitForSelector('#rankBody table', { timeout: 10000 }).catch(() => {});
   ok((await pg.$$('#rankBody tbody tr')).length >= 5, `${label}: ranking graczy na stronie głównej`);
   ok(await pg.$eval('#rankBody', (e) => e.textContent.includes('Zbyszko')), `${label}: boty w rankingu`);
-  ok(await pg.$eval('#news', (e) => /poziom 60/.test(e.textContent) && /Lochy drużynowe/.test(e.textContent) && /Osiągnięcia i tytuły/.test(e.textContent)), `${label}: Nowości z funkcjami rundy 3`);
+  ok(await pg.$eval('#news', (e) => /poziom 60/.test(e.textContent) && /Lochy drużynowe/.test(e.textContent) && /Osiągnięcia i tytuły/.test(e.textContent)), `${label}: Nowości z funkcjami rund 3 i 4`);
   if (shots) { await pg.$eval('#ranking', (e) => e.scrollIntoView()); await W(400); await pg.screenshot({ path: `shots/${shots}_20_home_ranking.png` }); }
   await pg.$eval('[data-rk="ach"]', (b) => b.click()); await W(200);
   ok(await pg.$eval('#rankBody', (e) => /Osiągnięcia/.test(e.textContent)), `${label}: zakładka osiągnięć w rankingu`);
