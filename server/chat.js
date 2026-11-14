@@ -9,7 +9,7 @@ const filter = (s) => BAD.reduce((t, re) => t.replace(re, (m) => m[0] + '*'.repe
 function createChat(world) {
   const sys = (p, text) => world.send(p, { t: 'chat', ch: 's', text: esc(text), ts: Date.now() });
   const commands = {
-    pomoc: (p) => sys(p, 'Komendy: /w nick wiadomość – prywatna, /r wiadomość – odpowiedz, /gracze – kto jest w tej krainie, /online – liczba graczy. Drużyna: /zapros nick, /akceptuj, /odrzuc, /opusc, /wyrzuc nick, /druzyna, /p wiadomość. Gildia: /gi wiadomość, /gzapros nick. Skróty: I – ekwipunek, R – rynek, U – gildia, P – PvP, J – zadania dzienne, O – osiągnięcia, E – rozmowa / zbieranie / kuźnia / wejście do lochu.'),
+    pomoc: (p) => sys(p, 'Komendy: /w nick wiadomość – prywatna, /r wiadomość – odpowiedz, /gracze – kto jest w tej krainie, /online – liczba graczy. Drużyna: /zapros nick, /akceptuj, /odrzuc, /opusc, /wyrzuc nick, /druzyna, /p wiadomość. Gildia: /gi wiadomość, /gzapros nick. Skróty: I – ekwipunek, R – rynek, U – gildia, P – PvP, J – zadania dzienne, O – osiągnięcia, E – rozmowa / zbieranie / kuźnia / wejście do lochu.' + (p.role === 'admin' || p.role === 'moderator' ? ' Moderacja: /mute nick 15m|1h|24h|7d|perm powód, /unmute nick, /ban nick czas powód, /unban nick, /kick nick powód. Panel: /admin.' : '')),
     gracze: (p) => { const list = world.inArea(p.area).map((o) => o.nick); sys(p, `W tej krainie (${list.length}): ${list.join(', ')}`); },
     online: (p) => sys(p, `Graczy online: ${world.players.size}.`),
     w: (p, rest) => {
@@ -38,12 +38,13 @@ function createChat(world) {
     if (p.mute && (p.mute.until === null || p.mute.until > now) && !isCmd) return sys(p, world.mod ? world.mod.muteMessage(p.mute) : 'Jesteś wyciszony.');
     if (p.muteUntil > now && !isCmd) return sys(p, `Jesteś wyciszony jeszcze ${Math.ceil((p.muteUntil - now) / 1000)} s.`);
     p.chatT = (p.chatT || []).filter((t) => now - t < 6000);
-    if (p.chatT.length >= 4) {
+    const staffCmd = isCmd && (p.role === 'admin' || p.role === 'moderator'); // moderation commands are never throttled
+    if (p.chatT.length >= 4 && !staffCmd) {
       p.flood = (p.flood || 0) + 1;
       if (p.flood >= 3) { p.muteUntil = now + 60e3; p.flood = 0; return sys(p, 'Zostałeś wyciszony na 60 s za zalewanie czatu.'); }
       return sys(p, 'Zwolnij! Za dużo wiadomości – odczekaj kilka sekund.');
     }
-    p.chatT.push(now);
+    if (!staffCmd) p.chatT.push(now);
     if (!isCmd) {
       if (p.lastChat === text && now - (p.lastChatT || 0) < 15000) return sys(p, 'Nie powtarzaj tej samej wiadomości.');
       p.lastChat = text; p.lastChatT = now;

@@ -10,6 +10,7 @@
   const decode = (s) => String(s).replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
   const escN = (s) => String(s).replace(/[^A-Za-z0-9_ĄĆĘŁŃÓŚŹŻąćęłńóśźż]/g, '');
 
+  const rb = (r) => (r === 'admin' ? '<span class="rb adm" title="Administrator">ADM</span>' : r === 'moderator' ? '<span class="rb mod" title="Moderator">MOD</span>' : '');
   function overlay(title, text, buttons, spin) {
     $('ovT').textContent = title; $('ovP').textContent = text || '';
     $('ovB').innerHTML = buttons || '';
@@ -31,8 +32,8 @@
     let h = `<span class="t">${tm}</span>`;
     // l.text is already HTML-escaped by the server; nicks are restricted to [A-Za-z0-9_ + PL letters]
     if (l.ch === 's') h += l.text;
-    else if (l.ch === 'w') h += l.from === NET.nick ? `do <span class="n" data-n="${escN(l.to)}">${escN(l.to)}</span>: ${l.text}` : `od <span class="n" data-n="${escN(l.from)}">${escN(l.from)}</span>: ${l.text}`;
-    else h += `<span class="ch">${{ g: 'Glob', r: 'Kraina', p: 'Drużyna', gu: 'Gildia' }[l.ch] || ''}</span><span class="n" data-n="${escN(l.from)}">${escN(l.from)}</span>: ${l.text}`;
+    else if (l.ch === 'w') h += l.from === NET.nick ? `do <span class="n" data-n="${escN(l.to)}">${escN(l.to)}</span>: ${l.text}` : `od ${rb(l.role)}<span class="n" data-n="${escN(l.from)}">${escN(l.from)}</span>: ${l.text}`;
+    else h += `<span class="ch">${{ g: 'Glob', r: 'Kraina', p: 'Drużyna', gu: 'Gildia' }[l.ch] || ''}</span>${rb(l.role)}<span class="n${l.role ? ' r-' + (l.role === 'admin' ? 'adm' : 'mod') : ''}" data-n="${escN(l.from)}">${escN(l.from)}</span>: ${l.text}`;
     d.innerHTML = h;
     d.style.display = visible(l) ? '' : 'none';
     return d;

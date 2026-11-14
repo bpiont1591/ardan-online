@@ -354,3 +354,8 @@ em.bad, .bad { color: #ff9a8a; }
 .bi.r3, .slot.r3, .ic.r3 { box-shadow: 0 0 10px rgba(255,138,61,.65); }
 .fnum.px { color: #c8a8ff; font-size: 16px; }
 .bt-log .px { color: #c8a8ff; }
+
+/* moderation badges in chat */
+.msgs .rb { display: inline-block; font: 800 10px Inter, sans-serif; letter-spacing: .05em; padding: 1px 5px; border-radius: 4px; margin-right: 4px; vertical-align: 1px; color: #fff; }
+.msgs .rb.adm { background: #d9533f; } .msgs .rb.mod { background: #3f7fd9; }
+.msgs .n.r-adm { color: #ff8a73 !important; font-weight: 800; } .msgs .n.r-mod { color: #7fb3ff !important; font-weight: 800; }
