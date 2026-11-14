@@ -55,57 +55,69 @@ npm run build:engine      # wymaga python3 i TypeScript (tsc)
 
 | Zmienna | Domyślnie | Opis |
 |---|---|---|
-| `NODE_ENV` | – | `production` na serwerze. Włącza bezpieczne ciasteczka, `trust proxy` i wyłącza wypisywanie linków resetu. |
-| `PORT` | `3000` | Port HTTP. |
-| `HOST` | `0.0.0.0` | Adres nasłuchu. |
-| `BASE_URL` | `http://localhost:PORT` | Publiczny adres strony (np. `https://ardan.pl`), używany w linkach resetu hasła. |
-| `DATABASE_PATH` | `./data/ardan.db` | Plik SQLite. **Na hostingu musi leżeć na trwałym dysku lub wolumenie.** |
+| `NODE_ENV` | – | `production` na serwerze. Włącza bezpieczne ciasteczka, HSTS i `trust proxy`, a wyłącza haki testowe i wypisywanie linków resetu. |
+| `PORT` / `HOST` | `3000` / `0.0.0.0` | Port i adres nasłuchu. |
+| `BASE_URL` | `RENDER_EXTERNAL_URL` lub `http://localhost:PORT` | Publiczny adres strony, używany w linkach resetu i w CSP. Na Renderze ustawia się sam. |
+| `DATA_DIR` | `./data` | Folder z bazą `ardan.db` i kopiami `backups/`. **Na hostingu z dyskiem wskaż trwały wolumen** (np. `/var/data`, `/data`). |
+| `DATABASE_PATH` | `DATA_DIR/ardan.db` | Pełna ścieżka pliku SQLite (nadpisuje `DATA_DIR`). |
+| `DATABASE_URL` | – | Opcjonalny Postgres (np. Neon) jako trwały zapis kopii bazy dla hostingu **bez dysku**. Szczegóły niżej. |
+| `SNAPSHOT_MINUTES` | `10` | Co ile minut wysyłać kopię do Postgresa (tylko jeśli coś się zmieniło). Kopia idzie też zawsze przy zamknięciu. |
+| `BACKUP_HOURS` / `BACKUP_KEEP` | `24` / `7` | Rotowane kopie pliku bazy w `DATA_DIR/backups` (i liczba kopii w Postgresie). |
+| `ADMIN_LOGIN`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` | – | Pierwszy administrator, tworzony przy starcie, jeśli nie istnieje. Istniejące konto dostaje rolę admin, a hasło nie jest zmieniane. |
+| `SESSION_SECRET` | – | Klucz HMAC do identyfikatorów sesji w bazie (zalecany). |
 | `COOKIE_SECURE` | `true` w produkcji | Ciasteczka tylko przez HTTPS. |
-| `TRUST_PROXY` | `1` w produkcji | Liczba proxy przed aplikacją (Render/Fly = 1). Potrzebne do poprawnego IP w rate-limitach. |
-| `SESSION_DAYS` | `30` | Ważność sesji. |
-| `RESET_TOKEN_MINUTES` | `30` | Ważność linku resetu hasła (link jest jednorazowy). |
-| `BCRYPT_COST` | `12` | Koszt hashowania haseł. |
+| `TRUST_PROXY` | `1` w produkcji | Liczba proxy przed aplikacją (Render/Fly = 1). |
+| `SESSION_DAYS` / `RESET_TOKEN_MINUTES` | `30` / `30` | Ważność sesji i jednorazowego linku resetu. |
+| `BCRYPT_COST` | `12` (zakres 10–15) | Koszt hashowania haseł. |
 | `MAX_CHARACTERS` | `3` | Limit postaci na konto. |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS` | – | Serwer poczty do e-maili z resetem hasła. |
-| `MAIL_FROM` | `ARDAN <no-reply@localhost>` | Nadawca e-maili. |
+| `API_PER_MIN`, `WS_PER_MIN`, `WS_PER_IP` | `240`, `30`, `8` | Limity nadużyć na adres IP. |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` | – | Poczta do resetu hasła, np. Brevo: `smtp-relay.brevo.com`, port `2525` (darmowy Render blokuje porty 25/465/587). |
 
-Przykład: `.env.example`. Aplikacja nie wczytuje pliku `.env` sama, więc zmienne ustaw w panelu hostingu albo w powłoce.
+Lokalnie można użyć pliku `.env` w katalogu projektu (wzór: `.env.example`). Zmienne ustawione w systemie mają pierwszeństwo.
+
+## Administrator i moderacja
+
+- **Role:** `gracz` < `moderator` < `admin`. Rola jest sprawdzana na serwerze przy każdym żądaniu `/api/admin/*`, przy każdej komendzie czatu i przy samej stronie `/admin` (niezalogowany → logowanie, gracz → 403).
+- **Pierwszy admin:**
+  - ustaw zmienne `ADMIN_LOGIN`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` przed pierwszym startem;
+  - albo z konsoli: `npm run make-admin -- <login>` nadaje rolę istniejącemu kontu, `--role moderator` nadaje inną rolę;
+  - nowe konto z losowym hasłem: `--create --email adres`.
+- **Panel `/admin`:** wyszukiwanie kont i postaci, wyciszenia (15 min, 1 h, 24 h, 7 dni lub na stałe, z powodem), blokady kont (czasowe; stałe tylko admin), wyrzucenie z gry, nadawanie ról (tylko admin), log czatu z wyciszaniem jednym kliknięciem, lista aktywnych kar i dziennik akcji (tylko admin).
+- **Komendy w grze:** `/mute nick 1h powód`, `/unmute nick`, `/ban nick 7d powód`, `/unban nick`, `/kick nick powód`.
+- **Zasady:** moderator może karać tylko graczy, a admin – graczy i moderatorów. Nie da się ukarać siebie, a ostatniego admina nie da się zdegradować.
+- **Skutki kar:**
+  - blokada natychmiast zamyka połączenia gracza, usuwa jego sesje i blokuje logowanie z komunikatem;
+  - wyciszony gracz dostaje komunikat z pozostałym czasem i powodem, a jego wiadomości (także prywatne, drużynowe i gildyjne) nikomu nie są dostarczane.
+- **Ślad akcji:** każda akcja trafia do tabeli `audit` (kto, kogo, co, powód, skąd: panel/czat/konsola). Log czatu (ostatnie 20 000 wiadomości) służy wyłącznie moderacji.
+
+## Baza danych
+
+- **SQLite (better-sqlite3)** w trybie WAL z `synchronous=NORMAL` i `busy_timeout`.
+- **Migracje:** numerowane, uruchamiane automatycznie przy starcie (`PRAGMA user_version`). Nowe zmiany schematu dopisuje się na końcu listy w `server/db.js`.
+- **Kopie zapasowe:**
+  - co `BACKUP_HOURS` (domyślnie codziennie) spójna kopia online trafia do `DATA_DIR/backups/ardan-RRRR-MM-DD-GG-MM.db`, a trzymanych jest `BACKUP_KEEP` ostatnich;
+  - ręcznie: `npm run backup`.
+- **Hosting bez trwałego dysku (Render free):**
+  - po ustawieniu `DATABASE_URL` cała baza jest co `SNAPSHOT_MINUTES` i przy każdym zamknięciu kompresowana i zapisywana w tabeli `ardan_snapshots` w Postgresie (np. Neon free);
+  - po starcie z pustym dyskiem jest automatycznie odtwarzana.
+  - Gra dalej działa na szybkim, lokalnym SQLite, więc nie trzeba było przepisywać całego serwera na asynchroniczny Postgres.
+  - **Ograniczenie:** po nagłej awarii (bez zamknięcia) można stracić do `SNAPSHOT_MINUTES` ostatnich zmian. Uśpienie, restart i aktualizacja nie gubią danych.
+  - Jeśli `DATABASE_URL` jest ustawiony, a Postgres nie odpowiada przy starcie produkcyjnym, serwer nie startuje, żeby nie nadpisać danych pustą bazą.
 
 ## Wdrożenie
 
-Gra trzyma stan w pamięci procesu (świat, potwory, gracze online), a dane w SQLite. Dlatego uruchamiaj **jedną instancję** z **trwałym dyskiem**. Nie skaluj poziomo bez przeniesienia stanu do wspólnej bazy.
+**Instrukcja krok po kroku dla osoby bez doświadczenia: [`DEPLOY_PL.md`](DEPLOY_PL.md)** (GitHub → Neon → Render Blueprint → `/admin`). Paczkę do wgrania buduje `npm run pack` (`dist/ardan-online.zip`).
 
-### Fly.io (polecane – region Warszawa)
+Gra trzyma stan świata w pamięci procesu. Uruchamiaj **jedną instancję**.
 
-1. Zainstaluj `flyctl` i zaloguj się: `fly auth login`.
-2. W `fly.toml` zmień `app` na własną, unikalną nazwę.
-3. Utwórz aplikację i wolumen:
-   ```bash
-   fly launch --no-deploy --copy-config
-   fly volumes create ardan_data --size 1 --region waw
-   ```
-4. Ustaw sekrety:
-   ```bash
-   fly secrets set BASE_URL=https://TWOJA-APKA.fly.dev SMTP_HOST=... SMTP_PORT=587 SMTP_USER=... SMTP_PASS=... MAIL_FROM="ARDAN <no-reply@twojadomena.pl>"
-   ```
-5. Wdróż: `fly deploy`. Do budowy służy `Dockerfile`, a SQLite trafia do `/data/ardan.db` na wolumenie.
-6. Własna domena:
-   1. `fly certs add ardan.pl`
-   2. Ustaw rekordy DNS według instrukcji z poprzedniego kroku.
-   3. Zmień `BASE_URL`.
+| Opcja | Koszt | Trwałość danych | Uwagi |
+|---|---|---|---|
+| Render Free + Neon Free (`render.yaml`) | 0 zł | kopia co 10 min + przy każdym zamknięciu | usypianie po 15 min bez graczy (start ok. 1 min), 750 h/mies. |
+| Render Starter + dysk (`render.disk.yaml`) | ok. 7,25 USD/mies. | pełna (dysk + codzienne kopie + snapshoty Rendera) | bez usypiania, polecane przy stałych graczach |
+| Fly.io + wolumen (`fly.toml`, `Dockerfile`) | kilka USD/mies., wymaga karty | pełna | region Warszawa |
+| Docker / VPS | zależnie od hostingu | pełna (wolumen `/data`) | `docker build -t ardan . && docker run -p 8080:8080 -v ardan:/data --env-file .env ardan` |
 
-### Render
-
-1. Wypchnij repozytorium na GitHub/GitLab.
-2. W Render: **New → Blueprint**, wskaż repozytorium. Plik `render.yaml` utworzy usługę web z dyskiem `/var/data`. Dysk wymaga płatnego planu – darmowy plan kasuje dane przy restarcie.
-3. Uzupełnij zmienne `BASE_URL` i `SMTP_*` w panelu.
-4. Własna domena: **Settings → Custom Domains**, potem zmień `BASE_URL`.
-
-WebSockety działają na obu platformach bez dodatkowej konfiguracji. Health check: `GET /healthz`.
-
-### Kopie zapasowe
-
-Rób regularną kopię pliku bazy, np. `sqlite3 /data/ardan.db ".backup /data/backup.db"` uruchamiane z crona albo ręcznie przez `fly ssh console`.
+Instalacja zależności na serwerze: `npm ci --omit=dev --ignore-scripts`. better-sqlite3 ma gotowe pliki binarne, więc nie potrzeba kompilatora. Health check: `GET /healthz`.
 
 ## Architektura
 

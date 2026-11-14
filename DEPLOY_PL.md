@@ -100,7 +100,7 @@ Bez tego gra działa normalnie, tylko przycisk „Nie pamiętam hasła” nie wy
 
 > Jeśli Render poprosi o kartę przy Blueprincie, możesz zamiast tego użyć **New + → Web Service** i wybrać repozytorium. Ustaw:
 > - **Language:** Node
-> - **Build Command:** `npm ci --omit=dev`
+> - **Build Command:** `npm ci --omit=dev --ignore-scripts`
 > - **Start Command:** `npm start`
 > - **Instance Type:** Free
 >

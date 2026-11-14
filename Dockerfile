@@ -1,9 +1,8 @@
 # ARDAN – obraz Docker (Fly.io, VPS, dowolny hosting z Dockerem). Dane w wolumenie /data.
 FROM node:22-bookworm-slim AS deps
 WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev --ignore-scripts   # better-sqlite3 ships prebuilt binaries
 
 FROM node:22-bookworm-slim
 ENV NODE_ENV=production PORT=8080 DATA_DIR=/data TRUST_PROXY=1

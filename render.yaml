@@ -9,7 +9,7 @@ services:
     runtime: node
     plan: free
     region: frankfurt
-    buildCommand: npm ci --omit=dev
+    buildCommand: npm ci --omit=dev --ignore-scripts   # better-sqlite3 ma gotowe pliki binarne (prebuilds) – nic nie trzeba kompilować
     startCommand: npm start
     healthCheckPath: /healthz
     envVars:

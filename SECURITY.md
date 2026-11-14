@@ -4,7 +4,7 @@ Short overview of the protections in the ARDAN server. Regression tests: `npm ru
 
 ## HTTP
 - **Headers (helmet):** strict CSP (`default-src 'self'`, `script-src 'self'` – no inline scripts or eval, `script-src-attr 'none'`, `object-src 'none'`, `base-uri 'self'`, `frame-ancestors 'none'`, `form-action 'self'`; in production `connect-src` is only the site's own origin plus its wss://). Also nosniff, X-Frame-Options, Referrer-Policy, Permissions-Policy, HSTS in production, and no `X-Powered-By`.
-- **Cookies:** the session cookie is a random 256-bit token. Only its SHA-256 is stored. The cookie is `HttpOnly; SameSite=Lax; Path=/`, plus `Secure` in production (`COOKIE_SECURE`). Every login rotates the session id, which prevents session fixation. Logout deletes the session, and a password reset logs the account out everywhere.
+- **Cookies:** the session cookie is a random 256-bit token. Only its HMAC-SHA-256 (with `SESSION_SECRET`) or SHA-256 is stored. The cookie is `HttpOnly; SameSite=Lax; Path=/`, plus `Secure` in production (`COOKIE_SECURE`). Every login rotates the session id, which prevents session fixation. Logout deletes the session, and a password reset logs the account out everywhere.
 - **CSRF:** every state-changing `/api` route uses a double-submit token (header `X-CSRF-Token` = cookie, constant-time compare). It also needs a same-origin `Origin` check and accepts only JSON bodies (415 otherwise).
 - **Passwords:** bcrypt with cost 12 by default (`BCRYPT_COST`, clamped to 10–15). Passwords must be 8–128 characters with 3 character classes and must not contain the login or the e-mail name. Logins use a dummy hash for unknown accounts, so timing doesn't reveal which accounts exist.
 - **Rate limits / lockout:**
@@ -29,6 +29,17 @@ Short overview of the protections in the ARDAN server. Regression tests: `npm ru
   - Trades check again, right before swapping, that both sides still own every item and the gold.
   - Item ids must be owned, and an item can't be in two places at once (it is removed from the bag when listed).
 - **Value sanity:** every tick, gold is clamped to an integer in `[0, 2 000 000 000]` (no overflow or negative gold). Prices are 1–10 000 000. Trade gold must be a safe integer between 0 and the gold the player has. Craft quantities are 1–10.
+
+## Moderation / admin
+- Roles `gracz` < `moderator` < `admin` stored in the DB. The role is re-read with the session on every request and re-checked from the DB on every moderator chat command. `/admin` HTML is only served to staff, and every `/api/admin/*` route has its own role check (403 otherwise).
+- Admin routes sit behind the same CSRF guard, rate limits and JSON-only rule as the rest of the API.
+- Staff can only act on accounts with a lower role. A permanent ban requires an admin, and the last admin can't be demoted.
+- Bans delete all sessions, close live sockets immediately and block login. A banned session can't open a socket even if a cookie survives.
+- Mutes are enforced server-side for global, region, whisper, party and guild messages.
+- Every moderation action is written to an append-only `audit` table (actor, target, action, reason, source).
+- The first admin comes from `ADMIN_*` env vars or the `make-admin` CLI. There is no default or hardcoded password.
+- Moderator-supplied text (reasons) is cleaned of control characters, length-limited and HTML-escaped wherever it is shown.
+- Tests: `npm run test:admin` (60 checks, including 403 for non-staff, CSRF, and mute/ban/kick enforcement).
 
 ## XSS
 - Chat text is stripped of control/bidi characters, filtered and HTML-escaped on the server. Nicks, logins and guild names/tags are restricted by regex. Everything else from players (guild message of the day, item names) is escaped with `esc()` before rendering. The CSP blocks inline scripts anyway.
