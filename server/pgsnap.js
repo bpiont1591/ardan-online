@@ -14,7 +14,7 @@ function getPool() {
   if (!pool) {
     const { Pool } = require('pg');
     const local = /@(localhost|127\.0\.0\.1)[:/]/.test(cfg.databaseUrl) || /sslmode=disable/.test(cfg.databaseUrl);
-    pool = new Pool({ connectionString: cfg.databaseUrl, max: 2, ssl: local ? false : { rejectUnauthorized: false }, connectionTimeoutMillis: 15000 });
+    pool = new Pool({ connectionString: cfg.databaseUrl, max: 2, ssl: local ? false : { rejectUnauthorized: process.env.PGSSL_NO_VERIFY !== '1' }, connectionTimeoutMillis: 15000 });
     pool.on('error', (e) => console.error('[ARDAN] Postgres:', e.message));
   }
   return pool;
