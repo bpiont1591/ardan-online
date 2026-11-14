@@ -102,7 +102,7 @@ async function flow(browser, label, vp, shots) {
   const tg = alive[0];
   await walkExact(tg.x, tg.y, 20000, 2);
   await pg.keyboard.press('f');
-  if (!(await pg.waitForSelector('#battle', { timeout: 5000 }).then(() => true).catch(() => false))) { const s = await snap(); console.log('    DEBUG', JSON.stringify(s.p), JSON.stringify(tg), JSON.stringify(s.m[tg.i]), await pg.evaluate(() => window.ARDAN_UI_STATE.open), [...document.querySelectorAll('#msgs .m')].slice(-3).map((e) => e.textContent).join(' | ')); await pg.screenshot({ path: 'shots/debug_f.png' }); }
+  if (!(await pg.waitForSelector('#battle', { timeout: 5000 }).then(() => true).catch(() => false))) { const s = await snap(); console.log('    DEBUG', JSON.stringify(s.p), JSON.stringify(tg), JSON.stringify(s.m[tg.i]), await pg.evaluate(() => window.ARDAN_UI_STATE.open), await pg.evaluate(() => [...document.querySelectorAll('#msgs .m')].slice(-3).map((e) => e.textContent).join(' | '))); await pg.screenshot({ path: 'shots/debug_f.png' }); }
   ok(await pg.$('#battle').then((e) => !!e), `${label}: walka turowa otwarta`);
   await W(700);
   ok((await pg.$$('#battle .bf.al')).length >= 2, `${label}: członek drużyny (bot) dołącza do walki`);
