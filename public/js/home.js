@@ -3,22 +3,14 @@
   const A = window.ARDAN;
   document.querySelectorAll('[data-emblem]').forEach((e) => { e.innerHTML = A.emblem; });
   document.querySelectorAll('[data-pips]').forEach((e) => { const n = +e.dataset.pips; e.innerHTML = [1, 2, 3, 4, 5].map((i) => `<i class="${i <= n ? 'on' : ''}"></i>`).join(''); });
-  const REG = [
-    ['village', 'Osada Brzozowa', 'Poziom 1', 'Spokojna wioska na skraju lasu. Tu Sołtys Radomir, Kowal Bogumił i Zielarka Wiesława pomogą stawiać pierwsze kroki.', null],
-    ['forest', 'Mroczny Bór', 'Poziomy 3–6', 'Gęsty las pełen wilków, dzików i goblinów. Przy ognisku czeka Pustelnik Ignacy, który pamięta, skąd przyszła mgła.', null],
-    ['cave', 'Jaskinia Cieni', 'Poziomy 7–12', 'Ciemne korytarze, pająki i szkielety. W najgłębszej sali czai się źródło mgły.', 'Upiór Mgieł'],
-    ['swamp', 'Bagna Żałoby', 'Poziomy 10–16', 'Grząskie moczary spowite oparem. Topielce, błędne ogniki i trolle strzegą chaty dawnej znachorki.', 'Wiedźma Moczarów'],
-    ['town', 'Srebrnogród', 'Bezpieczne miasto', 'Warowne miasto o srebrnych dachach. Płatnerz, alchemiczka, kapłanka i Kapitan Bronisław – serce Ardanu.', null],
-    ['mount', 'Szczyty Szronu', 'Poziomy 14–22', 'Mroźne przełęcze, śnieżne wilki i lodowe żywiołaki. Na płaskowyżu śpi lodowy smok.', 'Szronogrzbiet'],
-    ['desert', 'Ruiny Piasków', 'Poziomy 18–26', 'Oaza, skorpiony i mumie, a za nimi świątynia dawnego królestwa – i jego nieumarły władca.', 'Sethar, Król Cieni'],
-    ['port', 'Mewia Przystań', 'Miasto · od poz. 26', 'Portowe miasto na wschodzie. Kupiec Wit, kowal okrętowy Sambor, alchemiczka Morwena i Kapitan Rogwold z zadaniami.', null],
-    ['coast', 'Wybrzeże Wraków', 'Poziomy 27–36', 'Plaże pełne wraków, olbrzymie kraby, piraci i śpiewające syreny. W zatoce czai się morski potwór.', 'Lewiatan Głębin'],
-    ['fort', 'Twierdza Żarogród', 'Miasto · od poz. 36', 'Warowna twierdza strzegąca północy. Komendant Żelisław, płatnerz Radogost i alchemik Żar szukają śmiałków.', null],
-    ['volcano', 'Wulkan Ignara', 'Poziomy 37–48', 'Rzeki lawy, ogniste chochliki, salamandry i lawowe golemy. W kraterze rządzi dawny kowal pochłonięty przez ogień. Loch: Kuźnia Płomieni.', 'Ignar, Władca Magmy'],
-    ['citadel', 'Cytadela Świtu', 'Miasto · od poz. 46', 'Ostatni bastion przed mrokiem. Paladynka Świetlana, mistrz kuźni Światosław i arcymagini Lumena.', null],
-    ['abyss', 'Otchłań Zmierzchu', 'Poziomy 49–60', 'Kraina wiecznego zmierzchu: cienie, bestie pustki i upadli rycerze. Na końcu czeka Pan Otchłani. Loch: Serce Otchłani.', 'Morgath, Pan Otchłani'],
-  ];
-  document.getElementById('regions').innerHTML = REG.map((r) => `<article class="card hover region"><img src="/img/${r[0]}_m.jpg" alt="${r[1]}" loading="lazy" width="640" height="360"><div class="body"><h3>${r[1]}</h3><p class="muted" style="margin-bottom:10px">${r[3]}</p><span class="tag">${r[2]}</span>${r[4] ? `<span class="tag boss">Boss: ${r[4]}</span>` : ''}</div></article>`).join('');
+  // liczby świata prosto z serwera (krainy, bossowie, zadania, przedmioty)
+  const pl = (n, one, few, many) => (n === 1 ? one : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? few : many);
+  A.api('/world').then((r) => {
+    if (!r.ok || !r.data) return; const W = r.data;
+    const set = (sel, v) => document.querySelectorAll(sel).forEach((e) => { e.textContent = v; });
+    set('[data-world]', `${W.classes} klasy · ${W.areas} ${pl(W.areas, 'kraina', 'krainy', 'krain')} · ${W.bosses} ${pl(W.bosses, 'boss', 'bossów', 'bossów')} · ${W.quests} ${pl(W.quests, 'zadanie', 'zadania', 'zadań')}`);
+    set('[data-wq]', W.quests); set('[data-wb]', W.bosses); set('[data-wi]', `ponad ${Math.floor(W.items / 100) * 100}`);
+  });
   // ranking graczy
   function rankHtml(R, tab, esc) {
     const CN = { war: 'Wojownik', arc: 'Łucznik', mag: 'Mag' };
@@ -35,7 +27,15 @@
     box.addEventListener('click', (e) => { const b = e.target.closest('[data-rk]'); if (!b) return; tab = b.dataset.rk; draw(); });
     draw();
   }
-  A.api('/ranking').then((r) => initRanking(r.ok ? r.data : null, A.esc));
+  A.api('/ranking').then((r) => {
+    initRanking(r.ok ? r.data : null, A.esc);
+    const at = document.getElementById('rankAt');
+    if (at && r.ok && r.data && r.data.at) {
+      const f = (t) => new Date(t).toLocaleString('pl-PL', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+      const h = Math.round((r.data.every || 43200000) / 3600000);
+      at.textContent = `Aktualizacja co ${h} h, ostatnia: ${f(r.data.at)} · następna: ${f(r.data.next)}`;
+    }
+  });
   A.api('/news').then((r) => {
     const list = r.ok ? r.data : [];
     const fmt = (d) => new Date(d + 'T12:00:00').toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' });

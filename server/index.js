@@ -10,7 +10,7 @@ const characters = require('./characters');
 const { World } = require('./game');
 const news = require('./news');
 const mail = require('./mail');
-const { ranking } = require('./ranking');
+const { ranking, createRankingCache } = require('./ranking');
 const db = require('./db');
 const { createMod } = require('./mod');
 const admin = require('./admin');
@@ -52,8 +52,10 @@ api.use('/characters', characters.router((id) => world.isOnline(id)));
 api.use('/admin', admin.router(() => world.mod));
 api.get('/stats', (req, res) => { res.setHeader('Cache-Control', 'no-store'); res.json({ online: world.online() }); });
 api.get('/news', (req, res) => res.json(news));
-let rkCache = null, rkAt = 0;
-api.get('/ranking', (req, res) => { if (!rkCache || Date.now() - rkAt > 10000) { rkCache = ranking(qTop.all()); rkAt = Date.now(); } res.setHeader('Cache-Control', 'no-store'); res.json(rkCache); });
+// public ranking: recomputed at most every 12 h (RANKING_REFRESH_MS only shortens it for tests/dev)
+const rankCache = createRankingCache({ every: Number(process.env.RANKING_REFRESH_MS) || 0, compute: () => ranking(qTop.all()) });
+api.get('/ranking', (req, res) => { res.setHeader('Cache-Control', 'no-store'); res.json(rankCache.get()); });
+api.get('/world', (req, res) => { res.setHeader('Cache-Control', 'public, max-age=300'); res.json(world.info()); });
 api.use((req, res) => res.status(404).json({ error: 'Nie znaleziono.' }));
 app.use('/api', api);
 

@@ -129,6 +129,26 @@ async function main() {
     c.ws.send(JSON.stringify({ t: '__test', gold: 9e15 })); await W(300); c.ws.send(JSON.stringify({ t: '__test', heal: true })); await W(400);
     g = c.msgs.filter((m) => m.t === 'gear').pop();
     ok(g && g.gold === 2000000000, 'gold overflow clamped (got ' + (g && g.gold) + ')');
+    // trading only next to NPCs (server-checked distance)
+    c.ws.send(JSON.stringify({ t: '__test', gold: 1000, loot: 2 })); await W(300); c.ws.send(JSON.stringify({ t: '__test', heal: true })); await W(400);
+    const bagIt = ((c.msgs.filter((m) => m.t === 'gear').pop() || {}).bag || [])[0];
+    const gold1 = (c.msgs.filter((m) => m.t === 'gear').pop() || {}).gold;
+    c.ws.send(JSON.stringify({ t: 'mk', a: 'sell', u: bagIt ? bagIt.u : 'abcdef12', pr: 50 })); await W(300);
+    ok(c.msgs.some((m) => m.t === 'mk' && m.closed && m.err === 'far') && c.msgs.some((m) => m.t === 'chat' && /tylko u aukcjonera/.test(m.text || '')), 'auction listing far from an auctioneer rejected');
+    c.ws.send(JSON.stringify({ t: 'gear', a: 'sell', u: bagIt ? bagIt.u : 'abcdef12' })); await W(300);
+    c.ws.send(JSON.stringify({ t: 'npc', a: 'sell', u: bagIt ? bagIt.u : 'abcdef12' })); await W(300);
+    c.ws.send(JSON.stringify({ t: 'npc', a: 'junk' })); await W(300);
+    c.ws.send(JSON.stringify({ t: '__test', heal: true })); await W(400);
+    let g2 = c.msgs.filter((m) => m.t === 'gear').pop();
+    ok(bagIt && g2 && g2.bag.some((x) => x.u === bagIt.u) && g2.gold === gold1 && c.msgs.some((m) => m.t === 'npcui' && m.closed && m.err === 'far'), 'selling from the inventory / far from a merchant rejected (old route removed)');
+    c.ws.send(JSON.stringify({ t: '__test', near: { npc: 'handvil' } })); await W(300);
+    c.ws.send(JSON.stringify({ t: 'npc', a: 'sell', u: bagIt.u })); await W(400);
+    c.ws.send(JSON.stringify({ t: '__test', heal: true })); await W(400);
+    g2 = c.msgs.filter((m) => m.t === 'gear').pop();
+    ok(g2 && !g2.bag.some((x) => x.u === bagIt.u) && g2.gold === gold1 + Math.max(1, Math.floor(bagIt.v / 2)), 'selling next to a merchant works (half the value)');
+    c.ws.send(JSON.stringify({ t: 'npc', a: 'sellmany', us: ['x', 5, {}, 'abc'] })); await W(200);
+    ok(c.ws.readyState === 1, 'malformed merchant payload ignored');
+    c.ws.send(JSON.stringify({ t: '__test', near: { npc: 'auktown' } })); await W(300);
     c.ws.send(JSON.stringify({ t: 'mk', a: 'sell', u: 'abcdef12', pr: -5 })); await W(300);
     ok(c.msgs.some((m) => m.t === 'chat' && /Podaj cenę/.test(m.text || '')), 'negative market price rejected');
     // flood -> disconnect

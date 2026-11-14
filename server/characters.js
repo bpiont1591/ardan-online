@@ -6,7 +6,7 @@ const { needUser, NICK_RE } = require('./auth');
 
 const CLASSES = { war: 'Wojownik', arc: 'Łucznik', mag: 'Mag' };
 const START_WEAPON = { war: 'club', arc: 'sbow', mag: 'wand' };
-const AREA_NAMES = { village: 'Osada Brzozowa', forest: 'Mroczny Bór', cave: 'Jaskinia Cieni', swamp: 'Bagna Żałoby', town: 'Srebrnogród', mount: 'Szczyty Szronu', desert: 'Ruiny Piasków', port: 'Mewia Przystań', coast: 'Wybrzeże Wraków', fort: 'Twierdza Żarogród', volcano: 'Wulkan Ignara', citadel: 'Cytadela Świtu', abyss: 'Otchłań Zmierzchu' };
+const AREA_NAMES = { village: 'Osada Brzozowa', forest: 'Mroczny Bór', cave: 'Jaskinia Cieni', swamp: 'Bagna Żałoby', town: 'Srebrnogród', mount: 'Szczyty Szronu', desert: 'Ruiny Piasków', port: 'Mewia Przystań', coast: 'Wybrzeże Wraków', fort: 'Twierdza Żarogród', volcano: 'Wulkan Ignara', citadel: 'Cytadela Świtu', abyss: 'Otchłań Zmierzchu', wolfhills: 'Wilcze Wzgórza', mine: 'Kopalnia Krasnoludów', glacier: 'Lodowiec Wichrów', steppe: 'Spalone Stepy', elfwood: 'Szmaragdowa Puszcza', sunken: 'Zatopione Miasto', star: 'Gwiezdna Strażnica', crystal: 'Kryształowe Pustkowia', necro: 'Nekropolia Valgaru', dragon: 'Smocze Gniazdo' };
 const RESERVED = /^(admin|administrator|moderator|mod|gm|system|ardan|serwer|support)$/i;
 
 const qList = db.prepare('SELECT id, nick, cls, lvl, area, updated FROM characters WHERE user_id = ? ORDER BY id');

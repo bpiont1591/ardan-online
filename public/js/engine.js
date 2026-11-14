@@ -845,8 +845,89 @@ function createArdan(canvas, opts) {
         a.spawns.push(["morgath", 40, 7]);
         return a;
     }
+    // round 6: data-driven hunting land: scattered obstacles, clearings (nodes) joined by paths, edge exits
+    function genWild(o) {
+        const a = mkArea(o.id, o.name, o.w, o.h, o.base, !!o.dark, o.base);
+        const r = mkRng(o.seed);
+        for (const b of o.blobs || [])
+            for (let i = 0; i < b[1]; i++)
+                disc(3 + r() * (a.w - 6), 3 + r() * (a.h - 6), b[2] + r() * b[3], (x, y) => st(a, x, y, b[0]));
+        for (let i = 0; i < a.t.length; i++) {
+            if (a.t[i] !== o.base)
+                continue;
+            let q = r();
+            for (const s0 of o.scat) {
+                if (q < s0[1]) {
+                    a.t[i] = s0[0];
+                    break;
+                }
+                q -= s0[1];
+            }
+        }
+        borderFill(a, r, o.border, 0.6);
+        const inner = (x, y) => x > 0 && y > 0 && x < a.w - 1 && y < a.h - 1;
+        const clrN = (x, y) => { if (inner(x, y) && BLOCK[gt(a, x, y)])
+            st(a, x, y, o.base); };
+        const clrL = (x, y) => { if (!inner(x, y))
+            return; const t = gt(a, x, y); if (BLOCK[t] && t !== WATER && t !== BOG)
+            st(a, x, y, o.base); };
+        for (const c of o.nodes)
+            disc(c[0], c[1], c[2], clrN);
+        for (const s0 of o.segs)
+            line4(s0[0], s0[1], s0[2], s0[3], (x, y) => { disc(x, y, 1.2, clrL); const t = gt(a, x, y); st(a, x, y, t === WATER || t === BOG ? BRIDGE : PATH); });
+        for (const e of o.edges)
+            for (let c = e[1]; c <= e[2]; c++) {
+                for (let d = 0; d <= 1; d++) {
+                    const x = e[0] === "w" ? d : e[0] === "e" ? a.w - 1 - d : c, y = e[0] === "n" ? d : e[0] === "s" ? a.h - 1 - d : c;
+                    st(a, x, y, PATH);
+                }
+                const ex = e[0] === "w" ? 0 : e[0] === "e" ? a.w - 1 : c, ey = e[0] === "n" ? 0 : e[0] === "s" ? a.h - 1 : c;
+                a.exits.push(e[0] === "w" || e[0] === "e" ? { x: ex, y: ey, to: e[3], tx: e[4], ty: c + e[5] } : { x: ex, y: ey, to: e[3], tx: c + e[5], ty: e[4] });
+            }
+        for (const p of o.free || [])
+            disc(p[0], p[1], 1.5, (x, y) => { if (inner(x, y) && BLOCK[gt(a, x, y)])
+                st(a, x, y, o.base); });
+        const e0 = a.exits[0];
+        spawnIn(a, r, e0.x, e0.y, o.spawns, o.avoid);
+        a.spawns.push([o.boss[0], o.boss[1], o.boss[2]]);
+        return a;
+    }
+    // carve a corridor from the map edge inwards until it meets the walkable part of an existing area
+    function openEdge(a, side, c0, c1, tile, to, fixed, off) {
+        const e0 = a.exits[0];
+        const seen = reach(a, e0.x, e0.y);
+        for (let c = c0; c <= c1; c++) {
+            for (let d = 0; d < Math.max(a.w, a.h); d++) {
+                const x = side === "w" ? d : side === "e" ? a.w - 1 - d : c, y = side === "n" ? d : side === "s" ? a.h - 1 - d : c;
+                if (d > 1 && seen[y * a.w + x])
+                    break;
+                st(a, x, y, tile);
+            }
+            const ex = side === "w" ? 0 : side === "e" ? a.w - 1 : c, ey = side === "n" ? 0 : side === "s" ? a.h - 1 : c;
+            a.exits.push(side === "w" || side === "e" ? { x: ex, y: ey, to, tx: fixed, ty: c + off } : { x: ex, y: ey, to, tx: c + off, ty: fixed });
+        }
+    }
+    function genStar() {
+        const a = genCity("star", "Gwiezdna Strażnica", 461, COBBLE, ROOF2, ROOF, "wse");
+        for (const p of [[13, 9], [22, 9], [13, 18], [22, 18]])
+            st(a, p[0], p[1], PILLAR);
+        for (let y = 13; y <= 14; y++) {
+            a.exits.push({ x: 0, y, to: "citadel", tx: 34, ty: y });
+            a.exits.push({ x: 35, y, to: "crystal", tx: 1, ty: y + 6 });
+        }
+        for (let x = 17; x <= 18; x++)
+            a.exits.push({ x, y: 27, to: "necro", tx: x + 7, ty: 1 });
+        return a;
+    }
     const AREAS = {};
-    [genVillage(), genForest(), genCave(), genSwamp(), genTown(), genMount(), genDesert(), genPort(), genCoast(), genFort(), genVolcano(), genCitadel(), genAbyss()].forEach((a) => { AREAS[a.id] = a; });
+    [genVillage(), genForest(), genCave(), genSwamp(), genTown(), genMount(), genDesert(), genPort(), genCoast(), genFort(), genVolcano(), genCitadel(), genAbyss(), genStar(), genWild({ id: "wolfhills", name: "Wilcze Wzgórza", w: 50, h: 40, base: GRASS, seed: 501, dark: false, blobs: [[WATER, 3, 1.4, 1.4]], scat: [[TREE, 0.15], [DGRASS, 0.1], [ROCK, 0.03], [FLOWER, 0.05]], border: [TREE, TREE, ROCK], nodes: [[25, 4, 3.4], [14, 12, 4], [36, 12, 4], [24, 22, 4], [12, 30, 4], [38, 31, 4.5], [25, 34, 3.5]], segs: [[24, 0, 25, 4], [25, 4, 14, 12], [25, 4, 36, 12], [14, 12, 24, 22], [36, 12, 24, 22], [24, 22, 12, 30], [24, 22, 38, 31], [12, 30, 25, 34], [25, 34, 38, 31]], edges: [["n", 24, 25, "village", 28, -5]], spawns: [["bandit", 9, (x, y) => y > 8], ["bwolf", 8, (x, y) => true], ["bear", 5, (x, y) => y > 18]], avoid: [[25, 4, 6], [38, 31, 4]], boss: ["kiel", 38, 31], free: [[27, 4], [22, 3], [23, 6]] }), genWild({ id: "mine", name: "Kopalnia Krasnoludów", w: 44, h: 34, base: FLOOR, seed: 511, dark: true, blobs: [[WATER, 2, 1.2, 1]], scat: [[CWALL, 0.15], [ROCK, 0.05], [CRYSTAL, 0.015]], border: [CWALL, CWALL, ROCK], nodes: [[38, 21, 3.6], [28, 14, 4], [30, 27, 4], [16, 8, 4], [16, 22, 4.5], [8, 27, 4.5], [6, 12, 3]], segs: [[43, 21, 38, 21], [38, 21, 28, 14], [38, 21, 30, 27], [28, 14, 16, 8], [28, 14, 16, 22], [30, 27, 16, 22], [16, 22, 8, 27], [16, 8, 6, 12]], edges: [["e", 20, 22, "cave", 1, 1]], spawns: [["kobold", 9, (x, y) => true], ["crawler", 7, (x, y) => true], ["dghost", 5, (x, y) => x < 24]], avoid: [[38, 21, 5], [8, 27, 4]], boss: ["grimgor", 8, 27], free: [[38, 19], [37, 23]] }), genWild({ id: "glacier", name: "Lodowiec Wichrów", w: 50, h: 40, base: SNOW, seed: 521, dark: false, blobs: [[ICE, 6, 2, 2.5]], scat: [[SPINE, 0.2], [CLIFF, 0.06], [ROCK, 0.03]], border: [CLIFF, SPINE, CLIFF], nodes: [[25, 34, 3.6], [14, 26, 4], [36, 26, 4], [24, 17, 4.5], [10, 10, 4], [38, 9, 5], [24, 6, 3.5]], segs: [[25, 39, 25, 34], [25, 34, 14, 26], [25, 34, 36, 26], [14, 26, 24, 17], [36, 26, 24, 17], [24, 17, 10, 10], [24, 17, 24, 6], [24, 6, 38, 9], [36, 26, 38, 9]], edges: [["s", 24, 26, "mount", 1, 17]], spawns: [["frwraith", 9, (x, y) => true], ["icetroll", 7, (x, y) => y < 30], ["mammoth", 5, (x, y) => y < 22]], avoid: [[25, 34, 6], [38, 9, 5]], boss: ["szronia", 38, 8], free: [[27, 34], [22, 33], [23, 36]] }), genWild({ id: "steppe", name: "Spalone Stepy", w: 50, h: 40, base: SAND, seed: 531, dark: false, blobs: [[ASH, 8, 2, 3]], scat: [[DUNE, 0.08], [ROCK, 0.04], [CACTUS, 0.03], [DEADT, 0.03]], border: [CLIFF, ROCK, CLIFF], nodes: [[24, 34, 3.6], [12, 27, 4], [37, 27, 4], [24, 19, 4.5], [10, 11, 4], [39, 10, 4.5], [24, 5, 3]], segs: [[24, 39, 24, 34], [24, 34, 12, 27], [24, 34, 37, 27], [12, 27, 24, 19], [37, 27, 24, 19], [24, 19, 10, 11], [24, 19, 39, 10], [24, 19, 24, 5], [24, 5, 24, 0], [25, 5, 25, 0]], edges: [["s", 23, 25, "desert", 1, 0], ["n", 24, 25, "elfwood", 38, 0]], spawns: [["hyena", 9, (x, y) => true], ["nomad", 7, (x, y) => true], ["basil", 5, (x, y) => y < 24]], avoid: [[24, 34, 6], [39, 10, 4]], boss: ["burzan", 40, 9], free: [[26, 34], [21, 33], [22, 36]] }), genWild({ id: "elfwood", name: "Szmaragdowa Puszcza", w: 50, h: 40, base: DGRASS, seed: 541, dark: false, blobs: [[WATER, 4, 1.5, 2]], scat: [[TREE, 0.24], [FLOWER, 0.05], [ROCK, 0.02]], border: [TREE, TREE, TREE], nodes: [[25, 34, 3.6], [13, 27, 4], [37, 26, 4], [25, 18, 4.5], [11, 8, 5], [38, 10, 4], [25, 7, 3.5]], segs: [[24, 39, 25, 34], [25, 39, 25, 34], [25, 34, 13, 27], [25, 34, 37, 26], [13, 27, 25, 18], [37, 26, 25, 18], [25, 18, 25, 7], [25, 7, 11, 8], [25, 7, 38, 10], [37, 26, 38, 10]], edges: [["s", 24, 25, "steppe", 1, 0]], spawns: [["delf", 9, (x, y) => true], ["wwolf", 7, (x, y) => y < 30], ["treant", 5, (x, y) => y < 24]], avoid: [[25, 34, 6], [11, 8, 5]], boss: ["morana", 11, 7], free: [[27, 34], [22, 33], [23, 36]] }), genWild({ id: "sunken", name: "Zatopione Miasto", w: 50, h: 40, base: RFLOOR, seed: 551, dark: true, blobs: [[WATER, 14, 1.5, 2.5]], scat: [[RUINW, 0.06], [PILLAR, 0.03], [REED, 0.03]], border: [WATER, RUINW, WATER], nodes: [[25, 5, 3.6], [13, 12, 4], [37, 12, 4], [25, 21, 4.5], [12, 30, 4], [38, 30, 4], [25, 33, 5]], segs: [[24, 0, 24, 5], [25, 0, 25, 5], [25, 5, 13, 12], [25, 5, 37, 12], [13, 12, 25, 21], [37, 12, 25, 21], [25, 21, 12, 30], [25, 21, 38, 30], [12, 30, 25, 33], [38, 30, 25, 33]], edges: [["n", 24, 25, "coast", 38, 0]], spawns: [["naga", 9, (x, y) => true], ["drowned", 7, (x, y) => true], ["tentacle", 5, (x, y) => y > 16]], avoid: [[25, 5, 6], [25, 33, 5]], boss: ["thalassor", 25, 34], free: [[27, 5], [22, 4]] }), genWild({ id: "crystal", name: "Kryształowe Pustkowia", w: 50, h: 40, base: SNOW, seed: 561, dark: false, blobs: [[ICE, 8, 2, 3]], scat: [[CRYSTAL, 0.12], [ROCK, 0.05], [CLIFF, 0.05]], border: [CRYSTAL, CLIFF, CRYSTAL], nodes: [[5, 19.5, 3], [15, 12, 4], [15, 28, 4], [27, 20, 4.5], [37, 10, 4.5], [37, 30, 4], [44, 20, 5]], segs: [[0, 19, 5, 19], [0, 20, 5, 20], [5, 19, 15, 12], [5, 19, 15, 28], [15, 12, 27, 20], [15, 28, 27, 20], [27, 20, 37, 10], [27, 20, 37, 30], [37, 10, 44, 20], [37, 30, 44, 20]], edges: [["w", 19, 20, "star", 34, -6]], spawns: [["cspider", 9, (x, y) => true], ["starw", 7, (x, y) => true], ["cgolem", 5, (x, y) => x > 20]], avoid: [[5, 19, 6], [44, 20, 5]], boss: ["kolos", 44, 20], free: [] }), genWild({ id: "necro", name: "Nekropolia Valgaru", w: 50, h: 40, base: FLOOR, seed: 571, dark: true, blobs: [[BOG, 5, 1.5, 2]], scat: [[RUINW, 0.06], [DEADT, 0.05], [PILLAR, 0.02], [CWALL, 0.06]], border: [CWALL, RUINW, CWALL], nodes: [[24.5, 5, 3.5], [12, 12, 4], [37, 12, 4], [24, 21, 5], [10, 30, 4.5], [37, 30, 4], [44, 20, 3.5]], segs: [[24, 0, 24, 5], [25, 0, 25, 5], [24, 5, 12, 12], [24, 5, 37, 12], [12, 12, 24, 21], [37, 12, 24, 21], [24, 21, 10, 30], [24, 21, 37, 30], [37, 30, 44, 20], [37, 12, 44, 20], [44, 20, 49, 19], [44, 20, 49, 20]], edges: [["n", 24, 25, "star", 26, -7], ["e", 19, 20, "dragon", 1, 0]], spawns: [["bmage", 9, (x, y) => true], ["specter", 7, (x, y) => true], ["bdrake", 5, (x, y) => y > 14]], avoid: [[24, 5, 6], [10, 30, 5]], boss: ["valgar", 10, 31], free: [] }), genWild({ id: "dragon", name: "Smocze Gniazdo", w: 50, h: 40, base: ASH, seed: 581, dark: false, blobs: [[LAVA, 14, 1.2, 2.4]], scat: [[ROCK, 0.05], [CLIFF, 0.07], [DEADT, 0.02]], border: [CLIFF, CLIFF, ROCK], nodes: [[5, 19.5, 3], [15, 10, 4], [16, 30, 4], [27, 20, 4.5], [37, 30, 4], [36, 9, 4], [43, 18, 5.5]], segs: [[0, 19, 5, 19], [0, 20, 5, 20], [5, 19, 15, 10], [5, 19, 16, 30], [15, 10, 27, 20], [16, 30, 27, 20], [27, 20, 36, 9], [27, 20, 37, 30], [36, 9, 43, 18], [37, 30, 43, 18]], edges: [["w", 19, 20, "necro", 48, 0]], spawns: [["drakon", 9, (x, y) => true], ["dkin", 7, (x, y) => true], ["wyrm", 5, (x, y) => x > 20]], avoid: [[5, 19, 6], [43, 18, 6]], boss: ["valdrak", 44, 18], free: [] })].forEach((a) => { AREAS[a.id] = a; });
+    // round 6: roads from the old world into the new lands
+    openEdge(AREAS.village, "s", 19, 20, PATH, "wolfhills", 1, 5);
+    openEdge(AREAS.cave, "w", 21, 23, FLOOR, "mine", 42, -1);
+    openEdge(AREAS.mount, "n", 41, 43, PATH, "glacier", 38, -17);
+    openEdge(AREAS.desert, "n", 23, 25, PATH, "steppe", 38, 0);
+    openEdge(AREAS.coast, "s", 24, 25, PATH, "sunken", 1, 0);
+    openEdge(AREAS.citadel, "e", 13, 14, COBBLE, "star", 1, 0);
     Object.keys(AREAS).forEach((k) => {
         const a = AREAS[k];
         const e0 = a.exits[0];
@@ -881,6 +962,16 @@ function createArdan(canvas, opts) {
         volcano: { lv: "Potwory poz. 37–48", amb: "", dark: 0.25, bg: "#1a1012", gx: 4, gy: 1 },
         citadel: { lv: "Bezpieczne miasto · poz. 46+", amb: "", dark: 0, bg: "#2a2a38", gx: 5, gy: 0 },
         abyss: { lv: "Potwory poz. 49–60", amb: "fog", dark: 0.6, bg: "#0b0812", gx: 4, gy: 0 },
+        wolfhills: { lv: "Potwory poz. 4–10", amb: "fly", dark: 0, bg: "#24401c", gx: 0, gy: 2 },
+        mine: { lv: "Potwory poz. 11–18", amb: "", dark: 0.82, bg: "#0c0a0e", gx: 0, gy: 0 },
+        glacier: { lv: "Potwory poz. 20–28", amb: "snow", dark: 0, bg: "#7a8494", gx: 2, gy: 0 },
+        steppe: { lv: "Potwory poz. 25–33", amb: "sand", dark: 0, bg: "#8a6a40", gx: 3, gy: 1 },
+        elfwood: { lv: "Potwory poz. 31–39", amb: "fly", dark: 0.15, bg: "#14301a", gx: 3, gy: 0 },
+        sunken: { lv: "Potwory poz. 42–50", amb: "fog", dark: 0.4, bg: "#0e2026", gx: 5, gy: 3 },
+        star: { lv: "Bezpieczne miasto · poz. 60+", amb: "", dark: 0, bg: "#1c2236", gx: 6, gy: 0 },
+        crystal: { lv: "Potwory poz. 60–68", amb: "snow", dark: 0.15, bg: "#5a7088", gx: 7, gy: 0 },
+        necro: { lv: "Potwory poz. 66–74", amb: "fog", dark: 0.55, bg: "#0e0c12", gx: 6, gy: 1 },
+        dragon: { lv: "Potwory poz. 72–80", amb: "", dark: 0.25, bg: "#1a0c0a", gx: 7, gy: 1 },
     };
     const GRAPH = {};
     const EXG = {};
@@ -926,7 +1017,7 @@ function createArdan(canvas, opts) {
     function routeList(from, to) {
         const out = [from];
         let c = from, g = 0;
-        while (c !== to && g++ < 10) {
+        while (c !== to && g++ < 40) {
             const n = routeNext(c, to);
             if (!n)
                 break;
@@ -1810,6 +1901,30 @@ function createArdan(canvas, opts) {
         obsid: { n: "Odłamek obsydianu", t: "j", price: 130, c: "#6a4a8a", ic: "gem" },
         voids: { n: "Esencja pustki", t: "j", price: 200, c: "#9a5aff", ic: "orb" },
         crown: { n: "Korona Morgatha", t: "j", price: 3000, c: "#c58cff", ic: "relic" },
+        spot: { n: "Mikstura Gwiazd", t: "p", heal: 2600, price: 520, c: "#9fd8ff", ic: "pot" },
+        dpot: { n: "Smocza mikstura", t: "p", heal: 4200, price: 860, c: "#ff4a3a", ic: "pot" },
+        gmpot: { n: "Wielka mikstura many", t: "m", mana: 180, price: 70, c: "#2a5bff", ic: "pot" },
+        bandana: { n: "Chusta zbója", t: "j", price: 8, c: "#a0302a", ic: "silk" },
+        bearpaw: { n: "Niedźwiedzia łapa", t: "q", price: 14, c: "#7a4a2a", ic: "pelt" },
+        fang: { n: "Kieł Herszta", t: "j", price: 180, c: "#e8e0c8", ic: "tusk" },
+        kcrys: { n: "Kryształ kobolda", t: "j", price: 22, c: "#5fe3ff", ic: "gem" },
+        dwarfr: { n: "Krasnoludzka runa", t: "q", price: 30, c: "#c9a45c", ic: "relic" },
+        mtusk: { n: "Kieł mamuta", t: "q", price: 48, c: "#f0f0e0", ic: "tusk" },
+        frostc: { n: "Rdzeń zamieci", t: "j", price: 55, c: "#bfefff", ic: "orb" },
+        hyhide: { n: "Skóra hieny", t: "j", price: 50, c: "#b08a50", ic: "pelt" },
+        bscale: { n: "Łuska bazyliszka", t: "q", price: 70, c: "#5aa040", ic: "scarab" },
+        bark: { n: "Kora pradrzewa", t: "q", price: 85, c: "#6a8a3a", ic: "bone" },
+        elfar: { n: "Elfi grot", t: "j", price: 80, c: "#9fe08a", ic: "ear" },
+        coral: { n: "Czarny koral", t: "q", price: 150, c: "#3a2a4a", ic: "gem" },
+        nscale: { n: "Łuska nagi", t: "j", price: 140, c: "#3ac8a8", ic: "scarab" },
+        starsh: { n: "Gwiezdny odłamek", t: "q", price: 260, c: "#e8f4ff", ic: "gem" },
+        prism: { n: "Pryzmat", t: "j", price: 240, c: "#9fe8ff", ic: "orb" },
+        soulg: { n: "Klejnot duszy", t: "q", price: 300, c: "#8aff9a", ic: "orb" },
+        bdust: { n: "Proch kości", t: "j", price: 260, c: "#d8d2c0", ic: "bone" },
+        dscale: { n: "Łuska ognistego wyrma", t: "q", price: 360, c: "#ff5a2a", ic: "scarab" },
+        dheart: { n: "Smocze serce", t: "j", price: 1200, c: "#ff2a2a", ic: "relic" },
+        vcrown: { n: "Korona Valgara", t: "j", price: 4200, c: "#9aff9a", ic: "relic" },
+        vscale: { n: "Łuska Valdraka", t: "j", price: 6000, c: "#ffb347", ic: "relic" },
         tail: { n: "Szczurzy ogon", t: "j", price: 3, c: "#d89a9a", ic: "tail" },
         pelt: { n: "Wilcza skóra", t: "j", price: 9, c: "#8d8f94", ic: "pelt" },
         tusk: { n: "Kieł dzika", t: "q", price: 7, c: "#f1ead6", ic: "tusk" },
@@ -1832,7 +1947,7 @@ function createArdan(canvas, opts) {
         arc: { w: ["sbow", "hbow", "lbow", "dbow", "fbow", "sunbow"], a: ["shirt", "leather", "rjack", "rcloak", "rmail", "rdrag"] },
         mag: { w: ["wand", "ostaff", "rstaff", "dstaff", "fstaff", "sstaff"], a: ["shirt", "robe", "mrobe", "arobe", "srobe", "drobe"] },
     };
-    const LIGHTB = ["skel", "boss", "wisp", "ielem", "golem", "mummy", "king", "dragon", "siren", "imp", "lgolem", "ignar", "shade", "morgath"];
+    const LIGHTB = ["skel", "boss", "wisp", "ielem", "golem", "mummy", "king", "dragon", "siren", "imp", "lgolem", "ignar", "shade", "morgath", "dghost", "grimgor", "frwraith", "szronia", "delf", "naga", "starw", "kolos", "bmage", "specter", "valgar", "dkin", "valdrak", "morana", "thalassor", "cspider", "cgolem"];
     const MON = {
         rat: { n: "Szczur", lvl: 1, hp: 16, atk: 4, def: 0, xp: 7, gold: [0, 3], spd: 2.6, aggro: 0, cd: 1.3, resp: 14, drops: [["tail", 0.6], ["pot", 0.06]] },
         wolf: { n: "Szary wilk", lvl: 3, hp: 38, atk: 9, def: 2, xp: 17, gold: [2, 6], spd: 3.6, aggro: 4, cd: 1.2, resp: 22, drops: [["pelt", 0.5], ["pot", 0.1]] },
@@ -1864,6 +1979,42 @@ function createArdan(canvas, opts) {
         voidb: { n: "Bestia Pustki", lvl: 53, hp: 3500, atk: 140, def: 64, xp: 3400, gold: [90, 170], spd: 2.8, aggro: 4, cd: 1.5, resp: 38, sc: 1.35, as: "yeti", tint: "hue-rotate(230deg) saturate(2) brightness(0.65)", drops: [["voids", 0.5], ["selix", 0.06]] },
         dknight: { n: "Rycerz Otchłani", lvl: 56, hp: 3900, atk: 148, def: 70, xp: 3800, gold: [100, 190], spd: 2.6, aggro: 5, cd: 1.4, resp: 40, hum: { body: "#2a2236", skin: "#5a4a6a", hair: "#1a1022", eye: "#c58cff", helmet: true }, hw: "#8a5aff", drops: [["voids", 0.5], ["selix", 0.08]] },
         morgath: { n: "Morgath, Pan Otchłani", lvl: 60, hp: 24000, atk: 168, def: 76, xp: 50000, gold: [6000, 8000], spd: 2.4, aggro: 7, cd: 1.6, rng: 5, pc: "#c58cff", resp: 360, boss: true, slam: 5, sc: 1.6, hum: { body: "#1a0a2a", skin: "#8a7aa8", hair: "#0a0012", eye: "#ff4fd8", robe: true, crown: true }, hw: "#c58cff", hwk: "staff", glow: "rgba(197,140,255,0.5)", drops: [["crown", 1], ["selix", 1], ["voids", 1]] },
+        bandit: { n: "Zbój z gościńca", lvl: 5, hp: 66, atk: 13, def: 4, xp: 30, gold: [4, 9], spd: 3, aggro: 5, cd: 1.4, resp: 18, hum: { "body": "#5a3a2a", "skin": "#e0b48a", "hair": "#2a1a10", "eye": "#ff5040", "hood": true }, hw: "#9aa0a8", drops: [["bandana", 0.5], ["pot", 0.12]] },
+        bwolf: { n: "Czarny wilk", lvl: 6, hp: 80, atk: 15, def: 5, xp: 38, gold: [4, 10], spd: 3, aggro: 5, cd: 1.4, resp: 18, as: "wolf", tint: "brightness(0.45) saturate(0.6)", drops: [["pelt", 0.5], ["pot", 0.12]] },
+        bear: { n: "Niedźwiedź brunatny", lvl: 8, hp: 150, atk: 21, def: 8, xp: 75, gold: [8, 16], spd: 2.4, aggro: 5, cd: 1.4, resp: 26, as: "yeti", tint: "sepia(1) saturate(2.2) hue-rotate(-15deg) brightness(0.55)", sc: 1.05, drops: [["bearpaw", 0.55], ["bigpot", 0.06]] },
+        kiel: { n: "Kieł, Herszt Zbójców", lvl: 10, hp: 720, atk: 27, def: 11, xp: 760, gold: [140, 220], spd: 3, aggro: 5, cd: 1.4, resp: 180, boss: true, slam: 6, sc: 1.25, rng: 4, pc: "#ffb347", hum: { "body": "#3a1a1a", "skin": "#d8a880", "hair": "#1a1a1a", "eye": "#ff3030", "beard": true, "helmet": true }, hw: "#c9d1d9", glow: "rgba(255,90,60,0.3)", drops: [["fang", 1], ["bigpot", 1], ["$w3", 0.25]] },
+        kobold: { n: "Kobold górnik", lvl: 12, hp: 210, atk: 31, def: 12, xp: 160, gold: [10, 20], spd: 3, aggro: 5, cd: 1.4, resp: 22, as: "goblin", tint: "hue-rotate(160deg) saturate(1.4) brightness(0.8)", sc: 0.9, drops: [["kcrys", 0.5], ["bigpot", 0.08]] },
+        crawler: { n: "Kamienny pełzacz", lvl: 14, hp: 270, atk: 37, def: 15, xp: 220, gold: [12, 24], spd: 2.6, aggro: 5, cd: 1.4, resp: 22, as: "spider", tint: "grayscale(1) brightness(1.2)", sc: 1.2, drops: [["kcrys", 0.35], ["mpot", 0.1]] },
+        dghost: { n: "Duch krasnoluda", lvl: 16, hp: 380, atk: 43, def: 18, xp: 320, gold: [16, 30], spd: 3, aggro: 5, cd: 1.4, resp: 22, hum: { "body": "#4a5a7a", "skin": "#a8c0e0", "hair": "#e8e8ff", "eye": "#9fe8ff", "beard": true, "helmet": true }, hw: "#9fe8ff", glow: "rgba(150,200,255,0.4)", sc: 0.9, drops: [["dwarfr", 0.55], ["elix", 0.05]] },
+        grimgor: { n: "Grimgor, Duch Kopalni", lvl: 18, hp: 2100, atk: 50, def: 21, xp: 2500, gold: [400, 650], spd: 3, aggro: 5, cd: 1.4, resp: 200, boss: true, slam: 6, sc: 1.35, rng: 4, pc: "#9fe8ff", hum: { "body": "#2a3a5a", "skin": "#b8d0f0", "hair": "#ffffff", "eye": "#7fe9ff", "beard": true, "crown": true }, hw: "#9fe8ff", hwk: "staff", glow: "rgba(127,233,255,0.45)", drops: [["dwarfr", 1], ["elix", 1], ["relic", 0.5]] },
+        frwraith: { n: "Upiór zamieci", lvl: 21, hp: 500, atk: 56, def: 25, xp: 500, gold: [20, 40], spd: 3, aggro: 5, cd: 1.4, resp: 34, as: "wisp", tint: "grayscale(1) brightness(1.5)", rng: 4, pc: "#e8f8ff", drops: [["frostc", 0.45], ["elix", 0.05]] },
+        icetroll: { n: "Lodowy troll", lvl: 23, hp: 600, atk: 61, def: 28, xp: 600, gold: [24, 46], spd: 3, aggro: 5, cd: 1.4, resp: 34, as: "troll", tint: "hue-rotate(170deg) saturate(1.4) brightness(1.15)", drops: [["frostc", 0.3], ["elix", 0.06]] },
+        mammoth: { n: "Mamut szronowy", lvl: 25, hp: 850, atk: 68, def: 31, xp: 800, gold: [30, 55], spd: 2.2, aggro: 5, cd: 1.4, resp: 40, as: "yeti", tint: "sepia(0.6) brightness(0.9)", sc: 1.4, drops: [["mtusk", 0.55], ["gpot", 0.04]] },
+        szronia: { n: "Szronia, Królowa Lodu", lvl: 28, hp: 5200, atk: 76, def: 34, xp: 8500, gold: [1100, 1700], spd: 3, aggro: 5, cd: 1.4, resp: 240, boss: true, slam: 5, sc: 1.4, rng: 5, pc: "#bfefff", hum: { "body": "#bfe0ff", "skin": "#e8f4ff", "hair": "#ffffff", "eye": "#5fd8ff", "long": true, "robe": true, "crown": true }, hw: "#bfefff", hwk: "staff", glow: "rgba(190,240,255,0.5)", drops: [["frostc", 1], ["gpot", 1], ["relic", 1]] },
+        hyena: { n: "Hiena stepowa", lvl: 26, hp: 820, atk: 70, def: 32, xp: 820, gold: [28, 56], spd: 3, aggro: 5, cd: 1.4, resp: 34, as: "wolf", tint: "sepia(1) saturate(1.6) brightness(0.95)", drops: [["hyhide", 0.5], ["elix", 0.06]] },
+        nomad: { n: "Koczownik-łupieżca", lvl: 28, hp: 950, atk: 75, def: 34, xp: 950, gold: [36, 70], spd: 3, aggro: 5, cd: 1.4, resp: 34, hum: { "body": "#8a5a2a", "skin": "#c89068", "hair": "#1a1a1a", "eye": "#ffb040", "hood": true }, hw: "#c9d1d9", drops: [["hyhide", 0.25], ["gpot", 0.05]] },
+        basil: { n: "Bazyliszek", lvl: 31, hp: 1350, atk: 84, def: 37, xp: 1300, gold: [44, 84], spd: 2.4, aggro: 5, cd: 1.4, resp: 40, as: "scorp", tint: "hue-rotate(70deg) saturate(1.8)", sc: 1.3, drops: [["bscale", 0.55], ["gpot", 0.06]] },
+        burzan: { n: "Chan Burzan", lvl: 33, hp: 6500, atk: 88, def: 39, xp: 10000, gold: [1400, 2100], spd: 3, aggro: 5, cd: 1.4, resp: 240, boss: true, slam: 5, sc: 1.4, rng: 4, pc: "#ffb347", hum: { "body": "#7a3a1a", "skin": "#c89068", "hair": "#1a1a1a", "eye": "#ffd84a", "beard": true, "helmet": true }, hw: "#ffd84a", glow: "rgba(255,180,60,0.35)", drops: [["gpot", 1], ["relic", 1], ["hyhide", 1]] },
+        delf: { n: "Mroczny elf", lvl: 32, hp: 1250, atk: 86, def: 38, xp: 1250, gold: [42, 80], spd: 3, aggro: 5, cd: 1.4, resp: 34, hum: { "body": "#1a3a2a", "skin": "#c8d8c0", "hair": "#e8e8e8", "eye": "#7dff8a", "long": true, "hood": true }, hw: "#9fe08a", hwk: "staff", rng: 4, pc: "#7dff8a", drops: [["elfar", 0.5], ["gpot", 0.05]] },
+        wwolf: { n: "Wilkołak", lvl: 36, hp: 1500, atk: 96, def: 42, xp: 1550, gold: [48, 90], spd: 3, aggro: 5, cd: 1.4, resp: 34, as: "swolf", tint: "brightness(0.5) sepia(0.6)", sc: 1.25, drops: [["pelt", 0.6], ["gpot", 0.06]] },
+        treant: { n: "Pradrzewiec", lvl: 35, hp: 1900, atk: 94, def: 44, xp: 1700, gold: [50, 96], spd: 2, aggro: 5, cd: 1.4, resp: 40, as: "golem", tint: "sepia(1) hue-rotate(50deg) saturate(2) brightness(0.8)", sc: 1.35, drops: [["bark", 0.55], ["selix", 0.03]] },
+        morana: { n: "Morana, Driada Zagłady", lvl: 39, hp: 9000, atk: 104, def: 46, xp: 16000, gold: [2200, 3200], spd: 3, aggro: 5, cd: 1.4, resp: 270, boss: true, slam: 5, sc: 1.45, rng: 5, pc: "#7dff8a", hum: { "body": "#1a4a1a", "skin": "#a8d890", "hair": "#3a8a2a", "eye": "#e0ff60", "long": true, "robe": true, "crown": true }, hw: "#7dff8a", hwk: "staff", glow: "rgba(125,255,138,0.45)", drops: [["bark", 1], ["selix", 1], ["relic", 1]] },
+        naga: { n: "Naga z głębin", lvl: 43, hp: 2200, atk: 113, def: 52, xp: 2200, gold: [62, 120], spd: 3, aggro: 5, cd: 1.4, resp: 34, hum: { "body": "#1a6a6a", "skin": "#7ad8c0", "hair": "#1a3a3a", "eye": "#e0ff60", "long": true, "robe": true }, hw: "#7fffd0", hwk: "staff", rng: 4, pc: "#7fffd0", glow: "rgba(120,255,208,0.3)", drops: [["nscale", 0.5], ["selix", 0.04]] },
+        drowned: { n: "Utopiony rycerz", lvl: 46, hp: 2600, atk: 121, def: 56, xp: 2500, gold: [70, 130], spd: 3, aggro: 5, cd: 1.4, resp: 34, hum: { "body": "#2a4a4a", "skin": "#6a8a80", "hair": "#1a2a2a", "eye": "#c8ff60", "helmet": true }, hw: "#7a9a90", drops: [["nscale", 0.3], ["selix", 0.05]] },
+        tentacle: { n: "Macka Głębin", lvl: 48, hp: 3300, atk: 127, def: 60, xp: 3000, gold: [80, 150], spd: 2.2, aggro: 5, cd: 1.4, resp: 40, as: "drowner", tint: "hue-rotate(200deg) saturate(1.8) brightness(0.8)", sc: 1.35, drops: [["coral", 0.55], ["selix", 0.06]] },
+        thalassor: { n: "Thalassor, Kraken Głębin", lvl: 50, hp: 17000, atk: 136, def: 62, xp: 32000, gold: [3800, 5200], spd: 3, aggro: 5, cd: 1.4, resp: 300, boss: true, slam: 5, sc: 1.75, rng: 5, pc: "#7fffd0", as: "dragon", tint: "hue-rotate(120deg) saturate(1.6) brightness(0.8)", drops: [["coral", 1], ["selix", 1], ["relic", 2]] },
+        cspider: { n: "Pryzmatyczny pająk", lvl: 61, hp: 4200, atk: 158, def: 76, xp: 4300, gold: [120, 220], spd: 3, aggro: 5, cd: 1.4, resp: 34, as: "spider", tint: "hue-rotate(170deg) saturate(2) brightness(1.4)", sc: 1.25, drops: [["prism", 0.45], ["spot", 0.04]] },
+        cgolem: { n: "Kryształowy golem", lvl: 63, hp: 5600, atk: 164, def: 82, xp: 5200, gold: [140, 250], spd: 2, aggro: 5, cd: 1.4, resp: 42, as: "golem", tint: "hue-rotate(160deg) saturate(2.4) brightness(1.3)", sc: 1.4, drops: [["prism", 0.55], ["spot", 0.05]] },
+        starw: { n: "Gwiezdny strażnik", lvl: 66, hp: 5000, atk: 170, def: 80, xp: 5200, gold: [140, 260], spd: 3, aggro: 5, cd: 1.4, resp: 34, hum: { "body": "#2a3a6a", "skin": "#d8e0ff", "hair": "#ffffff", "eye": "#9fd8ff", "helmet": true }, hw: "#bfe8ff", glow: "rgba(160,210,255,0.35)", drops: [["starsh", 0.5], ["spot", 0.05]] },
+        kolos: { n: "Lustrzany Kolos", lvl: 68, hp: 32000, atk: 176, def: 84, xp: 70000, gold: [7000, 9500], spd: 3, aggro: 5, cd: 1.4, resp: 330, boss: true, slam: 5, sc: 1.8, rng: 5, pc: "#bfe8ff", as: "golem", tint: "hue-rotate(180deg) saturate(1.2) brightness(1.7)", drops: [["starsh", 1], ["spot", 2], ["relic", 2]] },
+        bmage: { n: "Kościany mag", lvl: 67, hp: 5300, atk: 172, def: 82, xp: 5400, gold: [150, 270], spd: 3, aggro: 5, cd: 1.4, resp: 34, hum: { "body": "#2a2a2a", "skin": "#ece6d4", "hair": "#ece6d4", "eye": "#7dff8a", "robe": true, "hood": true }, hw: "#7dff8a", hwk: "staff", rng: 4, pc: "#7dff8a", glow: "rgba(125,255,138,0.3)", drops: [["bdust", 0.5], ["spot", 0.05]] },
+        specter: { n: "Upiorna zjawa", lvl: 69, hp: 5600, atk: 177, def: 84, xp: 5800, gold: [160, 280], spd: 3, aggro: 5, cd: 1.4, resp: 34, as: "boss", tint: "hue-rotate(80deg) saturate(1.4)", drops: [["soulg", 0.5], ["spot", 0.05]] },
+        bdrake: { n: "Kościany smok", lvl: 72, hp: 7400, atk: 185, def: 90, xp: 7000, gold: [190, 320], spd: 2.4, aggro: 5, cd: 1.4, resp: 44, as: "dragon", tint: "grayscale(1) brightness(1.3)", sc: 1.1, drops: [["bdust", 0.6], ["dpot", 0.04]] },
+        valgar: { n: "Valgar, Lisz Nekropolii", lvl: 74, hp: 38000, atk: 190, def: 90, xp: 85000, gold: [8000, 11000], spd: 3, aggro: 5, cd: 1.4, resp: 360, boss: true, slam: 5, sc: 1.6, rng: 5, pc: "#9aff9a", hum: { "body": "#14201a", "skin": "#c8d0c0", "hair": "#0a120a", "eye": "#7dff8a", "robe": true, "crown": true }, hw: "#9aff9a", hwk: "staff", glow: "rgba(154,255,154,0.5)", drops: [["vcrown", 1], ["dpot", 2], ["relic", 2]] },
+        drakon: { n: "Ognisty drakon", lvl: 73, hp: 6400, atk: 188, def: 90, xp: 6600, gold: [180, 320], spd: 3, aggro: 5, cd: 1.4, resp: 34, as: "dragon", tint: "hue-rotate(-60deg) saturate(2)", sc: 0.9, drops: [["dscale", 0.3], ["dpot", 0.04]] },
+        dkin: { n: "Smoczy kultysta", lvl: 75, hp: 6800, atk: 193, def: 92, xp: 7000, gold: [190, 340], spd: 3, aggro: 5, cd: 1.4, resp: 34, hum: { "body": "#5a1a0a", "skin": "#d8a080", "hair": "#2a0a0a", "eye": "#ff6a2a", "robe": true, "hood": true }, hw: "#ff7a2a", hwk: "staff", rng: 4, pc: "#ff7a2a", glow: "rgba(255,120,40,0.35)", drops: [["dheart", 0.06], ["dpot", 0.05]] },
+        wyrm: { n: "Lawowy wyrm", lvl: 78, hp: 8800, atk: 200, def: 98, xp: 8600, gold: [220, 380], spd: 2.2, aggro: 5, cd: 1.4, resp: 46, as: "scorp", tint: "hue-rotate(-30deg) saturate(3) brightness(0.9)", sc: 1.5, drops: [["dscale", 0.55], ["dpot", 0.06]] },
+        valdrak: { n: "Valdrak, Pradawny Smok", lvl: 80, hp: 52000, atk: 210, def: 100, xp: 120000, gold: [12000, 16000], spd: 3, aggro: 5, cd: 1.4, resp: 420, boss: true, slam: 5, sc: 2, rng: 5, pc: "#ff7a2a", as: "dragon", tint: "hue-rotate(-90deg) saturate(2.4) brightness(1.05)", drops: [["vscale", 1], ["dheart", 1], ["dpot", 3]] },
         king: { n: "Sethar, Król Cieni", lvl: 26, hp: 4200, atk: 72, def: 32, xp: 7000, gold: [1500, 2200], spd: 2.5, aggro: 7, cd: 1.6, rng: 5, pc: "#c58cff", resp: 300, boss: true, slam: 5, sc: 1.4, drops: [["$w6", 1], ["relic", 1], ["elix", 1]] },
     };
     const NPCS = {
@@ -1898,6 +2049,29 @@ function createArdan(canvas, opts) {
         citalch: { n: "Arcymagini Lumena", area: "citadel", x: 9, y: 15, c: { body: "#2a3a7a", skin: "#f2cfa8", hair: "#d8d8e8", long: true }, shop: "citm", talk: "Esencja pustki jest groźna, ale w dobrych rękach leczy rany, których nic innego nie uleczy." },
         wieszcz: { n: "Wieszcz Dobromir", area: "citadel", x: 14, y: 16, c: { body: "#4a3a6a", skin: "#e0b890", hair: "#bbbbbb", beard: true }, talk: "Morgath czeka w sercu Otchłani. Widziałem w snach jego koronę." },
         citpriest: { n: "Kapłanka Jutrzenka", area: "citadel", x: 26, y: 15, c: { body: "#f0e8d8", skin: "#f2cfa8", hair: "#c87a3a", long: true }, heal: "Poproś o światło świtu", talk: "Światło świtu wyleczy każdą ranę." },
+        gajowy: { n: "Gajowy Bartosz", area: "wolfhills", x: 27, y: 4, c: { "body": "#3a5a2a", "skin": "#e0b48a", "hair": "#6a4a2a", "beard": true }, talk: "Wilcze Wzgórza były kiedyś spokojne. Teraz rządzą tu zbóje Kła i wilki, które straciły strach przed ludźmi." },
+        borysl: { n: "Krasnolud Borysław", area: "mine", x: 38, y: 19, c: { "body": "#5a4a3a", "skin": "#e0b090", "hair": "#a0522d", "beard": true, "helmet": true }, talk: "Moi przodkowie kopali tu srebro. Teraz w chodnikach straszy duch naszego dawnego starszego, Grimgora." },
+        szronka: { n: "Łowczyni Szronka", area: "glacier", x: 27, y: 34, c: { "body": "#c8d8e8", "skin": "#f2cfa8", "hair": "#e8e8e8", "long": true, "hood": true }, talk: "Na lodowcu przeżyją tylko najtwardsi. Królowa Lodu zamraża każdego, kto zbliży się do jej tronu." },
+        radzim: { n: "Zwiadowca Radzim", area: "steppe", x: 26, y: 34, c: { "body": "#8a6a3a", "skin": "#c89068", "hair": "#2a1a10", "hood": true }, talk: "Stepy płoną od lat. Chan Burzan i jego koczownicy palą wszystko, czego nie mogą zabrać." },
+        iwa: { n: "Strażniczka Iwa", area: "elfwood", x: 27, y: 34, c: { "body": "#2a5a3a", "skin": "#f2cfa8", "hair": "#d8c070", "long": true }, talk: "Puszcza choruje. Driada Morana zatruła korzenie pradrzew i obróciła mój lud przeciw nam." },
+        wawrzyn: { n: "Nurek Wawrzyn", area: "sunken", x: 27, y: 5, c: { "body": "#2a4a6a", "skin": "#e0b48a", "hair": "#3a2a1a", "beard": true }, talk: "Pod wodą leży stolica dawnego królestwa. Kraken Thalassor pilnuje jej skarbów od tysiąca lat." },
+        starcap: { n: "Strażnik Gwiazd Aurelian", area: "star", x: 21, y: 11, c: { "body": "#2a3a6a", "skin": "#e8bf98", "hair": "#e8e8e8", "helmet": true }, talk: "Gwiezdna Strażnica pilnuje granic świata. Dalej na wschodzie jest już tylko kryształ, śmierć i smoki." },
+        astronom: { n: "Astronom Gwidon", area: "star", x: 14, y: 16, c: { "body": "#3a2a6a", "skin": "#f0c9a0", "hair": "#bbbbbb", "beard": true, "robe": true }, talk: "Gwiazdy spadają na Kryształowe Pustkowia. Każdy odłamek ma w sobie moc, której nie rozumiemy." },
+        inkwiz: { n: "Inkwizytor Bożydar", area: "star", x: 26, y: 15, c: { "body": "#1a1a2a", "skin": "#e0b890", "hair": "#2a2a2a", "helmet": true }, talk: "Nekropolia Valgaru budzi się do życia. Lisz zbiera armię, której nie powstrzyma żaden mur." },
+        smokobojca: { n: "Smokobójca Bolesław", area: "star", x: 9, y: 15, c: { "body": "#6a2a1a", "skin": "#dfb088", "hair": "#7a2a1a", "beard": true, "helmet": true }, talk: "Valdrak, Pradawny Smok, był stary, gdy Ardan był młody. Kto go pokona, stanie się legendą." },
+        starsmith: { n: "Mistrz kuźni gwiezdnej Ostoja", area: "star", x: 26, y: 12, c: { "body": "#2a2a3a", "skin": "#dfb088", "hair": "#e8e8e8", "apron": true, "beard": true }, shop: "starm", talk: "Kuję w ogniu spadających gwiazd. Pokaż, co masz, a zrobię z tego coś godnego bohatera." },
+        staralch: { n: "Alchemiczka Gwiazdka", area: "star", x: 9, y: 12, c: { "body": "#3a5a8a", "skin": "#f2cfa8", "hair": "#d8d8ff", "long": true }, shop: "starm", talk: "Mikstura Gwiazd uleczy rany, po których inni już by nie wstali." },
+        starpriest: { n: "Kapłan Zorzy", area: "star", x: 21, y: 16, c: { "body": "#f0e8d8", "skin": "#e8bf98", "hair": "#5a3a2a" }, heal: "Poproś o blask zorzy", talk: "Blask zorzy przywraca siły każdemu, kto walczy z mrokiem." },
+        handvil: { n: "Handlarz Jędrek", area: "village", x: 24, y: 13, trade: "skup", c: { "body": "#7a5a2a", "skin": "#f0c9a0", "hair": "#5a3a1a", "beard": true }, talk: "Skupuję wszystko, co przyniesiesz z lasu: broń, zbroje, materiały. Płacę uczciwie, w złocie." },
+        handtown: { n: "Handlarz Bogdan", area: "town", x: 16, y: 12, trade: "skup", c: { "body": "#6a4a2a", "skin": "#f0c9a0", "hair": "#2a1a10", "beard": true }, talk: "Najlepsze ceny w Srebrnogrodzie! Sprzedaj mi to, czego nie potrzebujesz." },
+        auktown: { n: "Aukcjoner Mieszko", area: "town", x: 25, y: 13, trade: "aukcja", c: { "body": "#5a2a6a", "skin": "#f0c9a0", "hair": "#8a8a8a", "beard": true }, talk: "Dom aukcyjny Srebrnogrodu. U mnie wystawisz przedmioty dla innych graczy i kupisz to, co oni wystawili." },
+        handport: { n: "Handlarz Ignacy", area: "port", x: 21, y: 16, trade: "skup", c: { "body": "#2a4a6a", "skin": "#e0b48a", "hair": "#5a3a1a" }, talk: "Statki zabierają wszystko. Skupię każdy przedmiot i każdy materiał." },
+        aukport: { n: "Aukcjonerka Halina", area: "port", x: 14, y: 11, trade: "aukcja", c: { "body": "#6a2a3a", "skin": "#f2cfa8", "hair": "#c87a3a", "long": true }, talk: "Dom aukcyjny Mewiej Przystani. Wystawiaj, kupuj, odbieraj złoto ze sprzedaży." },
+        handfort: { n: "Handlarz Wojmir", area: "fort", x: 21, y: 16, trade: "skup", c: { "body": "#5a3a2a", "skin": "#e0b48a", "hair": "#1a1a1a", "beard": true }, talk: "Twierdza potrzebuje stali. Skupię broń, zbroje i materiały." },
+        handcit: { n: "Handlarz Świętosław", area: "citadel", x: 21, y: 16, trade: "skup", c: { "body": "#4a4a6a", "skin": "#f0c9a0", "hair": "#d8d8d8", "beard": true }, talk: "Skup przedmiotów Cytadeli. Każdy łup ma swoją cenę." },
+        aukcit: { n: "Aukcjonerka Dobrosława", area: "citadel", x: 14, y: 11, trade: "aukcja", c: { "body": "#2a2a5a", "skin": "#f2cfa8", "hair": "#ffd84a", "long": true }, talk: "Dom aukcyjny Cytadeli Świtu. Najlepsze przedmioty Ardanu przechodzą przez moje ręce." },
+        handstar: { n: "Handlarz Gwiezdny Lech", area: "star", x: 12, y: 11, trade: "skup", c: { "body": "#3a3a6a", "skin": "#e0b48a", "hair": "#2a1a10" }, talk: "Skupuję łupy z najdalszych krain. Płacę dobrze, bo wiem, ile kosztują." },
+        aukstar: { n: "Aukcjoner Gwiezdny Radosław", area: "star", x: 23, y: 17, trade: "aukcja", c: { "body": "#5a3a7a", "skin": "#f0c9a0", "hair": "#e8e8e8", "beard": true }, talk: "Dom aukcyjny Gwiezdnej Strażnicy. Tu handlują najpotężniejsi bohaterowie." },
     };
     const DECOR = [{ area: "forest", x: 12, y: 34, k: "fire" }, { area: "village", x: 22, y: 12, k: "crate" }, { area: "village", x: 23, y: 12, k: "barrel" },
         { area: "swamp", x: 27, y: 4, k: "lamp" }, { area: "swamp", x: 21, y: 8, k: "lamp" }, { area: "swamp", x: 36, y: 30, k: "lamp" },
@@ -1907,7 +2081,8 @@ function createArdan(canvas, opts) {
         { area: "port", x: 16, y: 2, k: "banner" }, { area: "port", x: 19, y: 2, k: "banner" }, { area: "port", x: 12, y: 11, k: "crate" }, { area: "port", x: 23, y: 16, k: "barrel" }, { area: "port", x: 15, y: 23, k: "lamp" }, { area: "port", x: 20, y: 23, k: "lamp" },
         { area: "fort", x: 16, y: 2, k: "banner" }, { area: "fort", x: 19, y: 2, k: "banner" }, { area: "fort", x: 2, y: 12, k: "banner" }, { area: "fort", x: 2, y: 15, k: "banner" }, { area: "fort", x: 12, y: 16, k: "fire" },
         { area: "citadel", x: 16, y: 2, k: "banner" }, { area: "citadel", x: 19, y: 2, k: "banner" }, { area: "citadel", x: 2, y: 12, k: "banner" }, { area: "citadel", x: 2, y: 15, k: "banner" }, { area: "citadel", x: 12, y: 11, k: "shrine" },
-        { area: "coast", x: 12, y: 18, k: "tent" }, { area: "coast", x: 13, y: 22, k: "fire" }, { area: "volcano", x: 44, y: 30, k: "shrine" }, { area: "abyss", x: 38, y: 32, k: "lamp" }, { area: "abyss", x: 42, y: 22, k: "lamp" }];
+        { area: "coast", x: 12, y: 18, k: "tent" }, { area: "coast", x: 13, y: 22, k: "fire" }, { area: "volcano", x: 44, y: 30, k: "shrine" }, { area: "abyss", x: 38, y: 32, k: "lamp" }, { area: "abyss", x: 42, y: 22, k: "lamp" },
+        { area: "wolfhills", x: 22, y: 3, k: "tent" }, { area: "wolfhills", x: 23, y: 6, k: "fire" }, { area: "mine", x: 37, y: 23, k: "lamp" }, { area: "mine", x: 29, y: 12, k: "lamp" }, { area: "mine", x: 15, y: 20, k: "lamp" }, { area: "mine", x: 40, y: 23, k: "crate" }, { area: "glacier", x: 22, y: 33, k: "tent" }, { area: "glacier", x: 23, y: 36, k: "fire" }, { area: "steppe", x: 21, y: 33, k: "tent" }, { area: "steppe", x: 22, y: 36, k: "fire" }, { area: "elfwood", x: 22, y: 33, k: "tent" }, { area: "elfwood", x: 23, y: 36, k: "fire" }, { area: "sunken", x: 22, y: 4, k: "lamp" }, { area: "sunken", x: 28, y: 3, k: "crate" }, { area: "star", x: 16, y: 2, k: "banner" }, { area: "star", x: 19, y: 2, k: "banner" }, { area: "star", x: 33, y: 12, k: "banner" }, { area: "star", x: 33, y: 15, k: "banner" }, { area: "star", x: 12, y: 16, k: "shrine" }, { area: "village", x: 25, y: 12, k: "crate" }, { area: "town", x: 15, y: 11, k: "crate" }, { area: "town", x: 26, y: 12, k: "banner" }, { area: "port", x: 13, y: 10, k: "banner" }, { area: "citadel", x: 13, y: 10, k: "lamp" }, { area: "star", x: 22, y: 18, k: "lamp" }, { area: "crystal", x: 6, y: 17, k: "shrine" }, { area: "necro", x: 22, y: 4, k: "lamp" }, { area: "necro", x: 27, y: 4, k: "lamp" }, { area: "dragon", x: 6, y: 17, k: "shrine" }];
     Object.keys(NPCS).forEach((k) => { const n = NPCS[k]; const a = AREAS[n.area]; if (solidT(a, n.x, n.y))
         st(a, n.x, n.y, a.base); });
     DECOR.forEach((d) => { const a = AREAS[d.area]; if (solidT(a, d.x, d.y))
@@ -1922,9 +2097,9 @@ function createArdan(canvas, opts) {
     const pvpAt = (area, x, y) => { for (const z of PVPZ)
         if (z.area === area && x >= z.x0 && x <= z.x1 && y >= z.y0 && y <= z.y1)
             return z; return null; };
-    const SHOPN = { smith: "Kuźnia Bogumiła", herbs: "Chata Zielarki", swamp: "Zapasy Rybaka", armory: "Zbrojownia Wojsława", alch: "Pracownia Alchemiczki", nomad: "Kram Nomady", portm: "Kram Mewiej Przystani", portsmith: "Kuźnia mistrzów", fortm: "Zaopatrzenie Żarogrodu", citm: "Skarbiec Świtu" };
-    const SHOPS = { smith: ["$w2", "$w3", "$a2", "$a3", "$a4"], herbs: ["pot", "bigpot", "mpot"], swamp: ["pot", "bigpot", "mpot"], armory: ["$w4", "$w5", "$a4", "$a5"], alch: ["bigpot", "elix", "mpot"], nomad: ["bigpot", "elix", "mpot"], portm: ["bigpot", "elix", "gpot", "mpot"], portsmith: ["$w5", "$w6", "$a5", "$a6"], fortm: ["elix", "gpot", "selix", "mpot"], citm: ["gpot", "selix", "mpot"] };
-    const QORDER = ["rats", "wolves", "tusks", "wraith", "letter", "drown", "wisps", "witchq", "swolves", "hearts", "dragonq", "stings", "mummies", "kingq", "crabs", "pirates", "pearls", "leviq", "imps", "embers", "golemsq", "ignarq", "shades", "voidq", "knights", "morgq"];
+    const SHOPN = { smith: "Kuźnia Bogumiła", herbs: "Chata Zielarki", swamp: "Zapasy Rybaka", armory: "Zbrojownia Wojsława", alch: "Pracownia Alchemiczki", nomad: "Kram Nomady", portm: "Kram Mewiej Przystani", portsmith: "Kuźnia mistrzów", fortm: "Zaopatrzenie Żarogrodu", citm: "Skarbiec Świtu", starm: "Gwiezdny skarbiec" };
+    const SHOPS = { smith: ["$w2", "$w3", "$a2", "$a3", "$a4"], herbs: ["pot", "bigpot", "mpot"], swamp: ["pot", "bigpot", "mpot"], armory: ["$w4", "$w5", "$a4", "$a5"], alch: ["bigpot", "elix", "mpot"], nomad: ["bigpot", "elix", "mpot"], portm: ["bigpot", "elix", "gpot", "mpot"], portsmith: ["$w5", "$w6", "$a5", "$a6"], fortm: ["elix", "gpot", "selix", "mpot"], citm: ["gpot", "selix", "spot", "mpot", "gmpot"], starm: ["selix", "spot", "dpot", "mpot", "gmpot"] };
+    const QORDER = ["rats", "wolves", "tusks", "wraith", "letter", "drown", "wisps", "witchq", "swolves", "hearts", "dragonq", "stings", "mummies", "kingq", "crabs", "pirates", "pearls", "leviq", "imps", "embers", "golemsq", "ignarq", "shades", "voidq", "knights", "morgq", "bandits", "bwolves", "bearpaws", "kielq", "kobolds", "crawlers", "runes", "grimq", "frwraiths", "mtusks", "szroniaq", "hyenas", "nomads", "bscales", "burzanq", "delves", "bark", "wolfmen", "moranaq", "nagas", "drowned", "corals", "thalq", "cspiders", "starsh", "kolosq", "bmages", "souls", "bdrakes", "valgarq", "drakons", "dkins", "dscales", "valdrakq"];
     const QUESTS = {
         rats: { n: "Szczury w spiżarni", giver: "soltys", kill: "rat", need: 4, area: "village", desc: "Ubij 4 szczury w Osadzie Brzozowej.",
             offer: "Witaj, wędrowcze! Szczury z piwnic rozpanoszyły się po całej osadzie. Ubij 4 z nich, a cię wynagrodzę.",
@@ -2014,6 +2189,40 @@ function createArdan(canvas, opts) {
         morgq: { n: "Pan Otchłani", giver: "citcap", req: "knights", lvl: 56, kill: "morgath", need: 1, area: "abyss", desc: "Pokonaj Morgatha, Pana Otchłani, w sercu krainy na północy.",
             offer: "Morgath, Pan Otchłani, to źródło całego mroku. Pokonaj go, a Ardan zazna prawdziwego świtu.", lock: "Morgath to najpotężniejsza istota Ardanu. Wróć na 56. poziomie.",
             mid: "Morgath wciąż czeka w sercu Otchłani.", thx: "Świt nad Ardanem! Jesteś największym bohaterem tej krainy.", rew: { xp: 120000, gold: 10000, items: [["relic", 5], ["selix", 5]] } },
+        bandits: { n: "Zbóje na gościńcu", giver: "gajowy", lvl: 4, kill: "bandit", need: 8, area: "wolfhills", desc: "Ubij 8 zbójów na Wilczych Wzgórzach (południowa droga z Osady).", offer: "Zbóje Kła napadają na każdego, kto idzie gościńcem. Przegoń ośmiu.", lock: "Zbóje są groźni dla żółtodziobów. Wróć na 4. poziomie.", mid: "Zbójów pokonanych: {c}/{n}.", thx: "Gościniec znów jest bezpieczny. Należy ci się nagroda.", rew: { "xp": 150, "gold": 50, "items": [["pot", 4]] } },
+        bwolves: { n: "Czarna wataha", giver: "gajowy", lvl: 5, kill: "bwolf", need: 8, area: "wolfhills", desc: "Ubij 8 czarnych wilków na Wilczych Wzgórzach.", offer: "Czarne wilki porywają owce z Osady. Ubij osiem, zanim zaczną atakować ludzi.", lock: "Wataha jest zbyt silna. Wróć na 5. poziomie.", mid: "Wilków ubitych: {c}/{n}.", thx: "Wataha się przerzedziła. Pasterze ci dziękują.", rew: { "xp": 220, "gold": 60, "items": [["pot", 3]] } },
+        bearpaws: { n: "Łapy niedźwiedzia", giver: "gajowy", lvl: 7, item: "bearpaw", src: "bear", need: 4, area: "wolfhills", desc: "Przynieś 4 niedźwiedzie łapy od niedźwiedzi brunatnych.", offer: "Z niedźwiedzich łap robię maść na rany. Przynieś mi cztery.", lock: "Niedźwiedź rozszarpie cię w mig. Wróć na 7. poziomie.", mid: "Masz {c}/{n} łap.", thx: "Doskonale! Maść wystarczy na całą zimę. Weź mikstury.", rew: { "xp": 480, "gold": 80, "items": [["bigpot", 2]] } },
+        kielq: { n: "Herszt Kieł", giver: "gajowy", req: "bandits", lvl: 8, kill: "kiel", need: 1, area: "wolfhills", desc: "Pokonaj Kła, Herszta Zbójców, w obozie na południowym wschodzie Wilczych Wzgórz.", offer: "Kieł dowodzi wszystkimi zbójami w okolicy. Pokonaj go, a wzgórza odetchną.", lock: "Kieł to doświadczony wojownik. Wróć na 8. poziomie.", mid: "Kieł wciąż rządzi w swoim obozie.", thx: "Kieł pokonany! Osada jest ci winna wdzięczność.", rew: { "xp": 1290, "gold": 240, "items": [["bigpot", 3]] } },
+        kobolds: { n: "Kobold w każdym chodniku", giver: "borysl", lvl: 11, kill: "kobold", need: 10, area: "mine", desc: "Ubij 10 koboldów w Kopalni Krasnoludów (zachodni tunel Jaskini Cieni).", offer: "Koboldy zajęły nasze chodniki i kradną rudę. Wyrzuć dziesięciu.", lock: "Koboldy chodzą stadami. Wróć na 11. poziomie.", mid: "Koboldów ubitych: {c}/{n}.", thx: "Chodniki znów są nasze. Dzięki, przyjacielu.", rew: { "xp": 930, "gold": 150, "items": [["bigpot", 3]] } },
+        crawlers: { n: "Kamienne pełzacze", giver: "borysl", lvl: 13, kill: "crawler", need: 8, area: "mine", desc: "Rozbij 8 kamiennych pełzaczy w kopalni.", offer: "Pełzacze drążą skałę i zawalają stropy. Rozbij ośmiu.", lock: "Pełzacze mają skorupy twarde jak granit. Wróć na 13. poziomie.", mid: "Pełzaczy rozbitych: {c}/{n}.", thx: "Stropy przestały się sypać. Bierz zapłatę.", rew: { "xp": 1280, "gold": 190, "items": [["bigpot", 3], ["mpot", 2]] } },
+        runes: { n: "Runy przodków", giver: "borysl", lvl: 14, item: "dwarfr", src: "dghost", need: 5, area: "mine", desc: "Przynieś 5 krasnoludzkich run od duchów krasnoludów.", offer: "Duchy moich przodków noszą runy, które mogą je uspokoić. Przynieś pięć.", lock: "Duchy nie zniosą słabego. Wróć na 14. poziomie.", mid: "Masz {c}/{n} run.", thx: "Runy wróciły do rodu. Duchy wreszcie odpoczną.", rew: { "xp": 1750, "gold": 220, "items": [["elix", 2]] } },
+        grimq: { n: "Duch Kopalni", giver: "borysl", req: "runes", lvl: 16, kill: "grimgor", need: 1, area: "mine", desc: "Pokonaj Grimgora, Ducha Kopalni, w najgłębszej sali na południowym zachodzie.", offer: "Grimgor był naszym starszym. Jego duch oszalał. Uwolnij go.", lock: "Grimgor jest potężny nawet po śmierci. Wróć na 16. poziomie.", mid: "Grimgor wciąż krąży po najgłębszej sali.", thx: "Grimgor zaznał spokoju. Ród Borysława nigdy cię nie zapomni.", rew: { "xp": 4790, "gold": 680, "items": [["elix", 3], ["relic", 1]] } },
+        frwraiths: { n: "Upiory zamieci", giver: "szronka", lvl: 20, kill: "frwraith", need: 10, area: "glacier", desc: "Rozprosz 10 upiorów zamieci na Lodowcu Wichrów (północna przełęcz Szczytów Szronu).", offer: "Upiory zamieci zamrażają podróżnych. Rozprosz dziesięć.", lock: "Mróz zabije cię szybciej niż upiór. Wróć na 20. poziomie.", mid: "Upiorów rozproszonych: {c}/{n}.", thx: "Zamieć słabnie. Dobra robota.", rew: { "xp": 2880, "gold": 400, "items": [["elix", 3]] } },
+        mtusks: { n: "Kły mamutów", giver: "szronka", lvl: 23, item: "mtusk", src: "mammoth", need: 5, area: "glacier", desc: "Przynieś 5 kłów mamuta od szronowych mamutów.", offer: "Kły mamutów są cenne jak złoto. Przynieś mi pięć.", lock: "Mamut stratuje cię bez trudu. Wróć na 23. poziomie.", mid: "Masz {c}/{n} kłów.", thx: "Piękne kły! Część zysku jest twoja.", rew: { "xp": 4290, "gold": 520, "items": [["elix", 3]] } },
+        szroniaq: { n: "Królowa Lodu", giver: "szronka", req: "frwraiths", lvl: 26, kill: "szronia", need: 1, area: "glacier", desc: "Pokonaj Szronię, Królową Lodu, na lodowym tronie na północnym wschodzie.", offer: "Szronia zamroziła pół Ardanu. Roztop jej serce mieczem.", lock: "Szronia zamrozi cię jednym spojrzeniem. Wróć na 26. poziomie.", mid: "Szronia wciąż siedzi na lodowym tronie.", thx: "Lód pęka! Wiosna wraca na przełęcze.", rew: { "xp": 11090, "gold": 1620, "items": [["gpot", 3], ["relic", 1]] } },
+        hyenas: { n: "Hieny stepowe", giver: "radzim", lvl: 25, kill: "hyena", need: 10, area: "steppe", desc: "Ubij 10 hien na Spalonych Stepach (północna droga z Ruin Piasków).", offer: "Hieny idą za koczownikami i dobijają rannych. Ubij dziesięć.", lock: "Stepy nie wybaczają słabości. Wróć na 25. poziomie.", mid: "Hien ubitych: {c}/{n}.", thx: "Hieny uciekły na wschód. Dziękuję.", rew: { "xp": 4160, "gold": 600, "items": [["elix", 3]] } },
+        nomads: { n: "Łupieżcy Chana", giver: "radzim", lvl: 27, kill: "nomad", need: 8, area: "steppe", desc: "Pokonaj 8 koczowników-łupieżców.", offer: "Koczownicy Burzana palą osady. Rozpraw się z ośmioma.", lock: "Łupieżcy jeżdżą bandami. Wróć na 27. poziomie.", mid: "Łupieżców pokonanych: {c}/{n}.", thx: "Osady ocalały. Chan straci cierpliwość.", rew: { "xp": 4720, "gold": 700, "items": [["gpot", 2]] } },
+        bscales: { n: "Łuski bazyliszka", giver: "radzim", lvl: 29, item: "bscale", src: "basil", need: 5, area: "steppe", desc: "Przynieś 5 łusek bazyliszka.", offer: "Łuski bazyliszka chronią przed ogniem. Przynieś mi pięć.", lock: "Spojrzenie bazyliszka paraliżuje. Wróć na 29. poziomie.", mid: "Masz {c}/{n} łusek.", thx: "Z tych łusek zrobimy tarcze dla zwiadowców.", rew: { "xp": 6290, "gold": 800, "items": [["gpot", 3]] } },
+        burzanq: { n: "Chan Burzan", giver: "radzim", req: "nomads", lvl: 31, kill: "burzan", need: 1, area: "steppe", desc: "Pokonaj Chana Burzana w jego obozie na północnym wschodzie stepów.", offer: "Bez Chana koczownicy rozproszą się w tydzień. Pokonaj go.", lock: "Chan to najlepszy wojownik stepów. Wróć na 31. poziomie.", mid: "Chan wciąż rządzi z obozu.", thx: "Chan pokonany! Stepy mogą odrosnąć.", rew: { "xp": 15560, "gold": 2260, "items": [["gpot", 3], ["relic", 1]] } },
+        delves: { n: "Mroczne elfy", giver: "iwa", lvl: 31, kill: "delf", need: 10, area: "elfwood", desc: "Pokonaj 10 mrocznych elfów w Szmaragdowej Puszczy (północ Spalonych Stepów).", offer: "Morana obróciła mój lud przeciwko nam. Pokonaj dziesięciu, może reszta się opamięta.", lock: "Elfy strzelają z ukrycia. Wróć na 31. poziomie.", mid: "Elfów pokonanych: {c}/{n}.", thx: "Część elfów rzuciła łuki. Jest nadzieja.", rew: { "xp": 6220, "gold": 900, "items": [["gpot", 3]] } },
+        bark: { n: "Kora pradrzew", giver: "iwa", lvl: 33, item: "bark", src: "treant", need: 6, area: "elfwood", desc: "Przynieś 6 kawałków kory pradrzewa od pradrzewców.", offer: "Z kory pradrzew uwarzę lek na zarazę korzeni. Przynieś sześć.", lock: "Pradrzewce miażdżą skały. Wróć na 33. poziomie.", mid: "Masz {c}/{n} kawałków kory.", thx: "Lek gotowy. Puszcza zaczyna zdrowieć.", rew: { "xp": 8950, "gold": 1020, "items": [["gpot", 3]] } },
+        wolfmen: { n: "Wilkołaki", giver: "iwa", lvl: 35, kill: "wwolf", need: 8, area: "elfwood", desc: "Ubij 8 wilkołaków w Szmaragdowej Puszczy.", offer: "Wilkołaki strzegą drogi do Morany. Ubij ośmiu.", lock: "Wilkołaki rozszarpią cię przy pełni. Wróć na 35. poziomie.", mid: "Wilkołaków ubitych: {c}/{n}.", thx: "Droga do Morany stoi otworem.", rew: { "xp": 9050, "gold": 1140, "items": [["gpot", 2], ["selix", 1]] } },
+        moranaq: { n: "Driada Zagłady", giver: "iwa", req: "wolfmen", lvl: 37, kill: "morana", need: 1, area: "elfwood", desc: "Pokonaj Moranę, Driadę Zagłady, na polanie na północnym zachodzie puszczy.", offer: "Morana jest sercem zarazy. Pokonaj ją, a puszcza ożyje.", lock: "Morana włada samymi korzeniami świata. Wróć na 37. poziomie.", mid: "Morana wciąż truje korzenie.", thx: "Puszcza oddycha! Mój lud jest wolny.", rew: { "xp": 26790, "gold": 3180, "items": [["selix", 3], ["relic", 2]] } },
+        nagas: { n: "Nagi z głębin", giver: "wawrzyn", lvl: 42, kill: "naga", need: 10, area: "sunken", desc: "Pokonaj 10 nag w Zatopionym Mieście (południowa droga z Wybrzeża Wraków).", offer: "Nagi wypływają na brzeg i porywają rybaków. Pokonaj dziesięć.", lock: "Nagi władają magią wody. Wróć na 42. poziomie.", mid: "Nag pokonanych: {c}/{n}.", thx: "Rybacy znów mogą łowić.", rew: { "xp": 15650, "gold": 1630, "items": [["selix", 2]] } },
+        drowned: { n: "Utopieni rycerze", giver: "wawrzyn", lvl: 44, kill: "drowned", need: 8, area: "sunken", desc: "Pokonaj 8 utopionych rycerzy.", offer: "Rycerze dawnej stolicy wciąż jej strzegą, choć dawno utonęli. Uwolnij ośmiu.", lock: "Ich zbroje pamiętają setki bitew. Wróć na 44. poziomie.", mid: "Rycerzy pokonanych: {c}/{n}.", thx: "Ich dusze odpłynęły w spokoju.", rew: { "xp": 17960, "gold": 1780, "items": [["selix", 2]] } },
+        corals: { n: "Czarny koral", giver: "wawrzyn", lvl: 46, item: "coral", src: "tentacle", need: 5, area: "sunken", desc: "Przynieś 5 czarnych korali od macek głębin.", offer: "Czarny koral rośnie tylko na mackach Krakena. Przynieś pięć.", lock: "Macki wciągną cię pod wodę. Wróć na 46. poziomie.", mid: "Masz {c}/{n} korali.", thx: "Z tego koralu zrobię amulety oddechu.", rew: { "xp": 24230, "gold": 1940, "items": [["selix", 3]] } },
+        thalq: { n: "Kraken Głębin", giver: "wawrzyn", req: "drowned", lvl: 48, kill: "thalassor", need: 1, area: "sunken", desc: "Pokonaj Thalassora, Krakena Głębin, w zatopionej świątyni na południu.", offer: "Thalassor śpi w świątyni na dnie miasta. Obudź go i pokonaj.", lock: "Kraken zmiażdży cię mackami. Wróć na 48. poziomie.", mid: "Thalassor wciąż czai się w świątyni.", thx: "Kraken pokonany! Skarby stolicy są wolne.", rew: { "xp": 57930, "gold": 5280, "items": [["selix", 4], ["relic", 2]] } },
+        cspiders: { n: "Pryzmatyczne pająki", giver: "astronom", lvl: 60, kill: "cspider", need: 10, area: "crystal", desc: "Ubij 10 pryzmatycznych pająków na Kryształowych Pustkowiach (wschodnia brama Strażnicy).", offer: "Pająki tkają sieci z kryształu i łapią moich zwiadowców. Ubij dziesięć.", lock: "Pustkowia to kraj dla legend. Wróć na 60. poziomie.", mid: "Pająków ubitych: {c}/{n}.", thx: "Moi zwiadowcy mogą wrócić do pracy.", rew: { "xp": 44060, "gold": 3280, "items": [["spot", 3]] } },
+        starsh: { n: "Odłamki gwiazd", giver: "astronom", req: "cspiders", lvl: 62, item: "starsh", src: "starw", need: 6, area: "crystal", desc: "Przynieś 6 gwiezdnych odłamków od gwiezdnych strażników.", offer: "Strażnicy noszą odłamki spadłych gwiazd. Przynieś mi sześć, chcę zbadać ich moc.", lock: "Strażnicy gwiazd nie znają litości. Wróć na 62. poziomie.", mid: "Masz {c}/{n} odłamków.", thx: "Niezwykłe! Gwiazdy mówią o czymś wielkim na wschodzie.", rew: { "xp": 57280, "gold": 3500, "items": [["spot", 3]] } },
+        kolosq: { n: "Lustrzany Kolos", giver: "astronom", req: "starsh", lvl: 65, kill: "kolos", need: 1, area: "crystal", desc: "Pokonaj Lustrzanego Kolosa na wschodnim krańcu Kryształowych Pustkowi.", offer: "Kolos odbija każdy cios i każde zaklęcie. Znajdź sposób, by go rozbić.", lock: "Kolos to góra żywego kryształu. Wróć na 65. poziomie.", mid: "Kolos wciąż stoi na straży.", thx: "Kolos rozbity w drobny mak! Strażnica jest ci wdzięczna.", rew: { "xp": 138280, "gold": 9610, "items": [["spot", 4], ["relic", 3]] } },
+        bmages: { n: "Kościani magowie", giver: "inkwiz", lvl: 66, kill: "bmage", need: 10, area: "necro", desc: "Pokonaj 10 kościanych magów w Nekropolii Valgaru (południowa brama Strażnicy).", offer: "Kościani magowie wskrzeszają poległych. Zniszcz dziesięciu.", lock: "Nekropolia pożre słabego. Wróć na 66. poziomie.", mid: "Magów pokonanych: {c}/{n}.", thx: "Martwi przestali wstawać. Dobrze.", rew: { "xp": 57750, "gold": 3960, "items": [["spot", 3]] } },
+        souls: { n: "Klejnoty dusz", giver: "inkwiz", lvl: 68, item: "soulg", src: "specter", need: 6, area: "necro", desc: "Przynieś 6 klejnotów duszy od upiornych zjaw.", offer: "Zjawy więzią dusze w klejnotach. Przynieś sześć, uwolnię je.", lock: "Zjawy wysysają życie. Wróć na 68. poziomie.", mid: "Masz {c}/{n} klejnotów.", thx: "Dusze są wolne. Valgar traci siłę.", rew: { "xp": 74410, "gold": 4200, "items": [["spot", 3]] } },
+        bdrakes: { n: "Kościane smoki", giver: "inkwiz", req: "bmages", lvl: 70, kill: "bdrake", need: 6, area: "necro", desc: "Zniszcz 6 kościanych smoków w Nekropolii.", offer: "Valgar wskrzesił smoki z dawnych wojen. Zniszcz sześć.", lock: "Kościany smok to wciąż smok. Wróć na 70. poziomie.", mid: "Smoków zniszczonych: {c}/{n}.", thx: "Niebo nad Nekropolią jest czyste.", rew: { "xp": 68190, "gold": 4450, "items": [["dpot", 2]] } },
+        valgarq: { n: "Lisz Nekropolii", giver: "inkwiz", req: "bdrakes", lvl: 71, kill: "valgar", need: 1, area: "necro", desc: "Pokonaj Valgara, Lisza Nekropolii, w krypcie na południowym zachodzie.", offer: "Valgar ukrył swoją duszę w koronie. Pokonaj go i zabierz ją.", lock: "Valgar to mistrz śmierci. Wróć na 71. poziomie.", mid: "Valgar wciąż rządzi w krypcie.", thx: "Lisz upadł! Korona Valgara już nikogo nie wskrzesi.", rew: { "xp": 177420, "gold": 11440, "items": [["dpot", 4], ["relic", 3]] } },
+        drakons: { n: "Ogniste drakony", giver: "smokobojca", lvl: 72, kill: "drakon", need: 10, area: "dragon", desc: "Ubij 10 ognistych drakonów w Smoczym Gnieździe (wschodnie wyjście z Nekropolii).", offer: "Drakony to młode Valdraka. Ubij dziesięć, zanim urosną.", lock: "Ogień drakonów topi stal. Wróć na 72. poziomie.", mid: "Drakonów ubitych: {c}/{n}.", thx: "Gniazdo się przerzedziło. Valdrak będzie wściekły.", rew: { "xp": 73810, "gold": 4710, "items": [["dpot", 3]] } },
+        dkins: { n: "Smoczy kultyści", giver: "smokobojca", lvl: 74, kill: "dkin", need: 8, area: "dragon", desc: "Pokonaj 8 smoczych kultystów.", offer: "Kultyści karmią Valdraka i strzegą jego legowiska. Pokonaj ośmiu.", lock: "Kultyści władają smoczym ogniem. Wróć na 74. poziomie.", mid: "Kultystów pokonanych: {c}/{n}.", thx: "Kult rozbity. Droga do Valdraka stoi otworem.", rew: { "xp": 79720, "gold": 4970, "items": [["dpot", 3]] } },
+        dscales: { n: "Łuski wyrmów", giver: "smokobojca", lvl: 76, item: "dscale", src: "wyrm", need: 5, area: "dragon", desc: "Przynieś 5 łusek ognistego wyrma od lawowych wyrmów.", offer: "Z łusek wyrmów wykuję pancerz, który zniesie oddech Valdraka. Przynieś pięć.", lock: "Wyrmy pływają w lawie. Wróć na 76. poziomie.", mid: "Masz {c}/{n} łusek.", thx: "Pancerz będzie gotowy na czas. Teraz twój ruch.", rew: { "xp": 101730, "gold": 5240, "items": [["dpot", 3]] } },
+        valdrakq: { n: "Pradawny Smok", giver: "smokobojca", req: "dscales", lvl: 77, kill: "valdrak", need: 1, area: "dragon", desc: "Pokonaj Valdraka, Pradawnego Smoka, na szczycie gniazda na wschodzie.", offer: "Valdrak był stary, gdy Ardan był młody. Pokonaj go i zostań legendą.", lock: "Valdrak to najpotężniejsza istota świata. Wróć na 77. poziomie.", mid: "Valdrak wciąż śpi na swoim złocie.", thx: "Pradawny Smok pokonany! Twoje imię zapisze się w Kronice Ardanu na zawsze.", rew: { "xp": 222780, "gold": 13440, "items": [["dpot", 5], ["relic", 5]] } },
     };
     // ---------- CLASSES ----------
     const CLS = {
@@ -2045,7 +2254,7 @@ function createArdan(canvas, opts) {
             { n: "Odnowa", lvl: 5, cost: 35, cd: 16, ic: "heal", d: "Przywraca 40% życia." }
         ],
     };
-    const MAXLVL = 60;
+    const MAXLVL = 80;
     const SKX = {
         war: [
             { n: "Szarża tytana", lvl: 15, cost: 45, cd: 3, ic: "smash", d: "Cios za 300% obrażeń, ogłusza (bossa rzadziej)." },
@@ -2325,6 +2534,7 @@ function createArdan(canvas, opts) {
         gainXp(q.rew.xp);
         save();
     }
+    let uiReq = "";
     function talk(id) {
         const n = NPCS[id];
         pl.talk = null;
@@ -2333,6 +2543,8 @@ function createArdan(canvas, opts) {
         const extra = [];
         if (n.shop)
             extra.push({ l: "Pokaż towary", fn: () => { dlg = null; panel = "shop"; shopId = n.shop; shopTab = "buy"; sellPage = 0; } });
+        if (n.trade)
+            extra.push({ l: n.trade === "aukcja" ? "Otwórz dom aukcyjny" : "Sprzedaj przedmioty", fn: () => { dlg = null; uiReq = n.trade + ":" + id; } });
         if (n.heal)
             extra.push({ l: n.heal, fn: () => { P.hp = maxHp(); P.mp = maxMp(); dlg = { name: n.n, text: "Czujesz, jak siły wracają. Zdrowie i " + C().res.toLowerCase() + " zostały w pełni przywrócone.", opts: [{ l: "Dziękuję", fn: () => { dlg = null; } }] }; const p = rpos(pl2()); burst(p[0] + 16, p[1] + 14, "#7dff8a", 18, 50); } });
         const bye = { l: "Do widzenia", fn: () => { dlg = null; } };
@@ -2702,7 +2914,7 @@ function createArdan(canvas, opts) {
         if (pl.dead || !P.cls)
             return;
         const miss = maxHp() - P.hp;
-        const have = ["pot", "bigpot", "elix"].filter((id) => countItem(id) > 0);
+        const have = ["pot", "bigpot", "elix", "gpot", "selix", "spot", "dpot"].filter((id) => countItem(id) > 0);
         if (!have.length) {
             log("Nie masz mikstur leczniczych. Kup je u zielarki lub alchemiczki.", "#ff8a7a");
             return;
@@ -2717,11 +2929,12 @@ function createArdan(canvas, opts) {
     function useMana() {
         if (pl.dead || !P.cls)
             return;
-        if (!countItem("mpot")) {
+        const mid = countItem("gmpot") ? "gmpot" : "mpot";
+        if (!countItem(mid)) {
             log("Nie masz mikstur many.", "#9fb8ff");
             return;
         }
-        useItem("mpot");
+        useItem(mid);
     }
     function useItem(id) {
         const it = ITEMS[id];
@@ -3911,7 +4124,7 @@ function createArdan(canvas, opts) {
         if (!P.intro && !dlg && !netIntro) {
             netIntro = true;
             dlg = { name: "ARDAN", text: (touchMode
-                    ? "Witaj w świecie ARDAN! Chodzisz strzałkami w lewym dolnym rogu (przytrzymaj; dwie naraz – po skosie). Złota strzałka i kropki wskazują drogę do celu zadania. Dotknij potwora (lub przycisk ataku obok niego), aby rozpocząć walkę turową – możesz włączyć walkę automatyczną. Dotknij innego gracza, by handlować, zaprosić go lub wyzwać na arenie PvP. Menu (☰) otwiera ekwipunek, rynek, gildię i ranking PvP."
+                    ? "Witaj w świecie ARDAN! Chodzisz strzałkami w lewym dolnym rogu (przytrzymaj; dwie naraz – po skosie). Złota strzałka i kropki wskazują drogę do celu zadania. Dotknij potwora (lub przycisk ataku obok niego), aby rozpocząć walkę turową – możesz włączyć walkę automatyczną. Dotknij innego gracza, by handlować, zaprosić go lub wyzwać na arenie PvP. Menu (☰) otwiera ekwipunek, gildię i ranking PvP. Przedmioty sprzedasz u handlarzy, a wystawisz u aukcjonerów w miastach."
                     : "Witaj w świecie ARDAN! WASD/strzałki – ruch. Klik na potwora albo Spacja/E obok niego – walka turowa (z opcją walki automatycznej). Klik na gracza – handel, drużyna, gildia, pojedynek PvP. I – ekwipunek, R – rynek, U – gildia, P – PvP, Q – zadania, M – mapa, C – czat."),
                 opts: [{ l: "Zaczynajmy!", fn: () => { dlg = null; act({ a: "intro" }); } }] };
         }
@@ -5917,9 +6130,9 @@ function createArdan(canvas, opts) {
             circleBtn(axc + Math.cos(angs[i]) * R0, ayc + Math.sin(angs[i]) * R0, sr, "sk" + i, () => act({ a: "sk", i }), hintOn ? String(i + 1) : "");
         const pr = small ? 18 : 20;
         const potX = axc - R0 - sr - pr - 8;
-        circleBtn(potX, ayc + 8, pr, "pot", () => act({ a: "pot" }), hintOn ? "H" : "", String(countItem("pot") + countItem("bigpot") + countItem("elix")));
-        if (P.cls === "mag" || countItem("mpot") > 0)
-            circleBtn(potX + 6, ayc - pr * 2 - 14, pr, "mpot", () => act({ a: "mpot" }), hintOn ? "G" : "", String(countItem("mpot")));
+        circleBtn(potX, ayc + 8, pr, "pot", () => act({ a: "pot" }), hintOn ? "H" : "", String(["pot", "bigpot", "elix", "gpot", "selix", "spot", "dpot"].reduce((n, k) => n + countItem(k), 0)));
+        if (P.cls === "mag" || countItem("mpot") + countItem("gmpot") > 0)
+            circleBtn(potX + 6, ayc - pr * 2 - 14, pr, "mpot", () => act({ a: "mpot" }), hintOn ? "G" : "", String(countItem("mpot") + countItem("gmpot")));
         let logBottom = H - 12;
         if (touchMode) {
             // arrow d-pad (always visible on touch devices); hold to walk, two arrows = diagonal
@@ -6435,8 +6648,14 @@ function createArdan(canvas, opts) {
             }
         }
         else {
-            const cw = iw / 6, ch = ih / 3;
-            const nb2 = (id) => [ix + (AINFO[id].gx + 0.5) * cw, iy + (AINFO[id].gy + 0.5) * ch];
+            let gxm = 0, gym = 0;
+            for (const k of Object.keys(AINFO)) {
+                gxm = Math.max(gxm, AINFO[k].gx);
+                gym = Math.max(gym, AINFO[k].gy);
+            }
+            const trp = ih > iw * 1.1;
+            const cw = iw / ((trp ? gym : gxm) + 1), ch = ih / ((trp ? gxm : gym) + 1);
+            const nb2 = (id) => [ix + ((trp ? AINFO[id].gy : AINFO[id].gx) + 0.5) * cw, iy + ((trp ? AINFO[id].gx : AINFO[id].gy) + 0.5) * ch];
             const done = {};
             ctx.lineWidth = 3;
             ctx.strokeStyle = "rgba(201,164,92,0.45)";
@@ -6854,6 +7073,8 @@ function createArdan(canvas, opts) {
                 panel = "";
                 return shopId;
             } return null; },
+            uiReq: () => { const u = uiReq; uiReq = ""; return u || null; },
+            quests: QUESTS, qorder: QORDER, maxLvl: MAXLVL,
             mobIdx: (m) => mobs[P.area].indexOf(m),
             partyKill: (mk, mlvl, baseXp, from) => {
                 if (pl.dead > 0 || !P.cls)

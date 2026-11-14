@@ -9,6 +9,7 @@ const { createParties } = require('./party');
 const { createGear } = require('./gear');
 const { createBattles } = require('./battle');
 const { createMarket } = require('./market');
+const { createMerchant } = require('./merchant');
 const { createTrade } = require('./trade');
 const { createGuilds } = require('./guild');
 const { createGather } = require('./gather');
@@ -41,7 +42,7 @@ const MAX_GOLD = 2000000000; // fits in int32, far above anything legit
 const TEST_HOOKS = typeof process !== 'undefined' && process.env && process.env.ARDAN_TEST_HOOKS === '1' && process.env.NODE_ENV !== 'production';
 function testHook(world, p, m) {
   const P = p.api.P();
-  if (Number.isInteger(m.lvl)) { P.lvl = Math.max(1, Math.min(60, m.lvl)); P.xp = 0; }
+  if (Number.isInteger(m.lvl)) { P.lvl = Math.max(1, Math.min(80, m.lvl)); P.xp = 0; }
   if (Number.isInteger(m.gold)) P.gold = m.gold;
   if (m.mats) world.gear.give(p, Object.keys(m.mats).map((k) => require('./items').mat(k, m.mats[k])));
   if (m.tp) { P.area = m.tp.area; P.x = m.tp.x; P.y = m.tp.y; }
@@ -71,6 +72,7 @@ class World {
     this.gear = this.use(createGear(this));
     this.battle = this.use(createBattles(this));
     this.market = this.use(createMarket(this));
+    this.merchant = this.use(createMerchant(this));
     this.trade = this.use(createTrade(this));
     this.guilds = this.use(createGuilds(this));
     this.gather = this.use(createGather(this));
@@ -92,6 +94,20 @@ class World {
   byNick(n) { n = String(n).toLowerCase(); for (const p of this.players.values()) if (p.nick.toLowerCase() === n) return p; return null; }
   isOnline(charId) { return this.players.has('p' + charId); }
   online() { return this.players.size; }
+  // public world facts for the homepage (computed once from a throw-away headless engine)
+  info() {
+    if (this._info) return this._info;
+    const srv = { id: 'info', mobs: {}, state: null, dirty: false };
+    createArdan(STUB_CANVAS, { server: srv });
+    const api = srv.api, A = api.areas, I = require('./items');
+    const lands = Object.keys(A).filter((k) => A[k].spawns.some((s) => !api.mon[s[0]].boss) && k !== 'village');
+    const bosses = Object.keys(api.mon).filter((k) => api.mon[k].boss);
+    const gear = Object.keys(I.BASES).length * I.TIERS.length + I.PXD.LEG.length;
+    const legacy = Object.keys(api.items).filter((k) => { const t = api.items[k].t; return t !== 'w' && t !== 'a'; }).length;
+    this._info = { classes: 3, areas: Object.keys(A).length, lands: lands.length, cities: Object.keys(A).length - lands.length, bosses: bosses.length, quests: api.qorder.length, items: gear + legacy, legendary: I.PXD.LEG.length, maxLvl: api.maxLvl,
+      traders: this.merchant.list(api) };
+    return this._info;
+  }
 
   join(ws, user, charId) {
     // a still-connected session of the same character is kicked and saved first, so we load fresh data
@@ -225,6 +241,7 @@ class World {
         const ms = JSON.stringify(meObj); if (ms !== p.lastMe) { p.lastMe = ms; this.send(p, { t: 'me', me: meObj }); }
         const dv = JSON.stringify(p.api.dlgView()); if (dv !== p.lastDlg) { p.lastDlg = dv; this.send(p, { t: 'dlg', d: JSON.parse(dv) }); }
         const sr = p.api.shopReq(); if (sr) this.send(p, { t: 'shop', shop: sr });
+        const ur = p.api.uiReq(); if (ur) this.merchant.open(p, ur.split(':')[0] === 'aukcja' ? 'aukcja' : 'skup');
         if (p.srv.dirty && nowMs - p.saveT > 15000) this.persist(p);
       }
     }

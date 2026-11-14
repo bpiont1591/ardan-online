@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ARDAN – przeglądarkowa gra MMORPG dark fantasy</title>
-<meta name="description" content="ARDAN – darmowa przeglądarkowa gra MMORPG. Trzy klasy, siedem krain, potężni bossowie i wspólna przygoda z innymi graczami. Graj na telefonie i komputerze.">
+<meta name="description" content="ARDAN – darmowa przeglądarkowa gra MMORPG. Trzy klasy, 23 krainy, 16 bossów, 60 zadań, ponad tysiąc przedmiotów i wspólna przygoda z innymi graczami. Graj na telefonie i komputerze.">
 <meta property="og:title" content="ARDAN – gra MMORPG w przeglądarce">
 <meta property="og:description" content="Mgła powróciła. Ardan potrzebuje bohaterów.">
 <meta property="og:image" content="/img/mount.jpg">
@@ -23,14 +23,14 @@
     <div class="emblem" data-emblem></div>
     <h1 class="logo">ARDAN</h1>
     <p class="tagline">Mgła powróciła. Ardan potrzebuje bohaterów.</p>
-    <p class="sub">Darmowa gra MMORPG w przeglądarce. Wybierz klasę, przemierz siedem krain, pokonaj pradawnych bossów – razem z innymi graczami, na telefonie i komputerze.</p>
+    <p class="sub">Darmowa gra MMORPG w przeglądarce. Wybierz klasę, przemierz 23 krainy aż po Smocze Gniazdo, pokonaj pradawnych bossów – razem z innymi graczami, na telefonie i komputerze.</p>
     <div class="cta">
       <a class="btn primary big" href="/postacie" data-play>Graj teraz</a>
       <a class="btn big" href="#swiat">Poznaj historię</a>
     </div>
     <div class="meta">
       <span class="online-pill"><i></i>Teraz w grze: <b data-online>…</b></span>
-      <span class="online-pill">3 klasy · 7 krain · 4 bossów · 14 zadań</span>
+      <span class="online-pill" data-world>3 klasy · 23 krainy · 16 bossów · 60 zadań</span>
     </div>
   </div>
 </section>
@@ -59,24 +59,15 @@
   </div>
 </section>
 
-<section id="krainy">
-  <div class="wrap">
-    <div class="kicker">Mapa świata</div>
-    <h2>Trzynaście krain Ardanu</h2>
-    <p class="lead" style="margin-bottom:34px">Każda kraina ma własny klimat, potwory, mieszkańców i zadania. Złota strzałka zawsze wskaże drogę do celu – nawet przez kilka krain.</p>
-    <div class="grid g3" id="regions"></div>
-  </div>
-</section>
-
 <section class="alt">
   <div class="wrap">
     <div class="kicker center">Dlaczego ARDAN?</div>
     <h2 class="center" style="margin-bottom:34px">Co czeka w grze</h2>
     <div class="grid g3">
       <div class="card feat"><h3><span class="ico"><svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><circle cx="16" cy="9" r="2.5"/><path d="M2 20c0-3.5 2.7-6 6-6s6 2.5 6 6M13 20c.3-2.6 2-4.5 4.5-4.5 2.6 0 4.5 2 4.5 4.5"/></svg></span>Wspólny świat</h3><p class="muted">Widzisz innych graczy na mapie, walczycie z tymi samymi potworami, a serwer pilnuje uczciwej gry.</p></div>
-      <div class="card feat"><h3><span class="ico"><svg viewBox="0 0 24 24"><path d="M4 5h16v10H9l-5 4z"/></svg></span>Czat</h3><p class="muted">Czat globalny i regionalny oraz prywatne szepty (/w nick). Umawiaj się na bossów i handel.</p></div>
-      <div class="card feat"><h3><span class="ico"><svg viewBox="0 0 24 24"><path d="M12 2l3 7h7l-5.5 4.5L18.5 21 12 16.5 5.5 21l2-7.5L2 9h7z"/></svg></span>Zadania z przewodnikiem</h3><p class="muted">14 zadań w siedmiu krainach. Strzałka, złote kropki i minimapa prowadzą prosto do celu.</p></div>
-      <div class="card feat"><h3><span class="ico"><svg viewBox="0 0 24 24"><path d="M14.5 17.5L3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2"/></svg></span>Bossowie i łupy</h3><p class="muted">Upiór Mgieł, Wiedźma Moczarów, Szronogrzbiet i Sethar, Król Cieni. Walka turowa – ręczna albo automatyczna – i łupy w czterech rzadkościach.</p></div>
+      <div class="card feat"><h3><span class="ico"><svg viewBox="0 0 24 24"><path d="M4 5h16v10H9l-5 4z"/></svg></span>Handel i czat</h3><p class="muted">Łupy sprzedasz handlarzom, a rzadkie przedmioty wystawisz u aukcjonerów w miastach. Do tego czat globalny, regionalny i szepty.</p></div>
+      <div class="card feat"><h3><span class="ico"><svg viewBox="0 0 24 24"><path d="M12 2l3 7h7l-5.5 4.5L18.5 21 12 16.5 5.5 21l2-7.5L2 9h7z"/></svg></span>Zadania z przewodnikiem</h3><p class="muted"><span data-wq>60</span> zadań w łańcuchach fabularnych – od Osady Brzozowej po Smocze Gniazdo. Strzałka i minimapa prowadzą do celu.</p></div>
+      <div class="card feat"><h3><span class="ico"><svg viewBox="0 0 24 24"><path d="M14.5 17.5L3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2"/></svg></span>Bossowie i łupy</h3><p class="muted"><span data-wb>16</span> bossów – od Kła, herszta bandytów, po Valdraka, Pradawnego Smoka. Walka turowa, ręczna lub automatyczna, i <span data-wi>ponad 1200</span> przedmiotów, w tym legendarne.</p></div>
       <div class="card feat"><h3><span class="ico"><svg viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg></span>Telefon i komputer</h3><p class="muted">Na telefonie strzałki na ekranie i duże przyciski, na komputerze WASD lub strzałki. Bez instalacji.</p></div>
       <div class="card feat"><h3><span class="ico"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg></span>Postęp na serwerze</h3><p class="muted">Poziom, ekwipunek i zadania zapisują się na Twoim koncie. Graj z dowolnego urządzenia.</p></div>
       <div class="card feat"><h3><span class="ico"><svg viewBox="0 0 24 24"><path d="M4 21V10a8 8 0 0116 0v11z"/><path d="M9 21v-6a3 3 0 016 0v6"/></svg></span>Lochy drużynowe</h3><p class="muted">Trzy instancje z elitarnymi potworami i bossami o własnych mechanikach. Najlepsze łupy – raz dziennie.</p></div>
@@ -90,7 +81,8 @@
   <div class="wrap">
     <div class="kicker">Najlepsi w Ardanie</div>
     <h2>Ranking graczy</h2>
-    <p class="lead" style="margin-bottom:22px">Najwyższe poziomy, mistrzowie areny PvP i kolekcjonerzy osiągnięć. Ranking odświeża się na bieżąco.</p>
+    <p class="lead" style="margin-bottom:22px">Najwyższe poziomy, mistrzowie areny PvP i kolekcjonerzy osiągnięć.</p>
+    <p class="muted rk-at" id="rankAt">Aktualizacja co 12 h</p>
     <div class="rk" id="rank"><div class="rk-tabs" role="tablist"><button type="button" class="on" data-rk="level" role="tab">Poziom</button><button type="button" data-rk="pvp" role="tab">PvP (Elo)</button><button type="button" data-rk="ach" role="tab">Osiągnięcia</button></div><div class="rk-body" id="rankBody"><p class="muted">Wczytywanie rankingu…</p></div></div>
   </div>
 </section>

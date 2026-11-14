@@ -46,8 +46,9 @@ for path, f in {'/': 'index', '/rejestracja': 'rejestracja', '/logowanie': 'logo
     title = re.search(r'<title>(.*?)</title>', src).group(1)
     pm = re.search(r'<body data-page="([a-z]+)"', src)
     main = re.search(r'<main>(.*)</main>', src, re.S).group(1)
-    if f == 'index':
-        main += re.search(r'(<div class="lightbox".*?</div></div>)', src, re.S).group(1)
+    lbm = re.search(r'(<div class="lightbox".*?</div></div>)', src, re.S) if f == 'index' else None
+    if lbm:
+        main += lbm.group(1)
     PAGES[path] = {'title': title, 'page': pm.group(1) if pm else ('home' if f == 'index' else 'other'), 'html': fix_html(main)}
 PAGES['/rejestracja']['html'] = PAGES['/rejestracja']['html'].replace('Postęp zapisuje się na serwerze.', 'W wersji demo konto zapisuje się tylko w tej przeglądarce.')
 
@@ -73,7 +74,7 @@ gameui += '\n' + rd(os.path.join(PUB, 'js/game-ui2.js'))
 import subprocess
 NEWS_JSON = subprocess.check_output(['node', '-e', "process.stdout.write(JSON.stringify(require(process.argv[1])))", os.path.join(SRV, 'news.js')]).decode()
 mods = {}
-for m in ['chat', 'party', 'passives', 'items', 'gear', 'battle', 'market', 'trade', 'guild', 'gather', 'dungeon', 'craft', 'daily', 'ach', 'ranking', 'game']:
+for m in ['chat', 'party', 'passives', 'items', 'gear', 'battle', 'market', 'merchant', 'trade', 'guild', 'gather', 'dungeon', 'craft', 'daily', 'ach', 'ranking', 'game']:
     mods[m] = rd(os.path.join(SRV, m + '.js'))
 require_js = """(function(){
 const defs = {}, cache = {};

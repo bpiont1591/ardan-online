@@ -16,9 +16,11 @@ const TIERS = [
   { l: 12, n: 'Moczarów', col: '#8fbf6a' }, { l: 17, n: 'Szronu', col: '#9fe6ff' }, { l: 22, n: 'Króla Cieni', col: '#ffb347' },
   { l: 28, n: 'Bursztynu', col: '#e8a33a' }, { l: 34, n: 'Sztormu', col: '#7fe9ff' }, { l: 40, n: 'Magmy', col: '#ff6a2a' },
   { l: 47, n: 'Świtu', col: '#ffe9a8' }, { l: 54, n: 'Otchłani', col: '#c58cff' },
+  // round 6: levels 60-80
+  { l: 60, n: 'Gwiazd', col: '#bfe8ff' }, { l: 66, n: 'Kryształu', col: '#7ff0ff' }, { l: 72, n: 'Nekropolii', col: '#9aff9a' }, { l: 78, n: 'Smoczej Krwi', col: '#ff5a4a' },
 ];
 const STAT_N = { atk: 'Atak', def: 'Obrona', hp: 'Życie', mp: 'Mana / energia', crit: 'Cios krytyczny %', dodge: 'Unik %' };
-const ELITE = { troll: 1, yeti: 1, golem: 1, mummy: 1, skel: 1, siren: 1, lgolem: 1, voidb: 1, dknight: 1 };
+const ELITE = { troll: 1, yeti: 1, golem: 1, mummy: 1, skel: 1, siren: 1, lgolem: 1, voidb: 1, dknight: 1, bear: 1, dghost: 1, mammoth: 1, basil: 1, treant: 1, tentacle: 1, cgolem: 1, bdrake: 1, wyrm: 1 };
 // legacy sprite ids used to draw the character (weapon colour / armour colour)
 const SPR = {
   war: { w: ['club', 'sword', 'axe', 'blade', 'fsword', 'ssword'], a: ['leather', 'leather', 'chain', 'plate', 'wplate', 'dplate'] },
@@ -82,6 +84,30 @@ const BASES = {
   fring: ['ring', null, 'Pierścień ognia', 'ring', (L) => ({ atk: 0.4 * L, crit: 2 })],
   talisman: ['amulet', null, 'Talizman', 'talisman', (L) => ({ crit: 2 + L / 8, dodge: 2 })],
   medal: ['amulet', null, 'Medalion', 'talisman', (L) => ({ def: 0.3 * L, hp: 2.5 * L })],
+  // round 6: 23 more item types, each in every tier (1-78)
+  glaive: ['weapon', 'war', 'Glewia', 'spear', (L) => ({ atk: 3 + 1.9 * L, crit: 2 })],
+  mace: ['weapon', 'war', 'Buzdygan', 'hammer', (L) => ({ atk: 2 + 1.75 * L, def: 0.2 * L, hp: L })],
+  bastard: ['weapon', 'war', 'Miecz półtoraręczny', 'sword', (L) => ({ atk: 3 + 1.85 * L, crit: 3 })],
+  kite: ['offhand', 'war', 'Tarcza migdałowa', 'shield', (L) => ({ def: 1 + 0.7 * L, hp: 1.5 * L, dodge: 1 })],
+  lamellar: ['armor', 'war', 'Zbroja lamelkowa', 'plate', (L) => ({ def: 2 + 1.1 * L, hp: 1.6 * L, dodge: 1 })],
+  barbute: ['helm', 'war', 'Przyłbica', 'helm', (L) => ({ def: 1 + 0.5 * L, hp: 1.2 * L, crit: 1 })],
+  cbow: ['weapon', 'arc', 'Łuk kompozytowy', 'bow', (L) => ({ atk: 2 + 1.8 * L, crit: 3 })],
+  hxbow: ['weapon', 'arc', 'Ciężka kusza', 'xbow', (L) => ({ atk: 4 + 2.1 * L, dodge: -1 })],
+  bolts: ['offhand', 'arc', 'Kołczan bełtów', 'quiver', (L) => ({ atk: 1 + 0.65 * L, crit: 1 })],
+  studded: ['armor', 'arc', 'Kaftan ćwiekowany', 'leather', (L) => ({ def: 1 + 0.9 * L, hp: 1.6 * L, dodge: 3 })],
+  rboots: ['boots', 'arc', 'Buty tropiciela', 'boots', (L) => ({ def: 1 + 0.25 * L, dodge: 4, crit: 1 })],
+  archglove: ['gloves', 'arc', 'Rękawice łowcy', 'bracer', (L) => ({ atk: 1 + 0.45 * L, dodge: 1 })],
+  rod: ['weapon', 'mag', 'Laska runiczna', 'staff', (L) => ({ atk: 3 + 1.85 * L, mp: 1.8 * L, crit: 1 })],
+  crystalw: ['weapon', 'mag', 'Kryształowa różdżka', 'wand', (L) => ({ atk: 2 + 1.75 * L, crit: 4 })],
+  idol: ['offhand', 'mag', 'Idol', 'orb', (L) => ({ atk: 1 + 0.55 * L, mp: 2.5 * L, hp: L })],
+  cowl: ['helm', 'mag', 'Kaptur maga', 'hood', (L) => ({ def: 1 + 0.35 * L, mp: 2.2 * L, crit: 1 })],
+  vest: ['armor', 'mag', 'Szata czarnoksiężnika', 'robe', (L) => ({ def: 1 + 0.65 * L, mp: 4 * L, crit: 1 })],
+  wgloves: ['gloves', 'mag', 'Rękawice zaklinacza', 'glove', (L) => ({ atk: 1 + 0.4 * L, mp: 1.2 * L })],
+  wboots: ['boots', 'war', 'Trzewiki pancerne', 'boots', (L) => ({ def: 1 + 0.5 * L, hp: L, dodge: 1 })],
+  loop: ['ring', null, 'Pierścień runiczny', 'ring', (L) => ({ mp: 1.5 * L, crit: 2, atk: 0.2 * L })],
+  sring: ['ring', null, 'Pierścień tarczy', 'ring', (L) => ({ def: 0.4 * L, hp: 1.5 * L })],
+  pendant: ['amulet', null, 'Wisior', 'amulet', (L) => ({ hp: 1.8 * L, atk: 0.3 * L })],
+  charm: ['amulet', null, 'Amulet żywiołów', 'talisman', (L) => ({ mp: 2 * L, crit: 2 })],
 };
 const BY_SLOT = {};
 for (const k of Object.keys(BASES)) { const b = BASES[k]; (BY_SLOT[b[0]] = BY_SLOT[b[0]] || []).push(k); }
@@ -162,13 +188,28 @@ function pickBase(cls, R) {
   return opts[Math.floor(R() * opts.length)];
 }
 const rankOf = (mk, d) => (d.boss ? 2 : ELITE[mk] ? 1 : 0);
+// round 6: every boss has its own legendary loot table (8% per item roll, class-matching items preferred)
+const BOSS_LEG = {
+  boss: ['mgiel', 'talizm'], witch: ['grzmot', 'szept', 'runah'], dragon: ['wampir', 'lowca', 'mrozn'], king: ['krwiop', 'ksiega', 'sygnet', 'zadlo'],
+  leviathan: ['lewiat', 'okolew', 'diadem'], ignar: ['gniewig', 'feniksz', 'rozdzf', 'midas'], morgath: ['berlo', 'tytan', 'serceo', 'gwiazda'],
+  kiel: ['klzboj', 'obroza'], grimgor: ['kilof', 'runah'], szronia: ['lzyk', 'plaszczs', 'mrozn'], burzan: ['chanl', 'burzank'], morana: ['moranaw', 'elfmask'],
+  thalassor: ['thalt', 'perlan', 'kolczan'], kolos: ['kolosz', 'pryzmat', 'gwiezdl', 'gwiazdam'], valgar: ['valgarb', 'calun', 'sygnv', 'kosa'],
+  valdrak: ['valdrm', 'smoczal', 'smoczek', 'smpanc', 'smhelm'],
+};
+const BOSS_LEG_CH = 0.08;
+function rollBossLeg(mk, cls, R) {
+  const t = BOSS_LEG[mk]; if (!t || R() >= BOSS_LEG_CH) return null;
+  const mine = t.filter((id) => { const D = PXD.LEG.find((x) => x.id === id); if (!D) return false; const bc = BASES[D.b][1]; return bc === null || bc === cls; });
+  const pool = mine.length && R() < 0.75 ? mine : t;
+  return makeLeg(pool[Math.floor(R() * pool.length)], R);
+}
 // loot after a won fight: weaker monsters rarely drop, elites usually, bosses always (2-3 items)
 function rollDrops(mk, d, cls, R) {
   R = R || Math.random;
   const rank = rankOf(mk, d);
   const n = rank === 2 ? 2 + (R() < 0.5 ? 1 : 0) : rank === 1 ? (R() < 0.85 ? 1 : 0) + (R() < 0.2 ? 1 : 0) : (R() < 0.08 + d.lvl * 0.008 ? 1 : 0);
   const out = [];
-  for (let i = 0; i < n; i++) out.push(rollLeg(rank, d.lvl, cls, R) || make(pickBase(cls, R), tierFor(d.lvl, R), rollRar(rank, d.lvl, R), R));
+  for (let i = 0; i < n; i++) out.push((rank === 2 && rollBossLeg(mk, cls, R)) || rollLeg(rank, d.lvl, cls, R) || make(pickBase(cls, R), tierFor(d.lvl, R), rollRar(rank, d.lvl, R), R));
   return out;
 }
 // dungeon loot: rank 3 (elite) or 4 (boss); bosses always drop 2-3 items, elites often one, plus materials
@@ -233,4 +274,4 @@ function canEquip(it, P) {
   return null;
 }
 const validItem = (it) => !!(it && typeof it === 'object' && typeof it.u === 'string' && it.st && typeof it.n === 'string' && typeof it.s === 'string');
-module.exports = { makeLeg, rollLeg, LEG_CH, PXD, SLOTS, SLOT_N, CLS_N, CLASSES, RAR, TIERS, STAT_N, BASES, SPR, ELITE, MATS, MAX_STACK, UP_MAX, UP_CHANCE, make, rollDrops, rollDungeon, randomItem, fromLegacy, canEquip, value, rankOf, validItem, mat, upCost, applyUp, forge, forgeCost, tierFor };
+module.exports = { BOSS_LEG, BOSS_LEG_CH, rollBossLeg, makeLeg, rollLeg, LEG_CH, PXD, SLOTS, SLOT_N, CLS_N, CLASSES, RAR, TIERS, STAT_N, BASES, SPR, ELITE, MATS, MAX_STACK, UP_MAX, UP_CHANCE, make, rollDrops, rollDungeon, randomItem, fromLegacy, canEquip, value, rankOf, validItem, mat, upCost, applyUp, forge, forgeCost, tierFor };

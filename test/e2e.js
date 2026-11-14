@@ -25,7 +25,7 @@ async function main() {
   const dbPath = `/tmp/ardan-e2e-${Date.now()}.db`;
   let log = '';
   const srv = spawn(process.execPath, [path.join(__dirname, '..', 'server', 'index.js')], {
-    env: { ...process.env, PORT: String(PORT), DATABASE_PATH: dbPath, BASE_URL: BASE, NODE_ENV: 'development', BCRYPT_COST: '10', SMTP_HOST: '', START_GOLD: '200', ARDAN_TEST_HOOKS: '1', API_PER_MIN: '5000', WS_PER_MIN: '500', WS_PER_IP: '50' },
+    env: { ...process.env, PORT: String(PORT), DATABASE_PATH: dbPath, BASE_URL: BASE, NODE_ENV: 'development', BCRYPT_COST: '10', SMTP_HOST: '', START_GOLD: '200', ARDAN_TEST_HOOKS: '1', RANKING_REFRESH_MS: '1000', API_PER_MIN: '5000', WS_PER_MIN: '500', WS_PER_IP: '50' },
   });
   srv.stdout.on('data', (d) => { log += d; }); srv.stderr.on('data', (d) => { log += d; process.stderr.write(d); });
   for (let i = 0; i < 50 && !log.includes('Serwer działa'); i++) await W(100);
@@ -46,7 +46,11 @@ async function main() {
     for (const [pg, name] of [[pa, 'desktop'], [pb, 'phone']]) {
       await pg.goto(BASE + '/', { waitUntil: 'networkidle0' });
       ok(await pg.$eval('h1.logo', (e) => e.textContent) === 'ARDAN', `logo ARDAN (${name})`);
-      ok((await pg.$$eval('#regions .region', (e) => e.length)) === 13, `13 krain na stronie (${name})`);
+      ok(!(await pg.$('#krainy')) && !(await pg.$('#regions')) && !(await pg.$('a[href="#krainy"]')), `bez sekcji mapy świata i linku „Krainy” (${name})`);
+      await pg.waitForFunction(() => /23 krainy · 16 bossów · 60 zadań/.test(document.querySelector('[data-world]').textContent), { timeout: 4000 }).catch(() => {});
+      ok(/3 klasy · 23 krainy · 16 bossów · 60 zadań/.test(await pg.$eval('[data-world]', (e) => e.textContent)), `liczby świata z serwera (${name})`);
+      await pg.waitForFunction(() => /ostatnia:/.test(document.getElementById('rankAt').textContent), { timeout: 4000 }).catch(() => {});
+      ok(/Aktualizacja co \d+ h, ostatnia: .+następna:/.test(await pg.$eval('#rankAt', (e) => e.textContent)), `czas aktualizacji rankingu (${name})`);
       ok((await pg.$$eval('#news article', (e) => e.length)) >= 3, `nowości z API (${name})`);
       ok(/^\d+$/.test(await pg.$eval('[data-online]', (e) => e.textContent)), `licznik online (${name})`);
       await pg.screenshot({ path: `${SHOTS}/01_home_${name}.png` });
@@ -221,7 +225,7 @@ async function main() {
     }
     // ---------- turn-based battle ----------
     console.log('Walka turowa');
-    const ui = (pg) => pg.evaluate(() => { const S = window.ARDAN_UI_STATE; return JSON.parse(JSON.stringify({ open: S.open, gear: S.gear, mk: S.mk, gd: S.gd, tr: S.tr, pvp: S.pvp, bt: S.bt })); });
+    const ui = (pg) => pg.evaluate(() => { const S = window.ARDAN_UI_STATE; return JSON.parse(JSON.stringify({ open: S.open, npc: S.npc, gear: S.gear, mk: S.mk, gd: S.gd, tr: S.tr, pvp: S.pvp, bt: S.bt })); });
     const hp0 = sb.m[tgt.i][2];
     for (let k = 0; k < 6; k++) { const s = await snap(pb); const r = s.m[tgt.i]; if (Math.max(Math.abs(r[0] - s.p.x), Math.abs(r[1] - s.p.y)) <= 2) break; await walkExact(pb, r[0], r[1], 3000); }
     await pb.keyboard.press('f');
@@ -275,11 +279,17 @@ async function main() {
     // ---------- market ----------
     console.log('Rynek');
     const wpn = gA.bag.find((x) => x.s === 'weapon'); const goldA0 = gA.gold;
-    await pa.click(`.bi[data-bag="${wpn.u}"]`); await W(300);
-    await pa.$eval('#mkPrice', (e) => { e.value = '7'; });
-    await pa.click('.ui-detail [data-ia="list"]'); await W(700);
+    // the auction house only works next to an auctioneer: both players walk up to Aukcjoner Mieszko in Srebrnogród
+    const TH0 = (pg, m) => pg.evaluate((m) => window.ARDAN_UI.h.send(Object.assign({ t: '__test' }, m)), m);
+    const backA = await snap(pa), backB = await snap(pb);
     await pa.keyboard.press('Escape'); await W(200);
-    await pa.keyboard.press('r'); await W(800);
+    await TH0(pa, { near: { npc: 'auktown' } }); await TH0(pb, { near: { npc: 'auktown' } }); await W(1500);
+    await pa.keyboard.press('r'); await W(1000);
+    ok((await ui(pa)).open === 'mk', 'dom aukcyjny otwarty przy aukcjonerze (klawisz R)');
+    await pa.click('[data-mtab="sell"]'); await W(300);
+    await pa.click(`.ui-panel .bi[data-bag="${wpn.u}"]`); await W(300);
+    await pa.$eval('#mkPrice', (e) => { e.value = '7'; });
+    await pa.click('.ui-detail [data-ia="list"]'); await W(900);
     let mA = (await ui(pa)).mk;
     ok(mA && mA.mine.some((x) => x.it.u === wpn.u && x.pr === 7), 'A wystawia broń na rynek za 7 zł');
     // B opens the market from the menu (phone)
@@ -300,6 +310,7 @@ async function main() {
     gA = (await ui(pa)).gear;
     ok(gA && gA.gold > goldA0 && !gA.bag.some((x) => x.u === wpn.u), `A dostaje złoto ze sprzedaży (${goldA0} → ${gA && gA.gold}, podatek 5%)`);
     await pa.keyboard.press('Escape'); await pb.tap('.ui-x[data-close]').catch(() => {}); await W(300);
+    await TH0(pa, { tp: { area: backA.a, x: backA.p.x, y: backA.p.y } }); await TH0(pb, { tp: { area: backB.a, x: backB.p.x, y: backB.p.y } }); await W(1500);
     // ---------- guild ----------
     console.log('Gildia');
     await pa.keyboard.press('u'); await W(600);
@@ -415,10 +426,53 @@ async function main() {
     const pot1 = ((await ui(pb)).gear.inv.find((x) => x.id === 'pot') || { n: 0 }).n;
     ok((await X3(pb)).cr.open === 'alch' && pot1 === pot0 + 1, `alchemik warzy miksturę (${pot0} → ${pot1})`);
     await pb.tap('.ui-x[data-close]').catch(() => {}); await W(200);
-    // materials on the market
+    // ---------- trading only at NPCs (Handlarz / Aukcjoner) ----------
+    console.log('Handel u NPC');
     const herbStack = (await ui(pb)).gear.bag.find((x) => x.s === 'mat' && x.m === 'herb');
+    const mineCnt = async () => { const m = (await ui(pb)).mk; return m && m.mine ? m.mine.length : 0; };
+    // far from any auctioneer (standing by the herbalist): listing is rejected by the server
     await pb.evaluate((u) => window.ARDAN_UI.h.send({ t: 'mk', a: 'sell', u, pr: 15 }), herbStack.u); await W(700);
-    await pa.keyboard.press('r'); await W(400); await pa.select('[data-f="slot"]', 'mat'); await W(800);
+    ok((await ui(pb)).gear.bag.some((x) => x.u === herbStack.u), 'wystawienie z dala od aukcjonera odrzucone (przedmiot zostaje w torbie)');
+    // old inventory "sell to merchant" route and selling far from the merchant both fail
+    if (!(await ui(pb)).gear.bag.some((x) => x.s !== 'mat')) { await TH(pb, { loot: 2 }); await W(1200); }
+    const junkIt = (await ui(pb)).gear.bag.find((x) => x.s !== 'mat');
+    const gold0 = (await ui(pb)).gear.gold;
+    await pb.evaluate((u) => window.ARDAN_UI.h.send({ t: 'gear', a: 'sell', u }), junkIt.u); await W(600);
+    await pb.evaluate((u) => window.ARDAN_UI.h.send({ t: 'npc', a: 'sell', u }), junkIt.u); await W(700);
+    let gS = (await ui(pb)).gear;
+    ok(gS.bag.some((x) => x.u === junkIt.u) && gS.gold === gold0, 'sprzedaż z ekwipunku / z dala od handlarza odrzucona');
+    // inventory detail no longer offers selling or listing
+    await pb.evaluate(() => window.ARDAN_UI.panel('eq')); await W(700);
+    await pb.evaluate((u) => { const b = document.querySelector(`.bi[data-bag="${u}"]`); if (b) b.click(); }, junkIt.u); await W(400);
+    ok(!!(await pb.$('.ui-detail [data-ia="drop"]')) && !(await pb.$('.ui-detail [data-ia="sell"]')) && !(await pb.$('.ui-detail [data-ia="list"]')), 'w ekwipunku brak przycisków sprzedaży i wystawiania');
+    await pb.evaluate(() => { const d = document.querySelector('.ui-detail [data-dclose]'); if (d) d.click(); window.ARDAN_UI.panel('eq'); }); await W(300);
+    // merchant in Srebrnogród
+    await TH(pb, { near: { npc: 'handtown' } }); await W(1500);
+    await pb.waitForSelector('#uiCtx:not([hidden])', { timeout: 4000 }).catch(() => {});
+    ok(/Sprzedaj przedmioty/.test(await pb.$eval('#uiCtx', (e) => e.textContent).catch(() => '')), 'przycisk „Sprzedaj przedmioty” przy handlarzu');
+    await pb.tap('#uiCtx'); await W(900);
+    let UN = await ui(pb);
+    ok(UN.open === 'skup' && UN.npc && UN.npc.n === 'Handlarz Bogdan', 'okno skupu u Handlarza Bogdana');
+    await pb.screenshot({ path: `${SHOTS}/40_npc_merchant_phone.png` });
+    await pb.evaluate((u) => { const b = document.querySelector(`.ui-panel .bi[data-bag="${u}"]`); if (b) b.click(); }, junkIt.u); await W(400);
+    const sellBtn = await pb.$('.ui-detail [data-ia="sell"]');
+    ok(!!sellBtn, 'przycisk sprzedaży w oknie handlarza');
+    if (sellBtn) { await sellBtn.tap(); await W(900); }
+    gS = (await ui(pb)).gear;
+    ok(!gS.bag.some((x) => x.u === junkIt.u) && gS.gold === gold0 + Math.max(1, Math.floor(junkIt.v / 2)), `handlarz odkupił przedmiot (+${Math.max(1, Math.floor(junkIt.v / 2))} zł)`);
+    // walking away closes the window and blocks further sales
+    await TH(pb, { near: { npc: 'kapitan' } }); await W(1200);
+    ok((await ui(pb)).open !== 'skup', 'odejście od handlarza zamyka okno');
+    // auctioneer in Srebrnogród: list the herbs there
+    await TH(pb, { near: { npc: 'auktown' } }); await W(1200);
+    await pb.evaluate((u) => window.ARDAN_UI.h.send({ t: 'mk', a: 'sell', u, pr: 15 }), herbStack.u); await W(700);
+    ok(!(await ui(pb)).gear.bag.some((x) => x.u === herbStack.u) && (await mineCnt()) >= 1, 'wystawienie u Aukcjonera Mieszka działa');
+    await TH(pa, { near: { npc: 'auktown' } }); await W(1200);
+    await pa.keyboard.press('r'); await W(900);
+    ok((await ui(pa)).open === 'mk', 'dom aukcyjny otwiera się przy aukcjonerze');
+    await pa.click('[data-mtab="all"]'); await W(300);
+    await pa.screenshot({ path: `${SHOTS}/41_npc_auction_desktop.png` });
+    await pa.select('[data-f="slot"]', 'mat'); await W(800);
     ok((await ui(pa)).mk.list.some((x) => x.it.s === 'mat' && x.it.m === 'herb'), 'materiały na rynku (filtr „Materiały”)');
     await pa.keyboard.press('Escape'); await W(200);
     console.log('Zadania dzienne');
@@ -510,8 +564,10 @@ async function main() {
     if (hb) { await hb.click(); await W(400); }
     ok(!!(await pa.$('.ui-detail [data-ia]')), 'kliknięcie nadal otwiera okno akcji');
     await pa.keyboard.press('Escape'); await pa.evaluate(() => { const d = document.querySelector('.ui-detail [data-dclose]'); if (d) d.click(); }); await pa.keyboard.press('Escape'); await W(300);
-    // market hover
+    // market hover (at the auctioneer)
+    await TH(pa, { near: { npc: 'auktown' } }); await W(1200);
     await pa.evaluate(() => window.ARDAN_UI.panel('mk')); await W(900);
+    await pa.click('[data-mtab="all"]').catch(() => {}); await W(300);
     const mrow = await pa.$('.mrow[data-mk]');
     if (mrow) { await mrow.hover(); await W(250); ok(await pa.evaluate(() => { const t = document.getElementById('uiTip'); return !!t && !t.hidden && /Cena|Wartość/.test(t.textContent); }), 'karta przedmiotu na rynku po najechaniu'); }
     await pa.mouse.move(5, 5); await pa.keyboard.press('Escape'); await W(300);

@@ -10,13 +10,13 @@
   const STAT_N = { atk: 'Atak', def: 'Obrona', hp: 'Życie', mp: 'Mana / energia', crit: 'Cios krytyczny', dodge: 'Unik' };
   const PCT = { crit: 1, dodge: 1 };
   const SKL = { 1: 650, 2: 330, 3: 120 };
-  const AREA_N = { village: 'Osada Brzozowa', forest: 'Szepczący Bór', cave: 'Jaskinia', swamp: 'Bagna', town: 'Srebrnogród', mount: 'Szczyty', desert: 'Ruiny Piasków', port: 'Mewia Przystań', coast: 'Wybrzeże Wraków', fort: 'Twierdza Żarogród', volcano: 'Wulkan Ignara', citadel: 'Cytadela Świtu', abyss: 'Otchłań Zmierzchu' };
+  const AREA_N = { village: 'Osada Brzozowa', forest: 'Mroczny Bór', cave: 'Jaskinia Cieni', swamp: 'Bagna Żałoby', town: 'Srebrnogród', mount: 'Szczyty Szronu', desert: 'Ruiny Piasków', port: 'Mewia Przystań', coast: 'Wybrzeże Wraków', fort: 'Twierdza Żarogród', volcano: 'Wulkan Ignara', citadel: 'Cytadela Świtu', abyss: 'Otchłań Zmierzchu', wolfhills: 'Wilcze Wzgórza', mine: 'Kopalnia Krasnoludów', glacier: 'Lodowiec Wichrów', steppe: 'Spalone Stepy', elfwood: 'Szmaragdowa Puszcza', sunken: 'Zatopione Miasto', star: 'Gwiezdna Strażnica', crystal: 'Kryształowe Pustkowia', necro: 'Nekropolia Valgaru', dragon: 'Smocze Gniazdo' };
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const $ = (s, r) => (r || document).querySelector(s);
   const pctW = (v, m) => Math.round(100 * Math.max(0, Math.min(1, v / (m || 1))));
 
   let NET = null, send = () => {}, cmd = () => {}, openChat = () => {};
-  const S = window.ARDAN_UI_STATE = { bt: null, gear: null, mk: null, gd: null, tr: null, pvp: null, trInv: null, open: '' };
+  const S = window.ARDAN_UI_STATE = { bt: null, gear: null, mk: null, gd: null, tr: null, pvp: null, trInv: null, npc: null, open: '' };
   let root, layer;
   const EXT = { onMsg: null, key: null, click: null, open: {}, menu: '' };
 
@@ -185,7 +185,7 @@
     if (ctx.from !== 'worn' && G.gear && it.s !== 'mat') { const s = slotOf(it); worn = s === 'ring' ? (G.gear.ring1 || G.gear.ring2) : G.gear[s]; }
     const okCls = !it.c || it.c === cls, okLvl = (G.lvl || 1) >= it.l;
     return `<div class="dh">${iconHtml(it, 48)}<div>${nameHtml(it)}<small style="color:${RAR[it.r].col}">${RAR[it.r].n}</small></div></div>
-      ${it.s === 'mat' ? `<div class="dm">Materiał rzemieślniczy · ilość: <b>${it.q || 1}</b></div><div class="dm">Przydaje się u kowala i alchemika. Można go sprzedać na rynku.</div>` : `<div class="dm">${esc(slotName(slotOf(it), it.c))}${it.up ? ` · ulepszenie +${it.up}` : ''}</div>
+      ${it.s === 'mat' ? `<div class="dm">Materiał rzemieślniczy · ilość: <b>${it.q || 1}</b></div><div class="dm">Przydaje się u kowala i alchemika. Można go sprzedać handlarzowi lub wystawić u aukcjonera.</div>` : `<div class="dm">${esc(slotName(slotOf(it), it.c))}${it.up ? ` · ulepszenie +${it.up}` : ''}</div>
       <div class="dm ${okCls ? '' : 'bad'}">Klasa: ${it.c ? CLS_N[it.c] : 'wszystkie'}</div>
       <div class="dm ${okLvl ? '' : 'bad'}">Wymagany poziom: ${it.l}</div>`}
       <div class="dst">${statLines(it.st || {}, worn ? worn.st : (it.s !== 'mat' && ctx.from !== 'worn' ? {} : null))}</div>
@@ -204,8 +204,10 @@
     if (ctx.from === 'bag') {
       if (it.s !== 'mat') acts += `<button type="button" data-ia="equip" ${okCls && okLvl ? '' : 'disabled'}>Załóż</button>`;
       if (S.tr && S.tr.open) acts += `<button type="button" data-ia="trade">Dodaj do wymiany</button>`;
-      acts += `<div class="sellrow"><label>Cena na rynku <input type="number" inputmode="numeric" min="1" max="999999" id="mkPrice" value="${Math.max(2, it.v * 2)}"> zł</label><button type="button" data-ia="list">Wystaw na rynek</button></div>`;
-      acts += `<button type="button" class="sec" data-ia="sell">Sprzedaj kupcowi (${Math.max(1, Math.floor(it.v / 2))} zł)</button><button type="button" class="sec dng" data-ia="drop">Wyrzuć</button>`;
+      // selling only through NPCs: the auction house (Aukcjoner) or a merchant (Handlarz) window must be open
+      if (S.open === 'mk' && S.mk && !S.mk.closed) acts += `<div class="sellrow"><label>Cena <input type="number" inputmode="numeric" min="1" max="999999" id="mkPrice" value="${Math.max(2, it.v * 2)}"> zł</label><button type="button" data-ia="list">Wystaw na aukcji</button></div>`;
+      if (S.open === 'skup' && S.npc) acts += `<button type="button" data-ia="sell">Sprzedaj: ${esc(S.npc.n)} (${Math.max(1, Math.floor(it.v / 2))} zł)</button>`;
+      acts += `<button type="button" class="sec dng" data-ia="drop">Wyrzuć</button>`;
     } else if (ctx.from === 'worn') acts += `<button type="button" data-ia="unequip">Zdejmij</button>`;
     else if (ctx.from === 'market') acts += ctx.mine ? `<button type="button" data-ia="cancel">Wycofaj ofertę</button>` : `<button type="button" data-ia="buy" ${(S.gear && S.gear.gold >= ctx.pr) ? '' : 'disabled'}>Kup za ${ctx.pr} zł</button>`;
     else if (ctx.from === 'tradeMine') acts += `<button type="button" data-ia="trrem">Usuń z wymiany</button>`;
@@ -219,7 +221,7 @@
       const a = b.dataset.ia;
       if (a === 'equip') send({ t: 'gear', a: 'equip', u: it.u });
       else if (a === 'unequip') send({ t: 'gear', a: 'unequip', slot: ctx.slot });
-      else if (a === 'sell') send({ t: 'gear', a: 'sell', u: it.u });
+      else if (a === 'sell') send({ t: 'npc', a: 'sell', u: it.u });
       else if (a === 'drop') { if (!b.dataset.sure) { b.dataset.sure = 1; b.textContent = 'Na pewno wyrzucić?'; return; } send({ t: 'gear', a: 'drop', u: it.u }); }
       else if (a === 'list') { const pr = Math.floor(+$('#mkPrice', detail).value || 0); if (pr < 1) return; send({ t: 'mk', a: 'sell', u: it.u, pr }); setTimeout(() => send({ t: 'mk', a: 'browse', f: mkF }), 150); }
       else if (a === 'buy') { send({ t: 'mk', a: 'buy', id: ctx.id }); setTimeout(() => send({ t: 'mk', a: 'browse', f: mkF }), 150); }
@@ -276,7 +278,7 @@
     if (mkTab === 'mine') return tabs + gold + (M.mine.length ? `<div class="mlist">${M.mine.map((x) => mkRow(x, true)).join('')}</div>` : '<p class="muted">Nie masz wystawionych przedmiotów.</p>');
     if (mkTab === 'sell') {
       const bag = (S.gear && S.gear.bag) || [];
-      return tabs + gold + '<p class="muted">Wybierz przedmiot lub materiały z torby, ustaw cenę i wystaw na rynek (materiały sprzedajesz całym stosem).</p>' + (bag.length ? `<div class="bag">${bag.map((it) => `<button type="button" class="bi r${it.r}" data-bag="${esc(it.u)}"><img src="${itemIcon(it, 40)}" alt="${esc(it.n)}" width="40" height="40">${qty(it)}</button>`).join('')}</div>` : '<p class="muted">Torba jest pusta.</p>');
+      return tabs + gold + '<p class="muted">Wybierz przedmiot lub materiały z torby, ustaw cenę i wystaw w domu aukcyjnym (materiały wystawiasz całym stosem).</p>' + (bag.length ? `<div class="bag">${bag.map((it) => `<button type="button" class="bi r${it.r}" data-bag="${esc(it.u)}"><img src="${itemIcon(it, 40)}" alt="${esc(it.n)}" width="40" height="40">${qty(it)}</button>`).join('')}</div>` : '<p class="muted">Torba jest pusta.</p>');
     }
     const opt = (v, l, cur) => `<option value="${v}" ${String(cur) === String(v) ? 'selected' : ''}>${l}</option>`;
     const f = `<div class="mf">
@@ -288,7 +290,33 @@
       <label class="chk"><input type="checkbox" data-f="lvl" ${mkF.lvl ? 'checked' : ''}> Na mój poziom</label></div>`;
     return tabs + f + gold + (M.list.length ? `<div class="mlist">${M.list.map((x) => mkRow(x, false)).join('')}</div><p class="muted">${M.total > M.list.length ? `Pokazano ${M.list.length} z ${M.total}.` : `Ofert: ${M.total}.`}</p>` : '<p class="muted">Brak ofert spełniających kryteria.</p>');
   }
-  function openMk() { panel('mk', 'Rynek Ardanu', mkHtml(), 'wide'); send({ t: 'mk', a: 'browse', f: mkF }); send({ t: 'gear', a: 'get' }); }
+  // the auction house opens only next to an auctioneer (server-checked); the menu/R key shows where to find one
+  function openMk() { if (S.open === 'mk') return; openHand(); send({ t: 'npc', a: 'open', k: 'aukcja' }); }
+  function showMk() { panel('mk', `Dom aukcyjny${S.mk && S.mk.npc ? ' · ' + esc(S.mk.npc) : ''}`, mkHtml(), 'wide'); send({ t: 'gear', a: 'get' }); }
+  // ---------- merchants (Handlarz / Aukcjoner NPCs) ----------
+  function tradeNpcs() { const N = (NET.api && NET.api.npcs) || {}; return Object.keys(N).filter((k) => N[k].trade).map((k) => N[k]); }
+  function handHtml() {
+    const rows = {}; for (const n of tradeNpcs()) { (rows[n.area] = rows[n.area] || []).push(n); }
+    const list = Object.keys(rows).map((a) => `<div class="li"><span><b>${esc(AREA_N[a] || a)}</b><br><small>${rows[a].map((n) => `${esc(n.n)} – ${n.trade === 'aukcja' ? 'dom aukcyjny' : 'skup przedmiotów'}`).join('<br>')}</small></span></div>`).join('');
+    return `<p class="muted">Przedmiotów nie sprzedajesz z ekwipunku. Odszukaj w mieście <b>handlarza</b> (odkupuje przedmioty i łupy za połowę wartości) albo <b>aukcjonera</b> (wystawiasz przedmioty innym graczom i kupujesz ich oferty). Podejdź do niego i porozmawiaj (E).</p><div class="legacy">${list || '<p class="muted">Brak kupców.</p>'}</div>`;
+  }
+  function openHand() { panel('hand', 'Handel u kupców', handHtml(), 'wide'); }
+  function skupHtml() {
+    const N = S.npc; if (!N) return '<p class="muted">Wczytywanie…</p>';
+    const G = S.gear || {}, bag = G.bag || [], pr = (it) => Math.max(1, Math.floor((it.v || 0) / 2));
+    const commons = bag.filter((it) => it.r === 0 && it.s !== 'mat');
+    const sum = commons.reduce((n, it) => n + pr(it), 0);
+    return `<p class="muted">${esc(N.n)} odkupi każdy przedmiot za połowę jego wartości. Masz <b class="gold">${G.gold != null ? G.gold : N.gold} zł</b>. Kliknij przedmiot, aby go sprzedać.</p>
+      ${bag.length ? `<div class="bag">${bag.map((it) => `<button type="button" class="bi r${it.r}" data-bag="${esc(it.u)}"><img src="${itemIcon(it, 40)}" alt="${esc(it.n)}" width="40" height="40">${qty(it)}<small class="pr">${pr(it)}</small></button>`).join('')}</div>` : '<p class="muted">Torba jest pusta.</p>'}
+      <div class="da" style="margin-top:12px">
+        ${commons.length ? `<button type="button" data-np="common">Sprzedaj zwykłe przedmioty (${commons.length}) · ${sum} zł</button>` : ''}
+        ${N.junk && N.junk.n ? `<button type="button" class="sec" data-np="junk">Sprzedaj łupy (${N.junk.n}) · ${N.junk.sum} zł</button>` : ''}</div>`;
+  }
+  function refreshSkup() { if (S.open !== 'skup') return; const b = curBody(); if (!b) return; const top = b.scrollTop; b.innerHTML = skupHtml(); b.scrollTop = top; }
+  function onNpcUi(msg) {
+    if (msg.closed) { if (msg.k === 'skup') { S.npc = null; if (S.open === 'skup') closePanels(); } return; }
+    if (msg.k === 'skup') { S.npc = msg; if (S.gear) S.gear.gold = msg.gold; if (S.open !== 'skup') { panel('skup', `Skup · ${esc(msg.n)}`, skupHtml(), 'wide'); send({ t: 'gear', a: 'get' }); } else refreshSkup(); }
+  }
   function refreshMk() { if (S.open !== 'mk') return; const b = curBody(); if (!b) return; const ae = document.activeElement, q = ae && ae.dataset && ae.dataset.f === 'q'; const top = b.scrollTop; b.innerHTML = mkHtml(); b.scrollTop = top; if (q) { const i = $('[data-f="q"]', b); i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }
 
   // ---------- trade ----------
@@ -362,7 +390,7 @@
   function openMenu() {
     panel('menu', 'Menu', `<div class="mgrid">
       <button type="button" data-open="eq"><b>🎒</b>Ekwipunek<small>I</small></button>
-      <button type="button" data-open="mk"><b>⚖</b>Rynek<small>R</small></button>
+      <button type="button" data-open="mk"><b>⚖</b>Handel u kupców<small>R</small></button>
       <button type="button" data-open="gd"><b>🛡</b>Gildia<small>U</small></button>
       <button type="button" data-open="pvp"><b>⚔</b>PvP i ranking<small>P</small></button>
       <button type="button" data-open="tr"><b>🤝</b>Handel</button>
@@ -451,7 +479,7 @@
     else if (st.phase === 'choose' && me.auto) acts.innerHTML = '<div class="wait">Walka automatyczna – postać sama wybiera ruchy.</div>';
     else if (st.phase !== 'choose') acts.innerHTML = '<div class="wait">Trwa runda…</div>';
     else {
-      const hp = potCount(['pot', 'bigpot', 'elix']), mp = potCount(['mpot']);
+      const hp = potCount(['pot', 'bigpot', 'elix', 'gpot', 'selix', 'spot', 'dpot']), mp = potCount(['mpot', 'gmpot']);
       acts.innerHTML = `<button type="button" class="ba atk" data-ba="atk" ${canAct ? '' : 'disabled'}><b>⚔</b>Atak<small>Spacja</small></button>${skillBtns(me)}
         <button type="button" class="ba" data-ba="pot" ${canAct && hp ? '' : 'disabled'}><b>❤</b>Mikstura<small>×${hp} (H)</small></button>
         ${me.cls === 'mag' ? `<button type="button" class="ba" data-ba="mpot" ${canAct && mp ? '' : 'disabled'}><b>✦</b>Mana<small>×${mp} (G)</small></button>` : ''}
@@ -550,8 +578,12 @@
   function onMsg(msg) {
     switch (msg.t) {
       case 'bt': onBattle(msg); return true;
-      case 'gear': S.gear = msg; refreshEq(); if (S.open === 'mk' && mkTab === 'sell') refreshMk(); refreshTr(); if (S.open === 'gd') refreshGd(); return true;
-      case 'mk': S.mk = msg; if (S.gear) S.gear.gold = msg.gold; refreshMk(); return true;
+      case 'gear': S.gear = msg; refreshEq(); if (S.open === 'mk' && mkTab === 'sell') refreshMk(); refreshSkup(); refreshTr(); if (S.open === 'gd') refreshGd(); return true;
+      case 'mk':
+        if (msg.closed) { S.mk = null; if (S.open === 'mk') openHand(); return true; }
+        S.mk = msg; if (S.gear) S.gear.gold = msg.gold;
+        if (msg.o && S.open !== 'mk') showMk(); else refreshMk(); return true;
+      case 'npcui': onNpcUi(msg); return true;
       case 'tr':
         if (msg.inv) {
           const t = toast(`<b>${esc(msg.inv)}</b> chce z tobą handlować.`, '<button type="button" data-ta="accept">Handluj</button><button type="button" class="no" data-ta="decline">Odrzuć</button>', 15000);
@@ -596,7 +628,7 @@
     if (detail) { if (lk === 'Escape') closeDetail(); return true; }
     if (EXT.key && EXT.key(lk, !!S.open)) return true;
     if (S.open) {
-      if (lk === 'Escape' || (lk === 'i' && S.open === 'eq') || (lk === 'r' && S.open === 'mk') || (lk === 'u' && S.open === 'gd') || (lk === 'p' && S.open === 'pvp')) { closePanels(); return true; }
+      if (lk === 'Escape' || (lk === 'i' && S.open === 'eq') || (lk === 'r' && (S.open === 'mk' || S.open === 'hand' || S.open === 'skup')) || (lk === 'u' && S.open === 'gd') || (lk === 'p' && S.open === 'pvp')) { closePanels(); return true; }
       if (lk === 'i') { openEq(); return true; } if (lk === 'r') { openMk(); return true; } if (lk === 'u') { openGd(); return true; } if (lk === 'p') { openPvp(); return true; }
       return true;
     }
@@ -617,6 +649,11 @@
     const bi = t.closest('[data-bag]'); if (bi && S.gear) { const it = S.gear.bag.find((x) => x.u === bi.dataset.bag); if (it) showDetail(it, { from: 'bag' }); return; }
     const us = t.closest('[data-use]'); if (us) { send({ t: 'in', mx: 0, my: 0, acts: [{ a: 'use', id: us.dataset.use }] }); setTimeout(() => send({ t: 'gear', a: 'get' }), 200); return; }
     const mt = t.closest('[data-mtab]'); if (mt) { mkTab = mt.dataset.mtab; refreshMk(); return; }
+    const np = t.closest('[data-np]'); if (np && !np.disabled && S.npc) {
+      if (np.dataset.np === 'junk') send({ t: 'npc', a: 'junk' });
+      else { const us = ((S.gear && S.gear.bag) || []).filter((it) => it.r === 0 && it.s !== 'mat').map((it) => it.u); if (!np.dataset.sure) { np.dataset.sure = 1; np.textContent = `Na pewno sprzedać ${us.length} szt.?`; return; } send({ t: 'npc', a: 'sellmany', us }); }
+      return;
+    }
     const mr = t.closest('[data-mk]'); if (mr && S.mk) { const mine = !!mr.dataset.mine; const x = (mine ? S.mk.mine : S.mk.list).find((y) => String(y.id) === mr.dataset.mk); if (x) showDetail(x.it, { from: 'market', id: x.id, pr: x.pr, mine, seller: mine ? '' : x.sn }); return; }
     const tri = t.closest('[data-tri]'); if (tri && S.tr) { const side = tri.dataset.mine ? S.tr.me : S.tr.them; const it = side.items.find((x) => x.u === tri.dataset.tri); if (it) showDetail(it, { from: tri.dataset.mine ? 'tradeMine' : 'loot' }); return; }
     const tra = t.closest('[data-tradd]'); if (tra) { send({ t: 'tr', a: 'add', u: tra.dataset.tradd }); return; }

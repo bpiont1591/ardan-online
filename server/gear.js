@@ -66,11 +66,6 @@ function createGear(world) {
     if (space(p) <= 0) return sys(p, 'Torba jest pełna!');
     P.gbag.push(P.gear[slot]); delete P.gear[slot]; changed(p);
   }
-  function sell(p, u) {
-    const it = take(p, u); if (!it) return;
-    const pr = Math.max(1, Math.floor(it.v / 2)); const P = p.api.P(); P.gold += pr;
-    sys(p, `Sprzedano kupcowi: ${it.n} (+${pr} zł).`);
-  }
   function view(p) {
     const P = p.api.P();
     return { t: 'gear', gear: P.gear, bag: P.gbag, max: BAG, st: p.api.stats(), gold: P.gold, lvl: P.lvl, cls: P.cls, inv: P.inv };
@@ -102,7 +97,7 @@ function createGear(world) {
       const u = typeof msg.u === 'string' && U_RE.test(msg.u) ? msg.u : null;
       if (msg.a === 'equip' && u) equip(p, u);
       else if (msg.a === 'unequip' && typeof msg.slot === 'string') unequip(p, msg.slot);
-      else if (msg.a === 'sell' && u) sell(p, u);
+      else if (msg.a === 'sell') sys(p, 'Przedmioty sprzedasz tylko u handlarza w mieście – poszukaj go i porozmawiaj z nim.');
       else if (msg.a === 'drop' && u) { const it = take(p, u); if (it) sys(p, `Wyrzucono: ${it.n}.`); }
       else if (msg.a === 'get') p.lastGear = '';
       push(p);

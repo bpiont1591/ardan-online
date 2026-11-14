@@ -204,3 +204,4 @@ footer .copy { margin-top: 30px; padding-top: 18px; border-top: 1px solid rgba(2
 .rk small { color: var(--muted, #a99d88); }
 @media (max-width: 640px) { .rk { padding: 10px; } .rk td, .rk th { padding: 7px 5px; } .rk .hide-s { display: none; } }
 .rk .cls-s { display: none; } .rk br.hide-l { display: none; } @media (max-width: 640px) { .rk .cls-s, .rk br.hide-l { display: inline; } }
+.rk-at { margin: -12px 0 18px; font-size: .92rem; }

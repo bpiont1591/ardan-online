@@ -11,4 +11,19 @@ function ranking(levels) {
   const ac = Object.values(ach).filter((e) => e.a > 0).sort((a, b) => b.a - a.a || b.lvl - a.lvl).slice(0, 10).map((e) => ({ n: e.n, cls: e.cls, lvl: e.lvl, a: e.a }));
   return { level, pvp: pv, ach: ac, total: 23 };
 }
-module.exports = { ranking };
+// Ranking na stronie głównej jest liczony po stronie serwera i odświeżany co 12 godzin.
+// Wynik (z czasem obliczenia) trzymamy w magazynie kv, więc przetrwa restart/deploy serwera.
+const EVERY = 12 * 3600e3;
+function createRankingCache(opts) {
+  const every = opts.every > 0 ? opts.every : EVERY;
+  const now = opts.now || Date.now;
+  const key = opts.key || 'rankCache';
+  function refresh() { const v = { at: now(), data: opts.compute() }; store.set(key, v); return v; }
+  function get() {
+    let c = store.get(key, null);
+    if (!c || !c.data || typeof c.at !== 'number' || now() - c.at >= every || c.at > now() + 60e3) c = refresh();
+    return Object.assign({}, c.data, { at: c.at, every, next: c.at + every });
+  }
+  return { get, refresh, every };
+}
+module.exports = { ranking, createRankingCache, EVERY };

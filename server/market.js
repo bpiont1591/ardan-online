@@ -1,5 +1,6 @@
 'use strict';
-// Rynek (auction house): list an item for gold, buy, cancel, browse with filters. Sellers who are offline get their gold on next login.
+// Dom aukcyjny: list an item for gold, buy, cancel, browse with filters. Sellers who are offline get their gold on next login.
+// Only usable while standing next to an auctioneer NPC (Aukcjoner) in a city – checked on every request (see merchant.js).
 const I = require('./items');
 const store = require('./store');
 const MAX_OWN = 10, TAX = 0.05, MAX_PRICE = 10000000;
@@ -22,7 +23,7 @@ function createMarket(world) {
     world.emit('onEvent', p, 'list', { it });
     return L;
   }
-  function browse(p, f) {
+  function browse(p, f, o) {
     f = f || {};
     const q = typeof f.q === 'string' ? f.q.toLowerCase().slice(0, 30) : '';
     let l = data().list.filter((x) => x.s !== p.ckey);
@@ -33,7 +34,8 @@ function createMarket(world) {
     if (q) l = l.filter((x) => x.it.n.toLowerCase().indexOf(q) >= 0);
     l.sort((a, b) => (f.sort === 'price' || f.sort === 'cheap' ? a.pr - b.pr : f.sort === 'lvl' ? b.it.l - a.it.l || b.it.r - a.it.r : b.t - a.t));
     const mine = data().list.filter((x) => x.s === p.ckey);
-    world.send(p, { t: 'mk', list: l.slice(0, 80), total: l.length, mine, tax: TAX, gold: p.api.P().gold });
+    const n = world.merchant.near(p, 'aukcja');
+    world.send(p, { t: 'mk', list: l.slice(0, 80), total: l.length, mine, tax: TAX, gold: p.api.P().gold, npc: n ? n.n : '', o: o ? 1 : undefined });
   }
   function buy(p, id) {
     const d = data(), i = d.list.findIndex((x) => x.id === id); if (i < 0) return sys(p, 'Ta oferta jest już nieaktualna.');
@@ -52,6 +54,7 @@ function createMarket(world) {
   }
   return {
     name: 'market', list, buy, data,
+    open(p) { browse(p, {}, true); },
     onJoin(p) {
       const m = mail(); const e = m[p.ckey];
       if (e && e.gold) { world.atomic([p], () => { p.api.P().gold += e.gold; p.srv.dirty = true; delete m[p.ckey]; store.set('mail', m); }); sys(p, `Rynek: podczas twojej nieobecności sprzedano przedmioty (${e.n}). Otrzymujesz ${e.gold} zł.`); }
@@ -59,6 +62,12 @@ function createMarket(world) {
     onMsg(p, msg) {
       if (msg.t !== 'mk') return false;
       if (p.battle) return true;
+      if (!world.merchant.near(p, 'aukcja')) {
+        world.send(p, { t: 'mk', closed: true, err: 'far' });
+        sys(p, `Dom aukcyjny jest dostępny tylko u aukcjonera (${world.merchant.where(p.api, 'aukcja')}). Podejdź do niego.`);
+        return true;
+      }
+      p.npcOpen = 'aukcja';
       if (msg.a === 'sell') {
         const pr = Math.floor(Number(msg.pr));
         if (!(pr >= 1 && pr <= MAX_PRICE)) sys(p, 'Podaj cenę od 1 do 10 000 000 zł.');

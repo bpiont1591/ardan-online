@@ -1,0 +1,35 @@
+'use strict';
+// Unit test: the homepage ranking is computed server-side and cached for 12 hours (persisted in the kv store).
+const fs = require('fs');
+const path = require('path');
+process.env.DATABASE_PATH = path.join('/tmp', `ardan-rank-${Date.now()}.db`);
+const store = require('../server/store');
+const { createRankingCache, EVERY } = require('../server/ranking');
+let pass = 0, fail = 0;
+const ok = (c, m) => { if (c) pass++; else fail++; console.log((c ? '  PASS ' : '  FAIL ') + m); };
+console.log('Ranking – pamięć podręczna 12 h');
+let t = Date.UTC(2026, 10, 14, 8, 0, 0), calls = 0, players = [{ nick: 'Alfa', cls: 'war', lvl: 10 }];
+const compute = () => { calls++; return { level: players.map((p) => ({ n: p.nick, cls: p.cls, lvl: p.lvl })), pvp: [], ach: [] }; };
+ok(EVERY === 12 * 3600 * 1000, 'domyślny okres odświeżania to 12 godzin');
+const rc = createRankingCache({ compute, now: () => t });
+let r = rc.get();
+ok(calls === 1 && r.at === t && r.every === EVERY && r.next === t + EVERY && r.level[0].n === 'Alfa', 'pierwsze zapytanie liczy ranking i zwraca czas obliczenia');
+players = [{ nick: 'Beta', cls: 'mag', lvl: 50 }];
+t += 3600e3; r = rc.get();
+ok(calls === 1 && r.level[0].n === 'Alfa', 'po 1 h ranking pochodzi z pamięci (bez ponownego liczenia)');
+t += 10.9 * 3600e3; r = rc.get();
+ok(calls === 1 && r.level[0].n === 'Alfa', 'po 11 h 54 min nadal ten sam ranking');
+const rc2 = createRankingCache({ compute, now: () => t });
+r = rc2.get();
+ok(calls === 1 && r.level[0].n === 'Alfa', 'po restarcie serwera ranking wczytany z bazy (bez ponownego liczenia)');
+t += 0.2 * 3600e3; r = rc.get();
+ok(calls === 2 && r.level[0].n === 'Beta' && r.at === t, 'po 12 h ranking odświeżony');
+ok(store.get('rankCache', null).at === t, 'zapisany w magazynie kv');
+t += 13 * 3600e3; r = rc.get();
+ok(calls === 3, 'kolejne odświeżenie po następnych 12 h');
+const short = createRankingCache({ compute, now: () => t, every: 1000, key: 'rk2' });
+short.get(); t += 1500; short.get();
+ok(calls === 5, 'okres można skrócić (testy / tryb deweloperski)');
+console.log(`\n${pass} PASS, ${fail} FAIL`);
+try { fs.unlinkSync(process.env.DATABASE_PATH); } catch (e) { /* */ }
+process.exit(fail ? 1 : 0);

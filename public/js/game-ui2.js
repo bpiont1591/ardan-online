@@ -11,7 +11,7 @@
   const NETf = () => H.NET();
   const MAT_IC = { herb: 'herb', ore: 'ore', wood: 'wood', crystal: 'crystal' };
   const MAT_N = { herb: 'Ziele lecznicze', ore: 'Ruda żelaza', wood: 'Drewno dębowe', crystal: 'Kryształ mgły' };
-  const CRAFT_NPC = { kowal: 'smith', platnerz: 'smith', alchemik: 'alch', zielarka: 'alch' };
+  const CRAFT_NPC = { kowal: 'smith', platnerz: 'smith', alchemik: 'alch', zielarka: 'alch', portsmith: 'smith', fortsmith: 'smith', citsmith: 'smith', starsmith: 'smith', portalch: 'alch', fortalch: 'alch', citalch: 'alch', staralch: 'alch' };
   const X = S.x = { objs: {}, dg: null, gate: null, cr: null, dq: null, ach: null, loginToast: false };
   const matIcon = (k, size) => iconHtml({ ic: MAT_IC[k], t: 0, r: k === 'crystal' ? 2 : 0 }, size || 24);
   const fmtT = (ms) => { const s = Math.max(0, Math.floor(ms / 1000)); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return `${h} godz. ${String(m).padStart(2, '0')} min`; };
@@ -67,6 +67,7 @@
     }
     const npcs = N.api.npcs || {};
     for (const k of Object.keys(CRAFT_NPC)) { const n = npcs[k]; if (n && n.area === P.area && cheb(n.x, n.y, P.x, P.y) <= 1) return { lab: CRAFT_NPC[k] === 'smith' ? '⚒ Kuźnia (E)' : '⚗ Pracownia alchemika (E)', type: CRAFT_NPC[k] }; }
+    for (const k of Object.keys(npcs)) { const n = npcs[k]; if (n.trade && n.area === P.area && cheb(n.x, n.y, P.x, P.y) <= 2) return { lab: n.trade === 'aukcja' ? '⚖ Dom aukcyjny' : '💰 Sprzedaj przedmioty', trade: n.trade }; }
     return null;
   }
   function tickLogin() {
@@ -83,12 +84,13 @@
   function tickCtx() {
     tickLogin();
     if (!ctxEl) return;
-    const th = (!U.inBattle() && !X.dg && !S.open) ? nearThing() : null;
+    const dlgOpen = !!(window.ARDAN_DEBUG && window.ARDAN_DEBUG.dlg);
+    const th = (!U.inBattle() && !X.dg && !S.open && !dlgOpen) ? nearThing() : null;
     ctxAct = th; ctxEl.hidden = !th; if (th && ctxEl.textContent !== th.lab) ctxEl.textContent = th.lab;
   }
   function useCtx() {
     const th = ctxAct; if (!th) return;
-    if (th.o) send({ t: 'ob', a: 'use', i: th.o.i }); else send({ t: 'craft', a: 'open', type: th.type });
+    if (th.o) send({ t: 'ob', a: 'use', i: th.o.i }); else if (th.trade) send({ t: 'npc', a: 'open', k: th.trade }); else send({ t: 'craft', a: 'open', type: th.type });
   }
 
   // ---------- dungeon gate dialog ----------

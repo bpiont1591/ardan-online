@@ -12,10 +12,10 @@ async function flow(browser, label, vp, shots) {
   await pg.setViewport(vp);
   const t0 = Date.now();
   await pg.goto(URL, { waitUntil: 'load' });
-  await pg.waitForSelector('#regions article');
+  await pg.waitForSelector('#rankBody table, #rankBody p.muted');
+  ok(!(await pg.$('#krainy')) && !(await pg.$('#regions')), `${label}: bez sekcji mapy świata`);
   ok(true, `${label}: strona główna (${Date.now() - t0} ms)`);
   ok(await pg.$eval('h1.logo', (e) => e.textContent) === 'ARDAN', `${label}: logo ARDAN`);
-  ok((await pg.$$('#gallery a')).length === 10, `${label}: galeria 10 zdjęć`);
   ok(await pg.$eval('#demoBadge', (e) => e.textContent) === 'WERSJA DEMO', `${label}: odznaka demo`);
   if (shots) await pg.screenshot({ path: `shots/${shots}_1_home.png` });
   const sfx = String(Date.now()).slice(-4);
@@ -128,12 +128,21 @@ async function flow(browser, label, vp, shots) {
   G = (await ui()).gear;
   const wp = G.bag.find((x) => x.s === 'weapon');
   ok(!!wp, `${label}: broń zdjęta do torby`);
-  await tap(`.bi[data-bag="${wp.u}"]`); await W(300);
-  await pg.$eval('#mkPrice', (e) => { e.value = '9'; });
-  await tap('.ui-detail [data-ia="list"]'); await W(700);
-  // market
+  // selling happens only at NPCs: walk up to the auctioneer in Srebrnogród and list the weapon there
+  ok(!(await pg.$(`.bi[data-bag="${wp.u}"]`).then(async (e) => { if (!e) return null; await e.click(); await W(300); return pg.$('.ui-detail [data-ia="list"], .ui-detail [data-ia="sell"]'); })), `${label}: w ekwipunku brak sprzedaży`);
+  await pg.evaluate(() => { const d = document.querySelector('.ui-detail [data-dclose]'); if (d) d.click(); }); await W(200);
   await tap('.ui-x[data-close]'); await W(200);
-  await pg.evaluate(() => window.ARDAN_UI.panel('mk')); await W(900);
+  const back0 = await snap();
+  await pg.evaluate(() => window.ARDAN_UI.h.send({ t: '__test', near: { npc: 'auktown' } })); await W(2500);
+  await pg.evaluate(() => window.ARDAN_UI.panel('mk'));
+  await pg.waitForFunction(() => window.ARDAN_UI_STATE.open === 'mk', { timeout: 8000 }).catch(() => {}); await W(400);
+  await tap('[data-mtab="sell"]'); await W(600);
+  await pg.waitForSelector(`.ui-panel .bi[data-bag="${wp.u}"]`, { timeout: 5000 }).catch(() => {});
+  await tap(`.ui-panel .bi[data-bag="${wp.u}"]`); await W(300);
+  await pg.$eval('#mkPrice', (e) => { e.value = '9'; });
+  await tap('.ui-detail [data-ia="list"]'); await W(1500);
+  await tap('[data-mtab="all"]'); await W(200);
+  await pg.evaluate(() => window.ARDAN_UI.h.send({ t: 'mk', a: 'browse', f: {} })); await W(900);
   let M = (await ui()).mk;
   ok(M && M.list.length >= 4, `${label}: rynek – oferty botów: ${M && M.list.length}`);
   ok(M && M.mine.some((x) => x.it.u === wp.u), `${label}: moja oferta na rynku`);
@@ -154,7 +163,8 @@ async function flow(browser, label, vp, shots) {
   await W(1200);
   if (shots) await pg.screenshot({ path: `shots/${shots}_10_guild.png` });
   await tap('.ui-x[data-close]'); await W(200);
-  // PvP
+  // PvP (back to the village after the visit at the auctioneer)
+  await pg.evaluate((b) => window.ARDAN_UI.h.send({ t: '__test', tp: { area: b.a, x: b.p.x, y: b.p.y } }), back0); await W(2500);
   await pg.evaluate(() => { const c = document.getElementById('chatIn'); c.value = '/opusc'; document.getElementById('chatForm').requestSubmit(); });
   ok(await walkExact(19, 22, 30000, 1), `${label}: na Arenie Osady`);
   await W(600);

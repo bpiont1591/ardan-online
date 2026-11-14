@@ -20,7 +20,8 @@ TSK.war.push({ cost: 45, cd: 3 }, { cost: 55, cd: 4 }, { cost: 70, cd: 6 });
 TSK.arc.push({ cost: 40, cd: 3 }, { cost: 55, cd: 4 }, { cost: 70, cd: 6 });
 TSK.mag.push({ cost: 40, cd: 3 }, { cost: 60, cd: 4 }, { cost: 75, cd: 6 });
 const SK_LV = [1, 3, 5, 15, 30, 45];
-const HEAL_POTS = ['pot', 'bigpot', 'elix', 'gpot', 'selix'];
+const HEAL_POTS = ['pot', 'bigpot', 'elix', 'gpot', 'selix', 'spot', 'dpot'];
+const MANA_POTS = ['mpot', 'gmpot'];
 
 function createBattles(world) {
   const battles = new Map(); let nextId = 1;
@@ -227,12 +228,12 @@ function createBattles(world) {
       }
     }
     if (ch.a === 'pot' || ch.a === 'mpot') {
-      const ids = ch.a === 'pot' ? HEAL_POTS : ['mpot'];
-      const id = ch.a === 'pot' ? potHave(f) : (f.p && f.p.api.countItem('mpot') > 0 ? 'mpot' : null);
+      const ids = ch.a === 'pot' ? HEAL_POTS : MANA_POTS;
+      const id = ch.a === 'pot' ? potHave(f) : (f.p ? MANA_POTS.slice().reverse().find((m) => f.p.api.countItem(m) > 0) || null : null);
       if (!id || ids.indexOf(id) < 0) { ev.push({ a: f.id, k: 'info', txt: `${f.n} szuka mikstury, ale torba jest pusta!` }); return; }
       f.p.api.removeItem(id, 1); f.p.srv.dirty = true;
       const def = f.p.api.items[id];
-      if (id === 'mpot') { const b0 = f.mp; f.mp = Math.min(f.mmp, f.mp + def.mana); ev.push({ a: f.id, t: f.id, k: 'mana', v: Math.round(f.mp - b0), txt: `${f.n} pije miksturę many: +${Math.round(f.mp - b0)}.` }); }
+      if (MANA_POTS.indexOf(id) >= 0) { const b0 = f.mp; f.mp = Math.min(f.mmp, f.mp + def.mana); ev.push({ a: f.id, t: f.id, k: 'mana', v: Math.round(f.mp - b0), txt: `${f.n} pije miksturę many: +${Math.round(f.mp - b0)}.` }); }
       else heal(f, def.heal, ev, def.n);
       return;
     }
