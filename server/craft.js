@@ -3,12 +3,14 @@
 // Materials (zioła, ruda, drewno, kryształ mgły) come from gathering nodes and dungeons.
 const I = require('./items');
 const cheb = (ax, ay, bx, by) => Math.max(Math.abs(ax - bx), Math.abs(ay - by));
-const NPC = { kowal: 'smith', platnerz: 'smith', alchemik: 'alch', zielarka: 'alch' };
+const NPC = { kowal: 'smith', platnerz: 'smith', alchemik: 'alch', zielarka: 'alch', portsmith: 'smith', fortsmith: 'smith', citsmith: 'smith', portalch: 'alch', fortalch: 'alch', citalch: 'alch' };
 const ALCH = [
   { id: 'pot', n: 'Mała mikstura', need: { herb: 2 }, gold: 3 },
   { id: 'mpot', n: 'Mikstura many', need: { herb: 2, wood: 1 }, gold: 5 },
   { id: 'bigpot', n: 'Duża mikstura', need: { herb: 4, ore: 1 }, gold: 12 },
   { id: 'elix', n: 'Eliksir życia', need: { herb: 5, crystal: 1 }, gold: 30 },
+  { id: 'gpot', n: 'Wielka mikstura', need: { herb: 8, crystal: 1, ore: 2 }, gold: 60 },
+  { id: 'selix', n: 'Eliksir Świtu', need: { herb: 12, crystal: 2 }, gold: 140 },
 ];
 const FORGE = ['weapon', 'offhand', 'helm', 'armor', 'gloves', 'boots', 'ring', 'amulet'];
 const U_RE = /^[a-z0-9]{6,24}$/;

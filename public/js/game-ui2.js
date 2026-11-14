@@ -4,6 +4,8 @@
 (function () {
   const U = window.ARDAN_UI; if (!U) return;
   const H = U.h, E = U.ext, S = U.state;
+  // dungeon loot in the hover / long-press tooltip
+  E.tipItem = (t) => { const l = t.closest('[data-dgl]'); const D = X.dg; if (!l || !D) return null; const it = (D.loot || []).find((x) => x.u === l.dataset.dgl); return it ? [it, { from: 'loot' }, l] : null; };
   const { esc, $, el, panel, closePanels, toast, curBody, iconHtml, nameHtml, RAR, CLS_N, SLOT_N, pctW } = H;
   const send = (m) => H.send(m);
   const NETf = () => H.NET();
@@ -252,18 +254,26 @@
     panel('dgi', '🕳 Lochy drużynowe', `<p class="muted">Lochy to instancje dla drużyny: kilka komnat z elitarnymi potworami i boss z własnymi mechanikami. Każdy loch możesz ukończyć raz dziennie (reset o północy czasu polskiego).</p>
       <div class="glist"><div class="gm"><span><b>Nora Goblinów</b><small>Szepczący Bór · poz. 4–8 · boss Wódz Grzmot</small></span></div>
       <div class="gm"><span><b>Zatopiona Krypta</b><small>Bagna · poz. 10–15 · boss Pani Topieli</small></span></div>
-      <div class="gm"><span><b>Grobowiec Sethara</b><small>Ruiny Piasków · poz. 18–24 · boss Arcykapłan Anubhet</small></span></div></div>
+      <div class="gm"><span><b>Grobowiec Sethara</b><small>Ruiny Piasków · poz. 18–24 · boss Arcykapłan Anubhet</small></span></div>
+      <div class="gm"><span><b>Kuźnia Płomieni</b><small>Wulkan Ignara · poz. 38–47 · boss Hefar, Kowal Płomieni</small></span></div>
+      <div class="gm"><span><b>Serce Otchłani</b><small>Otchłań Zmierzchu · poz. 52–60 · boss Wielki Inkwizytor Otchłani</small></span></div></div>
       <p class="muted">Wejście to kamienna brama z pochodniami na mapie krainy – podejdź i dotknij jej albo naciśnij E.</p>`, 'wide');
   }
   const DEMO = !!window.DEMO_PAGES;
-  if (DEMO) E.menu += '<button type="button" data-open="boost"><b>⚡</b>Demo: przygotuj postać<small>poz. 14 + materiały</small></button>';
+  if (DEMO) E.menu += '<button type="button" data-open="boost"><b>⚡</b>Demo: przygotuj postać<small>poz. 14 + materiały</small></button><button type="button" data-open="boost50"><b>🏰</b>Demo: poziom 50 w nowym mieście<small>Mewia Przystań + łupy</small></button>';
+  function boost50() {
+    const G = S.gear || {}; closePanels();
+    send({ t: '__test', lvl: Math.max(G.lvl || 1, 50), heal: true, gold: (G.gold || 0) + 5000, loot: 8, near: { npc: 'portcap' }, mats: { herb: 40, ore: 60, wood: 20, crystal: 10 }, items: [['gpot', 5], ['selix', 3], ['mpot', 8]] });
+    send({ t: 'in', mx: 0, my: 0, acts: [] });
+    toast('🏰 <b>Wersja demo:</b> poziom 50, +5000 zł, 8 łupów wysokiego poziomu i eliksiry. Jesteś w Mewiej Przystani – wschodnia brama prowadzi na Wybrzeże Wraków.');
+  }
   function boost() {
     const G = S.gear || {}; closePanels();
     send({ t: '__test', lvl: Math.max(G.lvl || 1, 14), heal: true, gold: (G.gold || 0) + 500, mats: { herb: 20, ore: 30, wood: 15, crystal: 5 }, items: [['bigpot', 5], ['mpot', 5]] });
     send({ t: 'in', mx: 0, my: 0, acts: [] });
     toast('⚡ <b>Wersja demo:</b> postać ma poziom 14, +500 zł, mikstury i materiały – możesz od razu wejść do lochu i używać kuźni.');
   }
-  E.open = { dq: openDq, ach: openAch, dgi: openDgInfo, boost };
+  E.open = { dq: openDq, ach: openAch, dgi: openDgInfo, boost, boost50 };
   E.key = (lk, open) => {
     if (X.dg && !open) { if (lk === 'j') { openDq(); return true; } if (lk === 'o') { openAch(); return true; } return lk !== 'i'; }
     if (lk === 'j') { if (S.open === 'dq') closePanels(); else openDq(); return true; }

@@ -6,11 +6,11 @@
   const OFF_N = { war: 'Tarcza', arc: 'Kołczan', mag: 'Kula mocy' };
   const CLS_N = { war: 'Wojownik', arc: 'Łucznik', mag: 'Mag' };
   const RAR = [{ n: 'zwykły', col: '#d9d2c3' }, { n: 'unikatowy', col: '#f2d04b' }, { n: 'heroiczny', col: '#59a8ff' }, { n: 'legendarny', col: '#ff8a3d' }];
-  const TIER_COL = ['#9a6b3c', '#b9c2cb', '#9fb2e8', '#8fbf6a', '#9fe6ff', '#ffb347'];
+  const TIER_COL = ['#9a6b3c', '#b9c2cb', '#9fb2e8', '#8fbf6a', '#9fe6ff', '#ffb347', '#e8a33a', '#7fe9ff', '#ff6a2a', '#ffe9a8', '#c58cff'];
   const STAT_N = { atk: 'Atak', def: 'Obrona', hp: 'Życie', mp: 'Mana / energia', crit: 'Cios krytyczny', dodge: 'Unik' };
   const PCT = { crit: 1, dodge: 1 };
   const SKL = { 1: 650, 2: 330, 3: 120 };
-  const AREA_N = { village: 'Osada Brzozowa', forest: 'Szepczący Bór', cave: 'Jaskinia', swamp: 'Bagna', town: 'Srebrnogród', mount: 'Szczyty', desert: 'Ruiny Piasków' };
+  const AREA_N = { village: 'Osada Brzozowa', forest: 'Szepczący Bór', cave: 'Jaskinia', swamp: 'Bagna', town: 'Srebrnogród', mount: 'Szczyty', desert: 'Ruiny Piasków', port: 'Mewia Przystań', coast: 'Wybrzeże Wraków', fort: 'Twierdza Żarogród', volcano: 'Wulkan Ignara', citadel: 'Cytadela Świtu', abyss: 'Otchłań Zmierzchu' };
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const $ = (s, r) => (r || document).querySelector(s);
   const pctW = (v, m) => Math.round(100 * Math.max(0, Math.min(1, v / (m || 1))));
@@ -113,11 +113,75 @@
   // ---------- item detail ----------
   let detail = null;
   function closeDetail() { if (detail) { detail.remove(); detail = null; } }
-  function showDetail(it, ctx) {
-    closeDetail();
+  // ---- item tooltip: mouse hover (desktop) / long-press (touch); clicking still opens the action dialog
+  let tip = null, lpT = 0, lpFired = 0, lpXY = null;
+  function itemFromEl(t) {
+    if (!t || !t.closest) return null;
+    const G = S.gear;
+    const sl = t.closest('[data-slot]'); if (sl) { const it = G && G.gear[sl.dataset.slot]; return it ? [it, { from: 'worn' }, sl] : null; }
+    const bi = t.closest('[data-bag],[data-tradd]'); if (bi) { const u = bi.dataset.bag || bi.dataset.tradd; const it = G && (G.bag || []).find((x) => x.u === u); return it ? [it, { from: 'bag' }, bi] : null; }
+    const mr = t.closest('[data-mk]'); if (mr && S.mk) { const mine = !!mr.dataset.mine; const x = (mine ? S.mk.mine : S.mk.list).find((y) => String(y.id) === mr.dataset.mk); return x ? [x.it, { from: 'market', seller: mine ? '' : x.sn, pr: x.pr }, mr] : null; }
+    const tri = t.closest('[data-tri]'); if (tri && S.tr) { const side = tri.dataset.mine ? S.tr.me : S.tr.them; const it = side && side.items.find((x) => x.u === tri.dataset.tri); return it ? [it, { from: 'trade' }, tri] : null; }
+    const lt = t.closest('[data-loot]'); if (lt && bt) { const it = (bt.lastLoot || []).find((x) => x.u === lt.dataset.loot); return it ? [it, { from: 'loot' }, lt] : null; }
+    if (EXT.tipItem) return EXT.tipItem(t) || null;
+    return null;
+  }
+  function hideTip() { if (tip) { tip.hidden = true; tip.dataset.u = ''; } }
+  function showTip(it, ctx, anchor, touch) {
+    if (detail) return;
+    if (!tip) { tip = el('<div class="ui-tip" id="uiTip" role="tooltip" hidden></div>'); root.appendChild(tip); }
+    if (tip.dataset.u !== it.u || tip.hidden) {
+      tip.innerHTML = `<div class="dcard tipc" style="border-color:${RAR[it.r].col}">${cardBody(it, ctx)}<div class="dm tiph">${touch ? 'Puść palec i dotknij, aby wybrać akcję.' : 'Kliknij, aby wybrać akcję.'}</div></div>`;
+      tip.dataset.u = it.u;
+    }
+    tip.hidden = false;
+    const r = anchor.getBoundingClientRect(), vw = window.innerWidth, vh = window.innerHeight, m = 8;
+    tip.style.left = '0px'; tip.style.top = '0px'; tip.style.maxHeight = (vh - m * 2) + 'px';
+    const w = tip.offsetWidth, h = tip.offsetHeight;
+    let x = r.right + 10; if (x + w > vw - m) x = r.left - w - 10; if (x < m) x = Math.max(m, Math.min(vw - w - m, r.left + r.width / 2 - w / 2));
+    let y = r.top; if (touch || x === Math.max(m, Math.min(vw - w - m, r.left + r.width / 2 - w / 2))) { y = r.top - h - 10; if (y < m) y = r.bottom + 10; }
+    y = Math.max(m, Math.min(vh - h - m, y)); x = Math.max(m, Math.min(vw - w - m, x));
+    tip.style.left = Math.round(x) + 'px'; tip.style.top = Math.round(y) + 'px';
+  }
+  function initTips() {
+    root.addEventListener('pointerover', (e) => {
+      if (e.pointerType && e.pointerType !== 'mouse') return;
+      const f = itemFromEl(e.target); if (f) showTip(f[0], f[1], f[2], false); else hideTip();
+    });
+    root.addEventListener('pointerleave', hideTip);
+    root.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse') { hideTip(); return; }
+      hideTip(); clearTimeout(lpT); lpFired = 0;
+      const f = itemFromEl(e.target); if (!f) return;
+      lpXY = [e.clientX, e.clientY];
+      lpT = setTimeout(() => { const g = itemFromEl(e.target); if (g && g[2].isConnected) { lpFired = Date.now(); showTip(g[0], g[1], g[2], true); if (navigator.vibrate) try { navigator.vibrate(12); } catch (x) {} } }, 420);
+    });
+    root.addEventListener('pointermove', (e) => { if (lpXY && Math.abs(e.clientX - lpXY[0]) + Math.abs(e.clientY - lpXY[1]) > 12) { clearTimeout(lpT); lpXY = null; } });
+    const end = () => { clearTimeout(lpT); lpXY = null; };
+    root.addEventListener('pointerup', end); root.addEventListener('pointercancel', () => { end(); });
+    root.addEventListener('click', (e) => { if (lpFired && Date.now() - lpFired < 1500 && itemFromEl(e.target)) { e.stopPropagation(); e.preventDefault(); lpFired = 0; } }, true);
+    root.addEventListener('contextmenu', (e) => { if (itemFromEl(e.target)) e.preventDefault(); });
+    window.addEventListener('scroll', hideTip, true);
+  }
+  // full item card (shared by the action dialog and the hover / long-press tooltip)
+  function cardBody(it, ctx) {
     const G = S.gear || {}, cls = G.cls;
     let worn = null;
-    if (ctx.from !== 'worn' && G.gear) { const s = slotOf(it); worn = s === 'ring' ? (G.gear.ring1 || G.gear.ring2) : G.gear[s]; }
+    if (ctx.from !== 'worn' && G.gear && it.s !== 'mat') { const s = slotOf(it); worn = s === 'ring' ? (G.gear.ring1 || G.gear.ring2) : G.gear[s]; }
+    const okCls = !it.c || it.c === cls, okLvl = (G.lvl || 1) >= it.l;
+    return `<div class="dh">${iconHtml(it, 48)}<div>${nameHtml(it)}<small style="color:${RAR[it.r].col}">${RAR[it.r].n}</small></div></div>
+      ${it.s === 'mat' ? `<div class="dm">Materiał rzemieślniczy · ilość: <b>${it.q || 1}</b></div><div class="dm">Przydaje się u kowala i alchemika. Można go sprzedać na rynku.</div>` : `<div class="dm">${esc(slotName(slotOf(it), it.c))}${it.up ? ` · ulepszenie +${it.up}` : ''}</div>
+      <div class="dm ${okCls ? '' : 'bad'}">Klasa: ${it.c ? CLS_N[it.c] : 'wszystkie'}</div>
+      <div class="dm ${okLvl ? '' : 'bad'}">Wymagany poziom: ${it.l}</div>`}
+      <div class="dst">${statLines(it.st || {}, worn ? worn.st : (it.s !== 'mat' && ctx.from !== 'worn' ? {} : null))}</div>
+      ${worn ? `<div class="dm cmp">Porównanie z: ${nameHtml(worn)}</div>` : (it.s !== 'mat' && ctx.from !== 'worn' && G.gear ? '<div class="dm cmp">Nic nie masz w tym miejscu – każda statystyka to zysk.</div>' : '')}
+      ${ctx.seller ? `<div class="dm">Sprzedający: ${esc(ctx.seller)}</div>` : ''}
+      ${ctx.pr ? `<div class="dm">Cena: <b class="gold">${ctx.pr} zł</b></div>` : ''}
+      <div class="dm">Wartość: ${it.v} zł</div>`;
+  }
+  function showDetail(it, ctx) {
+    closeDetail(); hideTip();
+    const G = S.gear || {}, cls = G.cls;
     const okCls = !it.c || it.c === cls, okLvl = (G.lvl || 1) >= it.l;
     let acts = '';
     if (ctx.from === 'bag') {
@@ -130,14 +194,7 @@
     else if (ctx.from === 'tradeMine') acts += `<button type="button" data-ia="trrem">Usuń z wymiany</button>`;
     detail = el(`<div class="ui-detail"><div class="dcard" style="border-color:${RAR[it.r].col}">
       <button type="button" class="ui-x" data-dclose aria-label="Zamknij">✕</button>
-      <div class="dh">${iconHtml(it, 48)}<div>${nameHtml(it)}<small style="color:${RAR[it.r].col}">${RAR[it.r].n}</small></div></div>
-      ${it.s === 'mat' ? `<div class="dm">Materiał rzemieślniczy · ilość: <b>${it.q || 1}</b></div><div class="dm">Przydaje się u kowala i alchemika. Można go sprzedać na rynku.</div>` : `<div class="dm">${esc(slotName(slotOf(it), it.c))}${it.up ? ` · ulepszenie +${it.up}` : ''}</div>
-      <div class="dm ${okCls ? '' : 'bad'}">Klasa: ${it.c ? CLS_N[it.c] : 'wszystkie'}</div>
-      <div class="dm ${okLvl ? '' : 'bad'}">Wymagany poziom: ${it.l}</div>`}
-      <div class="dst">${statLines(it.st || {}, worn ? worn.st : (ctx.from === 'bag' ? {} : null))}</div>
-      ${worn ? `<div class="dm cmp">Porównanie z: ${nameHtml(worn)}</div>` : ''}
-      ${ctx.seller ? `<div class="dm">Sprzedający: ${esc(ctx.seller)}</div>` : ''}
-      <div class="dm">Wartość: ${it.v} zł</div>
+      ${cardBody(it, Object.assign({}, ctx, { pr: 0 }))}
       <div class="da">${acts}</div></div></div>`);
     detail.addEventListener('click', (e) => {
       if (e.target === detail || e.target.closest('[data-dclose]')) return closeDetail();
@@ -171,7 +228,7 @@
     const st = G.st || {};
     const stats = [['Atak', st.atk], ['Obrona', st.def], ['Życie', st.hp], [st.res || 'Mana', st.mp], ['Cios krytyczny', (st.crit || 0) + '%'], ['Unik', (st.dodge || 0) + '%']]
       .map(([k, v]) => `<div class="st"><span>${k}</span><b>${v}</b></div>`).join('');
-    const bag = (G.bag || []).map((it) => `<button type="button" class="bi r${it.r}" data-bag="${esc(it.u)}" title="${esc(it.n)}"><img src="${itemIcon(it, 40)}" alt="${esc(it.n)}" width="40" height="40">${qty(it)}</button>`).join('');
+    const bag = (G.bag || []).map((it) => `<button type="button" class="bi r${it.r}" data-bag="${esc(it.u)}"><img src="${itemIcon(it, 40)}" alt="${esc(it.n)}" width="40" height="40">${qty(it)}</button>`).join('');
     const nb = (G.bag || []).length, pad = nb === 0 ? 8 : (8 - nb % 8) % 8;
     const inv = (G.inv || []).map((x) => { const d = NET.api.items[x.id]; if (!d) return ''; const usable = d.heal || d.mana || d.buff; return `<div class="li"><img src="${legacyIcon(x.id, 28)}" alt="" width="28" height="28"><span>${esc(d.n)}${x.n > 1 ? ` <small>×${x.n}</small>` : ''}</span>${usable ? `<button type="button" data-use="${esc(x.id)}">Użyj</button>` : ''}</div>`; }).join('');
     return `<div class="eq-top"><div class="doll">${doll}</div><div class="eq-st"><h4>Statystyki</h4>${stats}<div class="st gold"><span>Złoto</span><b>${G.gold} zł</b></div></div></div>
@@ -331,10 +388,13 @@
     }
   }
   function skillBtns(me) {
-    const sk = (NET.api.sk[me.cls] || []), lv = [1, 3, 5], cost = { war: [25, 35, 40], arc: [25, 40, 35], mag: [18, 30, 35] }[me.cls] || [0, 0, 0];
-    return sk.slice(0, 3).map((s, i) => {
+    const sk = (NET.api.sk[me.cls] || []).concat((NET.api.skx && NET.api.skx[me.cls]) || []), lv = [1, 3, 5, 15, 30, 45];
+    const cost = ({ war: [25, 35, 40, 45, 55, 70], arc: [25, 40, 35, 40, 55, 70], mag: [18, 30, 35, 40, 60, 75] })[me.cls] || [0, 0, 0, 0, 0, 0];
+    const nextLock = lv.findIndex((l, i) => sk[i] && me.lvl < l);
+    return sk.slice(0, 6).map((s, i) => {
+      if (me.lvl < lv[i] && i !== nextLock) return '';
       const lock = me.lvl < lv[i], cd = me.cds ? me.cds[i] : 0, noMp = me.mp < cost[i];
-      return `<button type="button" class="ba sk" data-ba="sk" data-i="${i}" ${lock || cd > 0 || noMp ? 'disabled' : ''}><b>${i + 1}</b>${esc(s.n)}<small>${lock ? 'od poz. ' + lv[i] : cd > 0 ? 'odnowienie: ' + cd : cost[i] + ' ' + (me.cls === 'mag' ? 'many' : 'energii')}</small></button>`;
+      return `<button type="button" class="ba sk${i >= 3 ? ' hi' : ''}" data-ba="sk" data-i="${i}" title="${esc(s.d || '')}" ${lock || cd > 0 || noMp ? 'disabled' : ''}><b>${i + 1}</b>${esc(s.n)}<small>${lock ? 'od poz. ' + lv[i] : cd > 0 ? 'odnowienie: ' + cd : cost[i] + ' ' + (me.cls === 'mag' ? 'many' : 'energii')}</small></button>`;
     }).join('');
   }
   function potCount(ids) { const inv = (S.gear && S.gear.inv) || []; let n = 0; for (const x of inv) if (ids.indexOf(x.id) >= 0) n += x.n || 1; return n; }
@@ -508,7 +568,7 @@
       if (lk === 'Escape' && bt.st && bt.st.phase === 'end') closeBattle();
       else if (lk === 'Enter' && bt.st && bt.st.phase === 'end') closeBattle();
       else if (lk === ' ' || lk === 'f') choose({ a: 'atk' });
-      else if (lk === '1' || lk === '2' || lk === '3') { const b = bt.el.querySelector(`[data-ba="sk"][data-i="${+lk - 1}"]`); if (b && !b.disabled) choose({ a: 'sk', i: +lk - 1 }); }
+      else if (lk >= '1' && lk <= '6' && lk.length === 1) { const b = bt.el.querySelector(`[data-ba="sk"][data-i="${+lk - 1}"]`); if (b && !b.disabled) choose({ a: 'sk', i: +lk - 1 }); }
       else if (lk === 'h') { const b = bt.el.querySelector('[data-ba="pot"]'); if (b && !b.disabled) choose({ a: 'pot' }); }
       else if (lk === 'g') { const b = bt.el.querySelector('[data-ba="mpot"]'); if (b && !b.disabled) choose({ a: 'mpot' }); }
       else if (lk === 'x') { const b = bt.el.querySelector('[data-ba="flee"]'); if (b && !b.disabled) choose({ a: 'flee' }); }
@@ -582,6 +642,7 @@
     layer = document.createElement('div'); layer.id = 'uiLayer'; root.appendChild(layer);
     root.insertAdjacentHTML('beforeend', '<div id="uiToasts" class="ui-toasts"></div><div id="uiZone" class="ui-zone" hidden></div>');
     layer.addEventListener('click', onLayerClick);
+    initTips();
     layer.addEventListener('change', onLayerChange);
     layer.addEventListener('input', onLayerInput);
     layer.addEventListener('submit', onLayerSubmit);

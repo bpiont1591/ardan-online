@@ -40,17 +40,19 @@ function sanitizeAct(a) {
 const TEST_HOOKS = typeof process !== 'undefined' && process.env && process.env.ARDAN_TEST_HOOKS === '1' && process.env.NODE_ENV !== 'production';
 function testHook(world, p, m) {
   const P = p.api.P();
-  if (Number.isInteger(m.lvl)) { P.lvl = Math.max(1, Math.min(30, m.lvl)); P.xp = 0; }
+  if (Number.isInteger(m.lvl)) { P.lvl = Math.max(1, Math.min(60, m.lvl)); P.xp = 0; }
   if (Number.isInteger(m.gold)) P.gold = m.gold;
   if (m.mats) world.gear.give(p, Object.keys(m.mats).map((k) => require('./items').mat(k, m.mats[k])));
   if (m.tp) { P.area = m.tp.area; P.x = m.tp.x; P.y = m.tp.y; }
   if (m.near) { // stand on a free tile next to a gathering node / gate / NPC
     const area = m.near.area || P.area; let t = null;
     if (m.near.npc) { const n = p.api.npcs[m.near.npc]; if (n) t = { a: n.area, x: n.x, y: n.y }; }
+    else if (m.near.mob) { const mb = (world.mobs[area] || []).find((x) => x.k === m.near.mob && !x.dead && !x.inB); if (mb) t = { a: area, x: Math.round(mb.x), y: Math.round(mb.y) }; }
     else { const o = (world.gather.objs[area] || []).find((x) => x.k === m.near.k && !x.rt); if (o) t = { a: area, x: o.x, y: o.y }; }
     if (t) for (const [dx, dy] of [[0, 1], [1, 0], [-1, 0], [0, -1], [1, 1], [-1, 1]]) if (!p.api.solid(t.a, t.x + dx, t.y + dy)) { P.area = t.a; P.x = t.x + dx; P.y = t.y + dy; break; }
   }
   if (Array.isArray(m.items)) for (const [id, n] of m.items) p.api.addItem(id, n);
+  if (Number.isInteger(m.loot) && m.loot > 0) { const I = require('./items'); world.gear.give(p, Array.from({ length: Math.min(12, m.loot) }, () => I.randomItem(P.lvl, 2))); }
   if (m.heal) { P.hp = p.api.maxHp(); P.mp = 9999; }
   if (m.dqdone && P.daily) { const q = P.daily.q[0]; q.have = q.need; q.done = true; p.dqDirty = true; }
   p.srv.dirty = true; world.gear.changed(p);

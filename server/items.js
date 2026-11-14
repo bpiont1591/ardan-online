@@ -13,9 +13,11 @@ const RAR = [
 const TIERS = [
   { l: 1, n: 'nowicjusza', col: '#9a6b3c' }, { l: 4, n: 'wędrowca', col: '#b9c2cb' }, { l: 8, n: 'Mgieł', col: '#9fb2e8' },
   { l: 12, n: 'Moczarów', col: '#8fbf6a' }, { l: 17, n: 'Szronu', col: '#9fe6ff' }, { l: 22, n: 'Króla Cieni', col: '#ffb347' },
+  { l: 28, n: 'Bursztynu', col: '#e8a33a' }, { l: 34, n: 'Sztormu', col: '#7fe9ff' }, { l: 40, n: 'Magmy', col: '#ff6a2a' },
+  { l: 47, n: 'Świtu', col: '#ffe9a8' }, { l: 54, n: 'Otchłani', col: '#c58cff' },
 ];
 const STAT_N = { atk: 'Atak', def: 'Obrona', hp: 'Życie', mp: 'Mana / energia', crit: 'Cios krytyczny %', dodge: 'Unik %' };
-const ELITE = { troll: 1, yeti: 1, golem: 1, mummy: 1, skel: 1 };
+const ELITE = { troll: 1, yeti: 1, golem: 1, mummy: 1, skel: 1, siren: 1, lgolem: 1, voidb: 1, dknight: 1 };
 // legacy sprite ids used to draw the character (weapon colour / armour colour)
 const SPR = {
   war: { w: ['club', 'sword', 'axe', 'blade', 'fsword', 'ssword'], a: ['leather', 'leather', 'chain', 'plate', 'wplate', 'dplate'] },
@@ -69,8 +71,8 @@ function make(base, tier, r, R) {
   }
   const cls = b[1];
   const it = { u: uid(), b: base, n: b[2] + ' ' + T.n, s: b[0], c: cls, l: L, r, t: tier, ic: b[3], st };
-  if (b[0] === 'weapon') it.spr = SPR[cls].w[tier];
-  if (b[0] === 'armor') it.spr = SPR[cls].a[tier];
+  if (b[0] === 'weapon') it.spr = SPR[cls].w[Math.min(tier, 5)];
+  if (b[0] === 'armor') it.spr = SPR[cls].a[Math.min(tier, 5)];
   it.v = value(it);
   return it;
 }

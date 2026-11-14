@@ -5,6 +5,7 @@ const I = require('./items');
 const PLAN = {
   village: { herb: 3, wood: 2, ore: 1 }, forest: { herb: 4, wood: 4, ore: 2 }, cave: { ore: 5, herb: 1 },
   swamp: { herb: 5, wood: 2 }, town: { herb: 2, ore: 1 }, mount: { ore: 4, wood: 2, herb: 1 }, desert: { ore: 3, herb: 2 },
+  port: { herb: 1, wood: 1 }, coast: { wood: 4, herb: 3, ore: 2 }, fort: { ore: 1 }, volcano: { ore: 6, herb: 1 }, citadel: { herb: 1 }, abyss: { ore: 4, herb: 3, wood: 1 },
 };
 const KIND_N = { herb: 'Krzew ziół', ore: 'Żyła rudy', wood: 'Powalone drzewo', gate: 'Wejście do lochu' };
 const RESPAWN = [45, 90]; // seconds
@@ -64,7 +65,7 @@ function createGather(world) {
     const lvlBonus = P.lvl >= 10 ? 1 : 0;
     const q = 1 + (R() < 0.45 ? 1 : 0) + lvlBonus;
     const got = [I.mat(o.k, q)];
-    if ((o.a === 'cave' || o.a === 'mount' || o.a === 'desert') && R() < 0.06) got.push(I.mat('crystal', 1));
+    if ((o.a === 'cave' || o.a === 'mount' || o.a === 'desert' || o.a === 'coast' || o.a === 'volcano' || o.a === 'abyss') && R() < (o.a === 'volcano' || o.a === 'abyss' ? 0.15 : 0.06)) got.push(I.mat('crystal', 1));
     const ok = world.gear.give(p, got);
     if (!ok.length) return;
     o.rt = now + (RESPAWN[0] + R() * (RESPAWN[1] - RESPAWN[0])) * 1000; ver[o.a]++;

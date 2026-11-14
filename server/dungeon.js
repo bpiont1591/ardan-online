@@ -42,6 +42,27 @@ const DUNGEONS = {
     ],
     boss: { base: 'mummy', n: 'Arcykapłan Anubhet', lvl: 25, hp: 5600, atk: 60, def: 27, xp: 7000, gold: [800, 1200], mech: ['summon', 'curse', 'enrage'], summon: 'mummy', sc: 1.6 },
   },
+  magma: {
+    id: 'magma', n: 'Kuźnia Płomieni', area: 'volcano', at: [22, 30], lv: [38, 47], lvl: 42,
+    rooms: [
+      { n: 'Gorące korytarze', g: [{ m: [['imp', 2]], x: 3, y: 2 }, { m: [['salam', 2]], x: 7, y: 4 }] },
+      { n: 'Hala odlewni', g: [{ m: [['salam', 1], ['imp', 1]], x: 3, y: 4 }, { m: [['lgolem', 1]], x: 8, y: 2 }] },
+      { n: 'Jezioro magmy', g: [{ m: [['lgolem', 1], ['imp', 2]], x: 5, y: 3 }] },
+      { n: 'Kowadło Hefara', boss: true, g: [{ m: [['B', 1]], x: 5, y: 2 }] },
+    ],
+    boss: { base: 'lgolem', n: 'Hefar, Kowal Płomieni', lvl: 47, hp: 16000, atk: 124, def: 56, xp: 32000, gold: [2500, 3500], mech: ['shield', 'enrage'], sc: 1.6 },
+  },
+  heart: {
+    id: 'heart', n: 'Serce Otchłani', area: 'abyss', at: [20, 32], lv: [52, 60], lvl: 57,
+    rooms: [
+      { n: 'Brama cieni', g: [{ m: [['shade', 2]], x: 3, y: 2 }, { m: [['shade', 1], ['voidb', 1]], x: 7, y: 4 }] },
+      { n: 'Leże bestii', g: [{ m: [['voidb', 2]], x: 3, y: 3 }, { m: [['dknight', 1]], x: 8, y: 2 }] },
+      { n: 'Sala upadłych', g: [{ m: [['dknight', 2]], x: 5, y: 3 }] },
+      { n: 'Ołtarz Pustki', g: [{ m: [['voidb', 1], ['dknight', 1], ['shade', 1]], x: 5, y: 3 }] },
+      { n: 'Tron Inkwizytora', boss: true, g: [{ m: [['B', 1]], x: 5, y: 2 }] },
+    ],
+    boss: { base: 'dknight', n: 'Wielki Inkwizytor Otchłani', lvl: 62, hp: 32000, atk: 172, def: 76, xp: 70000, gold: [6000, 9000], mech: ['summon', 'curse', 'drain', 'enrage'], summon: 'shade', sc: 1.7 },
+  },
 };
 const MECH_N = { summon: 'przyzywa posiłki co 3 tury', enrage: 'poniżej 35% życia wpada w szał', drain: 'wysysa życie co 2 tury', shield: 'przy 60% i 30% życia osłania się tarczą', curse: 'rzuca klątwę płomieni na całą drużynę' };
 

@@ -15,7 +15,12 @@ const TSK = {
   arc: [{ cost: 25, cd: 2 }, { cost: 40, cd: 3 }, { cost: 35, cd: 5 }],
   mag: [{ cost: 18, cd: 1 }, { cost: 30, cd: 3 }, { cost: 35, cd: 4 }],
 };
-const HEAL_POTS = ['pot', 'bigpot', 'elix'];
+// round 4: high-level skills unlocked at 15 / 30 / 45 (names from engine SKX)
+TSK.war.push({ cost: 45, cd: 3 }, { cost: 55, cd: 4 }, { cost: 70, cd: 6 });
+TSK.arc.push({ cost: 40, cd: 3 }, { cost: 55, cd: 4 }, { cost: 70, cd: 6 });
+TSK.mag.push({ cost: 40, cd: 3 }, { cost: 60, cd: 4 }, { cost: 75, cd: 6 });
+const SK_LV = [1, 3, 5, 15, 30, 45];
+const HEAL_POTS = ['pot', 'bigpot', 'elix', 'gpot', 'selix'];
 
 function createBattles(world) {
   const battles = new Map(); let nextId = 1;
@@ -30,7 +35,7 @@ function createBattles(world) {
     const P = p.api.P(), st = p.api.stats();
     return { id: p.pid, kind: 'p', side, p, n: p.nick, cls: P.cls, lvl: P.lvl, hp: Math.max(1, Math.round(P.hp)), mhp: st.hp, mp: Math.round(P.mp), mmp: st.mp,
       atk: st.atk, def: st.def, crit: st.crit / 100, dodge: st.dodge / 100, res: st.res, w: P.eq.w, a: P.eq.a, gt: p.guildTag || null,
-      cds: [0, 0, 0], buf: {}, stun: 0, frz: 0, burn: 0, burnD: 0, alive: true, fled: false, choice: null, auto: !!p.autoFight || !!p.bot, bot: !!p.bot };
+      cds: [0, 0, 0, 0, 0, 0], buf: {}, stun: 0, frz: 0, burn: 0, burnD: 0, alive: true, fled: false, choice: null, auto: !!p.autoFight || !!p.bot, bot: !!p.bot };
   }
   function fMob(m, idx) {
     const d = m.d;
@@ -136,8 +141,13 @@ function createBattles(world) {
     const en = enemiesOf(b, f); if (!en.length) return { a: 'atk' };
     const tgt = en.slice().sort((x, y) => x.hp - y.hp)[0].id;
     const hpk = f.hp / f.mhp, sk = TSK[f.cls] || TSK.war, lvl = f.lvl;
-    const ok = (i) => lvl >= [1, 3, 5][i] && f.cds[i] <= 0 && f.mp >= sk[i].cost;
+    const ok = (i) => !!sk[i] && lvl >= SK_LV[i] && (f.cds[i] | 0) <= 0 && f.mp >= sk[i].cost;
     if (hpk < 0.35 && !f.bot && potHave(f)) return { a: 'pot', t: tgt };
+    if (hpk < 0.5 && f.cls !== 'arc' && ok(5)) return { a: 'sk', i: 5, t: tgt };
+    if (f.cls === 'arc' && ok(5)) return { a: 'sk', i: 5, t: tgt };
+    if (en.length >= 2 && ok(4)) return { a: 'sk', i: 4, t: tgt };
+    if (en.length >= 2 && ok(3)) return { a: 'sk', i: 3, t: tgt };
+    if (ok(3) && !ok(0)) return { a: 'sk', i: 3, t: tgt };
     if (hpk < 0.5 && (f.cls === 'war' || f.cls === 'mag') && ok(2)) return { a: 'sk', i: 2, t: tgt };
     if (f.cls === 'arc' && ok(2) && !f.buf.crit) return { a: 'sk', i: 2, t: tgt };
     if (en.length >= 2 && ok(1)) return { a: 'sk', i: 1, t: tgt };
@@ -163,7 +173,7 @@ function createBattles(world) {
     const en = enemiesOf(b, f); if (!en.length) return;
     ch = ch || { a: 'atk' };
     let t = en.find((x) => x.id === ch.t) || en.slice().sort((x, y) => x.hp - y.hp)[0];
-    const SKN = (f.p && f.p.api.sk[f.cls]) || [];
+    const SKN = f.p ? (f.p.api.sk[f.cls] || []).concat((f.p.api.skx && f.p.api.skx[f.cls]) || []) : [];
     if (ch.a === 'flee') {
       if (b.kind === 'pvp') { ev.push({ a: f.id, k: 'info', txt: `${f.n} nie może uciec z pojedynku!` }); ch = { a: 'atk' }; }
       else {
@@ -184,7 +194,7 @@ function createBattles(world) {
     }
     if (ch.a === 'sk') {
       const i = ch.i | 0, sk = (TSK[f.cls] || TSK.war)[i], nm = SKN[i] ? SKN[i].n : 'Umiejętność';
-      if (!sk || f.lvl < [1, 3, 5][i] || f.cds[i] > 0 || f.mp < sk.cost) { ch = { a: 'atk' }; }
+      if (!sk || f.lvl < SK_LV[i] || (f.cds[i] | 0) > 0 || f.mp < sk.cost) { ch = { a: 'atk' }; }
       else {
         f.mp -= sk.cost; f.cds[i] = sk.cd + 1;
         ev.push({ a: f.id, k: 'skill', txt: `${f.n} używa: ${nm}!` });
@@ -198,6 +208,15 @@ function createBattles(world) {
         else if (k === 'mag0') { hit(b, f, t, 2.4, ev, nm); if (t.alive) { t.burn = 2; t.burnD = Math.max(1, Math.round(f.atk * 0.3)); } for (const e of en) if (e !== t) hit(b, f, e, 0.5, ev, 'odłamki ognia'); }
         else if (k === 'mag1') for (const e of en) { hit(b, f, e, 1.3, ev, nm); if (e.alive && !e.boss) e.frz = 1; }
         else if (k === 'mag2') heal(f, f.mhp * 0.4, ev, nm);
+        else if (k === 'war3') { hit(b, f, t, 3, ev, nm); if (t.alive && (!t.boss || R() < 0.35)) { t.stun = 1; ev.push({ t: t.id, k: 'info', txt: `${t.n} jest ogłuszony!` }); } }
+        else if (k === 'war4') for (const e of en) { hit(b, f, e, 2, ev, nm); if (e.alive) { e.burn = 2; e.burnD = Math.max(1, Math.round(f.atk * 0.35)); } }
+        else if (k === 'war5') { hit(b, f, t, 3.5, ev, nm); if (f.hp < f.mhp) heal(f, f.mhp * 0.3, ev, nm); f.buf.def = 3; }
+        else if (k === 'arc3') for (const e of en) hit(b, f, e, 1.9, ev, nm);
+        else if (k === 'arc4') for (let n = 0; n < 5; n++) { const al = en.filter((e) => e.alive); if (!al.length) break; hit(b, f, al[Math.floor(R() * al.length)], 1.3, ev, nm); }
+        else if (k === 'arc5') { const c0 = f.crit; f.crit = 1; hit(b, f, t, 4.2, ev, nm); f.crit = c0; }
+        else if (k === 'mag3') for (const e of en) hit(b, f, e, 1.9, ev, nm);
+        else if (k === 'mag4') { hit(b, f, t, 3.8, ev, nm); if (t.alive) { t.burn = 3; t.burnD = Math.max(1, Math.round(f.atk * 0.4)); } for (const e of en) if (e !== t) hit(b, f, e, 1.5, ev, nm); }
+        else if (k === 'mag5') { for (const e of en) { hit(b, f, e, 2.2, ev, nm); if (e.alive && !e.boss) e.frz = 1; } if (f.hp < f.mhp) heal(f, f.mhp * 0.35, ev, nm); }
         return;
       }
     }
@@ -393,7 +412,7 @@ function createBattles(world) {
       else if (msg.a === 'speed') pushAll(b);
       else if (msg.a === 'act' && b.phase === 'choose' && active(f) && msg.c && typeof msg.c === 'object') {
         const c = msg.c, a = ['atk', 'sk', 'pot', 'mpot', 'flee'].indexOf(c.a) >= 0 ? c.a : 'atk';
-        f.choice = { a, i: Number.isInteger(c.i) && c.i >= 0 && c.i < 3 ? c.i : 0, t: typeof c.t === 'string' && c.t.length < 30 ? c.t : null };
+        f.choice = { a, i: Number.isInteger(c.i) && c.i >= 0 && c.i < 6 ? c.i : 0, t: typeof c.t === 'string' && c.t.length < 30 ? c.t : null };
         pushAll(b);
       } else if (msg.a === 'get') world.send(p, view(b, f));
       return true;

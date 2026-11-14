@@ -255,6 +255,52 @@ async function flow(browser, label, vp, shots) {
     ok(bd.r >= bd.w - 1 && /vertical/.test(bd.wm) && bd.top > bd.h * 0.25, `${label}: odznaka WERSJA DEMO pionowo przy prawej krawędzi (nie zasłania HUD)`);
     await pg.screenshot({ path: `shots/${shots}_19_badge.png` });
   }
+  // ---------- runda 4: poziom 60, nowe miasta, podgląd przedmiotów ----------
+  await pg.evaluate(() => window.ARDAN_UI.close()); await W(200);
+  await pg.evaluate(() => { const c = document.getElementById('chatIn'); c.value = '/opusc'; document.getElementById('chatForm').requestSubmit(); }); await W(600);
+  await pg.evaluate(() => window.ARDAN_UI.panel('menu')); await W(300);
+  await tap('[data-open="boost50"]'); await W(2500);
+  ok(((await ui()).gear || {}).lvl >= 50 && (await pg.evaluate(() => window.ARDAN_DEBUG.last.a)) === 'port', `${label}: demo – poziom 50 w Mewiej Przystani`);
+  if (shots) await pg.screenshot({ path: `shots/${shots}_22_new_city.png` });
+  await pg.evaluate(() => window.ARDAN_UI.panel('eq')); await W(800);
+  await pg.waitForSelector('.ui-panel .bag .bi[data-bag]', { timeout: 4000 }).catch(() => {});
+  const sel4 = await pg.evaluate(() => { const b = (window.ARDAN_UI_STATE.gear || {}).bag || []; const it = b.find((x) => x.s !== 'mat') || b[0]; return it ? `.ui-panel .bag .bi[data-bag="${it.u}"]` : '.ui-panel .bag .bi[data-bag]'; });
+  const bi4 = await pg.$(sel4);
+  let tip4 = null;
+  if (bi4) {
+    const bb = await bi4.boundingBox();
+    if (vp.isMobile) { await pg.touchscreen.touchStart(bb.x + bb.width / 2, bb.y + bb.height / 2); await W(750); }
+    else { await pg.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2); await W(300); }
+    tip4 = await pg.evaluate(() => { const t = document.getElementById('uiTip'); if (!t || t.hidden) return null; const r = t.getBoundingClientRect(); return { txt: t.textContent, in: r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight }; });
+    if (shots) await pg.screenshot({ path: `shots/${shots}_23_tooltip.png` });
+    if (vp.isMobile) { await pg.touchscreen.touchEnd(); await W(300); }
+  }
+  ok(!!tip4 && tip4.in && /Wymagany poziom|Materiał/.test(tip4.txt), `${label}: ${vp.isMobile ? 'przytrzymanie' : 'najechanie'} pokazuje kartę przedmiotu w granicach ekranu`);
+  ok(!(await pg.$('.ui-detail')), `${label}: podgląd nie otwiera okna akcji`);
+  await pg.evaluate(() => window.ARDAN_UI.close()); await W(200);
+  await TH({ lvl: 60, heal: true, near: { area: 'volcano', mob: 'imp' } }); await W(2500);
+  await pg.evaluate(() => { try { localStorage.setItem('ardan_auto', '0'); } catch (e) {} window.ARDAN_UI.h.send({ t: 'bt', a: 'auto', on: false }); window.ARDAN_UI.h.send({ t: 'bt', a: 'speed', v: 1 }); }); await W(300);
+  await pg.keyboard.press('f');
+  const b60 = await pg.waitForSelector('#battle', { timeout: 6000 }).then(() => true).catch(() => false);
+  ok(b60, `${label}: walka w Wulkanie Ignara na 60. poziomie`);
+  if (b60) {
+    if (await pg.$('#btAuto:checked')) { await tap('#btAuto'); await W(300); }
+    await pg.waitForSelector('#battle [data-ba="sk"][data-i="5"]:not([disabled])', { timeout: 8000 }).catch(() => {});
+    ok((await pg.$$('#battle [data-ba="sk"]')).length === 6, `${label}: 6 umiejętności (nowe od poz. 15/30/45)`);
+    for (let k = 0; k < 5; k++) {
+      if (await pg.$$eval('#btLog .l', (e) => e.some((l) => /Zatrzymanie czasu/.test(l.textContent)))) break;
+      if (await pg.$('#btAuto:checked')) await tap('#btAuto').catch(() => {});
+      await pg.waitForSelector('#battle [data-ba="sk"][data-i="5"]:not([disabled])', { timeout: 8000 }).catch(() => {});
+      await tap('#battle [data-ba="sk"][data-i="5"]').catch(() => {}); await W(2500);
+    }
+    await pg.waitForFunction(() => [...document.querySelectorAll('#btLog .l')].some((l) => /Zatrzymanie czasu/.test(l.textContent)), { timeout: 15000 }).catch(() => {});
+    ok(await pg.$$eval('#btLog .l', (e) => e.some((l) => /Zatrzymanie czasu/.test(l.textContent))), `${label}: użyto „Zatrzymanie czasu” (poz. 45)`);
+    if (shots) await pg.screenshot({ path: `shots/${shots}_24_high_skill.png` });
+    await tap('#btAuto').catch(() => {}); await tap('#battle [data-spd="3"]').catch(() => {});
+    await pg.waitForSelector('#btEnd:not([hidden])', { timeout: 90000 }).catch(() => {});
+    ok(/Zwycięstwo/.test(await pg.$eval('#btEnd', (e) => e.textContent).catch(() => '')), `${label}: Ognisty chochlik pokonany`);
+    await tap('#btEnd [data-ba="close"]').catch(() => {}); await W(500);
+  }
   // reload keeps character saved
   await pg.evaluate(() => { location.hash = '#/postacie'; });
   await pg.waitForSelector('body[data-page=chars] .char', { timeout: 10000 });
@@ -263,7 +309,7 @@ async function flow(browser, label, vp, shots) {
   await pg.waitForSelector('#rankBody table', { timeout: 10000 }).catch(() => {});
   ok((await pg.$$('#rankBody tbody tr')).length >= 5, `${label}: ranking graczy na stronie głównej`);
   ok(await pg.$eval('#rankBody', (e) => e.textContent.includes('Zbyszko')), `${label}: boty w rankingu`);
-  ok(await pg.$eval('#news', (e) => /Lochy drużynowe/.test(e.textContent) && /Osiągnięcia i tytuły/.test(e.textContent)), `${label}: Nowości z funkcjami rundy 3`);
+  ok(await pg.$eval('#news', (e) => /poziom 60/.test(e.textContent) && /Lochy drużynowe/.test(e.textContent) && /Osiągnięcia i tytuły/.test(e.textContent)), `${label}: Nowości z funkcjami rundy 3`);
   if (shots) { await pg.$eval('#ranking', (e) => e.scrollIntoView()); await W(400); await pg.screenshot({ path: `shots/${shots}_20_home_ranking.png` }); }
   await pg.$eval('[data-rk="ach"]', (b) => b.click()); await W(200);
   ok(await pg.$eval('#rankBody', (e) => /Osiągnięcia/.test(e.textContent)), `${label}: zakładka osiągnięć w rankingu`);

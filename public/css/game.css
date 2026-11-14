@@ -244,7 +244,8 @@ table.rank { width: 100%; border-collapse: collapse; font-size: 13px; }
   .bf { width: 112px; padding: 4px 6px 6px; } .bf.boss { width: 130px; }
   .bspr { height: 60px; } .bspr canvas { width: 60px; height: 60px; }
   .bt-log { height: 92px; font-size: 12.5px; }
-  .bt-acts { grid-template-columns: repeat(3, 1fr); }
+  .bt-acts { grid-template-columns: repeat(4, 1fr); gap: 4px; }
+  .ba small { font-size: 9.5px; }
   .ba { padding: 6px 2px; font-size: 12px; }
   .ui-back { padding: 6px; align-items: end; }
   .ui-panel, .ui-panel.wide { width: 100%; max-height: 92vh; max-height: 92dvh; }
@@ -334,3 +335,13 @@ em.bad, .bad { color: #ff9a8a; }
 .bt-mech[hidden] { display: none; }
 .bf.boss { width: min(200px, 62vw) !important; }
 .bf.boss .bn { white-space: normal; }
+
+/* round 4: item tooltip (hover on desktop, long-press on touch) */
+.ui-tip { position: fixed; left: 0; top: 0; z-index: 30; pointer-events: none; width: min(300px, calc(100vw - 16px)); }
+.ui-tip .dcard { width: 100%; max-height: inherit; overflow: hidden; padding: 12px 14px; box-shadow: 0 12px 40px rgba(0,0,0,.75); animation: tipIn .08s ease-out; }
+.ui-tip .tiph { margin-top: 6px; color: #8a8070; font-size: 11px; font-style: italic; }
+@keyframes tipIn { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+.bi, .slot, .mrow, .lt, [data-tri], [data-tradd] { -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
+.bi img, .slot img, .mrow img, .lt img { -webkit-user-drag: none; pointer-events: none; }
+.ba.sk { position: relative; }
+.ba.sk.hi b::after { content: '★'; margin-left: 3px; color: #c58cff; }

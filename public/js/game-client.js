@@ -117,7 +117,7 @@
 
   // ---------- party (drużyna) ----------
   const partyEl = $('party');
-  const AREA = { village: 'Osada', forest: 'Bór', cave: 'Jaskinia', swamp: 'Bagna', town: 'Srebrnogród', mount: 'Szczyty', desert: 'Ruiny' };
+  const AREA = { village: 'Osada', forest: 'Bór', cave: 'Jaskinia', swamp: 'Bagna', town: 'Srebrnogród', mount: 'Szczyty', desert: 'Ruiny', port: 'Przystań', coast: 'Wybrzeże', fort: 'Żarogród', volcano: 'Wulkan', citadel: 'Cytadela', abyss: 'Otchłań' };
   const command = (text) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: 'chat', ch: 'g', text })); };
   function party(msg) {
     const map = {}; for (const m of msg.m) map[m.i] = 1; if (NET) NET.party = map;

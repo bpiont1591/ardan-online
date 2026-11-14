@@ -11,6 +11,12 @@
     ['town', 'Srebrnogród', 'Bezpieczne miasto', 'Warowne miasto o srebrnych dachach. Płatnerz, alchemiczka, kapłanka i Kapitan Bronisław – serce Ardanu.', null],
     ['mount', 'Szczyty Szronu', 'Poziomy 14–22', 'Mroźne przełęcze, śnieżne wilki i lodowe żywiołaki. Na płaskowyżu śpi lodowy smok.', 'Szronogrzbiet'],
     ['desert', 'Ruiny Piasków', 'Poziomy 18–26', 'Oaza, skorpiony i mumie, a za nimi świątynia dawnego królestwa – i jego nieumarły władca.', 'Sethar, Król Cieni'],
+    ['port', 'Mewia Przystań', 'Miasto · od poz. 26', 'Portowe miasto na wschodzie. Kupiec Wit, kowal okrętowy Sambor, alchemiczka Morwena i Kapitan Rogwold z zadaniami.', null],
+    ['coast', 'Wybrzeże Wraków', 'Poziomy 27–36', 'Plaże pełne wraków, olbrzymie kraby, piraci i śpiewające syreny. W zatoce czai się morski potwór.', 'Lewiatan Głębin'],
+    ['fort', 'Twierdza Żarogród', 'Miasto · od poz. 36', 'Warowna twierdza strzegąca północy. Komendant Żelisław, płatnerz Radogost i alchemik Żar szukają śmiałków.', null],
+    ['volcano', 'Wulkan Ignara', 'Poziomy 37–48', 'Rzeki lawy, ogniste chochliki, salamandry i lawowe golemy. W kraterze rządzi dawny kowal pochłonięty przez ogień. Loch: Kuźnia Płomieni.', 'Ignar, Władca Magmy'],
+    ['citadel', 'Cytadela Świtu', 'Miasto · od poz. 46', 'Ostatni bastion przed mrokiem. Paladynka Świetlana, mistrz kuźni Światosław i arcymagini Lumena.', null],
+    ['abyss', 'Otchłań Zmierzchu', 'Poziomy 49–60', 'Kraina wiecznego zmierzchu: cienie, bestie pustki i upadli rycerze. Na końcu czeka Pan Otchłani. Loch: Serce Otchłani.', 'Morgath, Pan Otchłani'],
   ];
   document.getElementById('regions').innerHTML = REG.map((r) => `<article class="card hover region"><img src="/img/${r[0]}_m.jpg" alt="${r[1]}" loading="lazy" width="640" height="360"><div class="body"><h3>${r[1]}</h3><p class="muted" style="margin-bottom:10px">${r[3]}</p><span class="tag">${r[2]}</span>${r[4] ? `<span class="tag boss">Boss: ${r[4]}</span>` : ''}</div></article>`).join('');
   const GAL = [

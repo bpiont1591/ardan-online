@@ -46,7 +46,7 @@ async function main() {
     for (const [pg, name] of [[pa, 'desktop'], [pb, 'phone']]) {
       await pg.goto(BASE + '/', { waitUntil: 'networkidle0' });
       ok(await pg.$eval('h1.logo', (e) => e.textContent) === 'ARDAN', `logo ARDAN (${name})`);
-      ok((await pg.$$eval('#regions .region', (e) => e.length)) === 7, `7 krain na stronie (${name})`);
+      ok((await pg.$$eval('#regions .region', (e) => e.length)) === 13, `13 krain na stronie (${name})`);
       ok((await pg.$$eval('#news article', (e) => e.length)) >= 3, `nowości z API (${name})`);
       ok(/^\d+$/.test(await pg.$eval('[data-online]', (e) => e.textContent)), `licznik online (${name})`);
       await pg.screenshot({ path: `${SHOTS}/01_home_${name}.png` });
@@ -488,6 +488,92 @@ async function main() {
     ok(await pa.$eval('.dg-gate', (e) => /dzisiaj/.test(e.textContent)).catch(() => false), 'blokada dzienna po pokonaniu bossa');
     await pa.keyboard.press('Escape'); await W(200);
     if (await pb.$('#dungeon')) { await pb.evaluate(() => window.ARDAN_UI.h.send({ t: 'dg', a: 'leave' })); await W(800); }
+    // ---------- round 4: tooltips, level 60, new cities ----------
+    console.log('Podgląd przedmiotów, poziom 60, nowe miasta');
+    await cmd(pa, '/opusc'); await W(600);
+    await pa.keyboard.press('i'); await W(700);
+    const gearSel = (pg) => pg.evaluate(() => { const b = (window.ARDAN_UI_STATE.gear || {}).bag || []; const it = b.find((x) => x.s !== 'mat') || b[0]; return it ? `.ui-panel .bag .bi[data-bag="${it.u}"]` : '.ui-panel .bag .bi[data-bag]'; });
+    const bagSel = await gearSel(pa);
+    await pa.waitForSelector(bagSel, { timeout: 4000 }).catch(() => {});
+    const hb = await pa.$(bagSel);
+    if (hb) { await hb.hover(); await W(250); }
+    const tipA = await pa.evaluate(() => { const t = document.getElementById('uiTip'); if (!t || t.hidden) return null; const r = t.getBoundingClientRect(); return { txt: t.textContent, in: r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight, w: r.width }; });
+    ok(!!tipA && /Wymagany poziom|Materiał/.test(tipA.txt) && tipA.in, `najechanie myszką na przedmiot w torbie pokazuje kartę (w oknie: ${tipA && tipA.in})`);
+    ok(!(await pa.$('.ui-detail')), 'samo najechanie nie otwiera okna akcji');
+    await pa.screenshot({ path: `${SHOTS}/30_tooltip_hover_desktop.png` });
+    const sl = await pa.$('.doll .slot:not(.empty)');
+    if (sl) { await sl.hover(); await W(250); }
+    ok(await pa.evaluate(() => { const t = document.getElementById('uiTip'); return !!t && !t.hidden && /Klasa|Wymagany/.test(t.textContent); }), 'karta po najechaniu na założony przedmiot');
+    const lastSlot = await pa.$$('.doll .slot'); if (lastSlot.length) { const b = await lastSlot[lastSlot.length - 1].boundingBox(); await pa.mouse.move(b.x + b.width - 2, b.y + b.height - 2); await W(200); }
+    const edge = await pa.evaluate(() => { const t = document.getElementById('uiTip'); if (!t || t.hidden) return true; const r = t.getBoundingClientRect(); return r.left >= 0 && r.top >= 0 && r.right <= innerWidth + 0.5 && r.bottom <= innerHeight + 0.5; });
+    ok(edge, 'karta zawsze mieści się w oknie');
+    if (hb) { await hb.click(); await W(400); }
+    ok(!!(await pa.$('.ui-detail [data-ia]')), 'kliknięcie nadal otwiera okno akcji');
+    await pa.keyboard.press('Escape'); await pa.evaluate(() => { const d = document.querySelector('.ui-detail [data-dclose]'); if (d) d.click(); }); await pa.keyboard.press('Escape'); await W(300);
+    // market hover
+    await pa.evaluate(() => window.ARDAN_UI.panel('mk')); await W(900);
+    const mrow = await pa.$('.mrow[data-mk]');
+    if (mrow) { await mrow.hover(); await W(250); ok(await pa.evaluate(() => { const t = document.getElementById('uiTip'); return !!t && !t.hidden && /Cena|Wartość/.test(t.textContent); }), 'karta przedmiotu na rynku po najechaniu'); }
+    await pa.mouse.move(5, 5); await pa.keyboard.press('Escape'); await W(300);
+    // phone: long-press
+    await pb.evaluate(() => window.ARDAN_UI.panel('eq')); await W(800);
+    await pb.waitForSelector('.ui-panel .bag .bi[data-bag]', { timeout: 4000 }).catch(() => {});
+    const pbi = await pb.$(await gearSel(pb));
+    let lp = null;
+    if (pbi) {
+      const bb = await pbi.boundingBox();
+      await pb.touchscreen.touchStart(bb.x + bb.width / 2, bb.y + bb.height / 2); await W(750);
+      lp = await pb.evaluate(() => { const t = document.getElementById('uiTip'); if (!t || t.hidden) return null; const r = t.getBoundingClientRect(); return { in: r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight }; });
+      await pb.screenshot({ path: `${SHOTS}/31_tooltip_longpress_phone.png` });
+      await pb.touchscreen.touchEnd(); await W(400);
+    }
+    ok(!!lp && lp.in, 'telefon: przytrzymanie palca pokazuje kartę w granicach ekranu');
+    ok(!(await pb.$('.ui-detail')), 'telefon: po przytrzymaniu nie otwiera się okno akcji');
+    if (pbi) { await pbi.tap(); await W(400); ok(!!(await pb.$('.ui-detail')), 'telefon: zwykłe dotknięcie otwiera akcje'); }
+    await pb.evaluate(() => { const d = document.querySelector('.ui-detail [data-dclose]'); if (d) d.click(); window.ARDAN_UI.close(); }); await W(300);
+    // level 60 + high-level skill
+    await TH(pa, { lvl: 60, heal: true, items: [['selix', 3]], near: { area: 'volcano', mob: 'imp' } }); await W(1600);
+    const meA60 = await pa.evaluate(() => window.ARDAN_DEBUG.me);
+    ok(meA60 && meA60.lvl === 60 && (await snap(pa)).a === 'volcano', `poziom 60 i Wulkan Ignara (poz. ${meA60 && meA60.lvl})`);
+    await pa.evaluate(() => { try { localStorage.setItem('ardan_auto', '0'); } catch (e) {} window.ARDAN_UI.h.send({ t: 'bt', a: 'auto', on: false }); window.ARDAN_UI.h.send({ t: 'bt', a: 'speed', v: 1 }); }); await W(300);
+    await pa.keyboard.press('f');
+    const bt60 = await pa.waitForSelector('#battle', { timeout: 5000 }).then(() => true).catch(() => false);
+    ok(bt60, 'walka z Ognistym chochlikiem w nowej krainie');
+    if (bt60) {
+      if (await pa.$('#btAuto:checked')) { await pa.click('#btAuto'); await W(300); }
+      await pa.waitForSelector('#battle [data-ba="sk"][data-i="5"]:not([disabled])', { timeout: 8000 }).catch(() => {});
+      const nSk = await pa.$$eval('#battle [data-ba="sk"]', (e) => e.length);
+      ok(nSk === 6, `6 umiejętności na 60. poziomie (${nSk})`);
+      await pa.screenshot({ path: `${SHOTS}/32_high_skill_desktop.png` });
+      const skN = await pa.$eval('#battle [data-ba="sk"][data-i="5"]', (e) => e.textContent).catch(() => '');
+      for (let k = 0; k < 5; k++) {
+        if (await pa.$$eval('#btLog .l', (e) => e.some((l) => /Gniew bogów|Strzała zagłady|Zatrzymanie czasu/.test(l.textContent)))) break;
+        if (await pa.$('#btAuto:checked')) await pa.click('#btAuto').catch(() => {});
+        await pa.waitForSelector('#battle [data-ba="sk"][data-i="5"]:not([disabled])', { timeout: 8000 }).catch(() => {});
+        await pa.click('#battle [data-ba="sk"][data-i="5"]').catch(() => {}); await W(2500);
+      }
+      await pa.waitForFunction(() => [...document.querySelectorAll('#btLog .l')].some((l) => /Gniew bogów|Strzała zagłady|Zatrzymanie czasu/.test(l.textContent)), { timeout: 15000 }).catch(() => {});
+      ok(await pa.$$eval('#btLog .l', (e) => e.some((l) => /Gniew bogów|Strzała zagłady|Zatrzymanie czasu/.test(l.textContent))), `umiejętność z 45. poziomu użyta (${skN.replace(/\s+/g, ' ').trim()})`);
+      await pa.screenshot({ path: `${SHOTS}/33_high_skill_used_desktop.png` });
+      await pa.click('#btAuto').catch(() => {}); await pa.click('#battle [data-spd="3"]').catch(() => {});
+      await pa.waitForSelector('#btEnd:not([hidden])', { timeout: 90000 }).catch(() => {});
+      ok(/Zwycięstwo/.test(await pa.$eval('#btEnd', (e) => e.textContent).catch(() => '')), 'chochlik pokonany na 60. poziomie');
+      await pa.click('#btEnd [data-ba="close"]').catch(() => {}); await W(500);
+    }
+    // new city on the phone
+    await TH(pb, { near: { npc: 'portcap' } }); await W(1600);
+    const sP = await snap(pb);
+    ok(sP.a === 'port', `Mewia Przystań – nowe miasto (${sP.a})`);
+    await pb.screenshot({ path: `${SHOTS}/34_new_city_port_phone.png` });
+    await TH(pb, { near: { npc: 'citcap' } }); await W(1600);
+    ok((await snap(pb)).a === 'citadel', 'Cytadela Świtu – nowe miasto');
+    await pb.screenshot({ path: `${SHOTS}/35_new_city_citadel_phone.png` });
+    await TH(pb, { near: { npc: 'fortcap' } }); await W(1600);
+    ok((await snap(pb)).a === 'fort', 'Twierdza Żarogród – nowe miasto');
+    await pb.screenshot({ path: `${SHOTS}/36_new_city_fort_phone.png` });
+    await pb.keyboard.press('m'); await W(700);
+    await pb.screenshot({ path: `${SHOTS}/37_world_map_phone.png` });
+    await pb.keyboard.press('m'); await W(300);
     console.log('Ranking');
     const rk = (await api(pa, '/ranking')).data;
     ok(rk && rk.level.some((r) => r.n === A.nick) && rk.pvp.length === 2 && rk.ach.some((r) => r.n === A.nick), `API rankingu (poziom ${rk.level.length}, PvP ${rk.pvp.length}, osiągnięcia ${rk.ach.length})`);
@@ -498,7 +584,7 @@ async function main() {
     ok((await ph.$$eval('#rankBody tbody tr', (e) => e.length)) >= 2, 'ranking graczy na stronie głównej');
     await ph.tap('[data-rk="pvp"]'); await W(200);
     ok(await ph.$eval('#rankBody', (e) => /Elo|W \/ P/.test(e.textContent)), 'zakładka PvP w rankingu');
-    ok(await ph.$eval('#news', (e) => /Lochy drużynowe/.test(e.textContent) && /Rzemiosło/.test(e.textContent) && /Zadania dzienne/.test(e.textContent)), 'Nowości opisują nowe funkcje');
+    ok(await ph.$eval('#news', (e) => /poziom 60/.test(e.textContent) && /Lochy drużynowe/.test(e.textContent) && /Rzemiosło/.test(e.textContent) && /Zadania dzienne/.test(e.textContent)), 'Nowości opisują nowe funkcje');
     await ph.$eval('#ranking', (e) => e.scrollIntoView()); await W(300);
     await ph.screenshot({ path: `${SHOTS}/28_home_ranking_phone.png` });
     await ph.$eval('#nowosci', (e) => e.scrollIntoView()); await W(300);
