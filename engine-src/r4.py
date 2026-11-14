@@ -284,5 +284,5 @@ ed('sk: SK, cls: CLS, zones: PVPZ, pvpAt, others: (): any => others, gearIds: GE
 open('engine.ts', 'w').write(s)
 print('r4 ok')
 s = open('engine.ts').read()
-ed('  const xpNext = (l: number): number => Math.floor(40 * Math.pow(l, 1.65));', '  const xpNext = (l: number): number => Math.floor(40 * Math.pow(l, 1.65) * (l > 30 ? 1 + (l - 30) * 0.04 : 1));')
+ed('  const xpNext = (l: number): number => Math.floor(40 * Math.pow(l, 1.65));', '  const xpNext = (l: number): number => Math.floor(40 * Math.pow(l, 1.65) * (1 + Math.min(0.35, Math.max(0, l - 4) * 0.025)) * (l > 30 ? 1 + (l - 30) * 0.05 : 1));')
 open('engine.ts', 'w').write(s)

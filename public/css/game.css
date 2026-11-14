@@ -345,3 +345,12 @@ em.bad, .bad { color: #ff9a8a; }
 .bi img, .slot img, .mrow img, .lt img { -webkit-user-drag: none; pointer-events: none; }
 .ba.sk { position: relative; }
 .ba.sk.hi b::after { content: '★'; margin-left: 3px; color: #c58cff; }
+
+/* round 5: item passives, legendaries */
+.pxs { margin: 8px 0 4px; padding: 7px 9px; border-radius: 8px; background: rgba(120,80,200,.12); border: 1px solid rgba(160,120,255,.25); }
+.pxs .px { font-size: 12.5px; color: #d8ccf0; margin: 2px 0; line-height: 1.35; } .pxs .px b { color: #c8a8ff; } .pxs .px.leg b { color: #ff9a4d; }
+.dm.lore { font-style: italic; color: #e0b070; }
+.dcard.r3, .ui-tip .dcard.r3 { box-shadow: 0 0 0 1px #ff8a3d, 0 0 28px rgba(255,138,61,.45), 0 12px 40px rgba(0,0,0,.75); }
+.bi.r3, .slot.r3, .ic.r3 { box-shadow: 0 0 10px rgba(255,138,61,.65); }
+.fnum.px { color: #c8a8ff; font-size: 16px; }
+.bt-log .px { color: #c8a8ff; }

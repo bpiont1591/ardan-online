@@ -22,6 +22,9 @@
 
   // ---------- pixel icons ----------
   const iconCache = {};
+  // item passives (mirror of server/passives.js – names and descriptions only)
+  const PXN = {"ls":["Wampiryzm","{v}% zadanych obrażeń przywraca życie",0],"stun":["Ogłuszenie","{v}% szans na ogłuszenie celu przy trafieniu",0],"thorns":["Ciernie","{v}% otrzymanych obrażeń wraca do atakującego",0],"xturn":["Pośpiech","{v}% szans na dodatkowy atak w turze",0],"critd":["Okrucieństwo","+{v}% obrażeń krytycznych",0],"regen":["Źródło","+{v} many / energii co turę",0],"boss":["Pogromca","+{v}% obrażeń przeciw bossom i elitom",0],"poison":["Trucizna","{v}% szans na zatrucie celu (3 tury, 15% ataku na turę)",0],"shield":["Bariera","na start walki tarcza pochłaniająca {v} obrażeń",0],"hregen":["Odnowa","+{v}% maks. życia co turę",0],"exec":["Egzekucja","+{v}% obrażeń przeciw wrogom poniżej 30% życia",0],"block":["Blok","{v}% szans na zablokowanie połowy obrażeń",0],"first":["Inicjatywa","+{v}% obrażeń w pierwszej rundzie walki",0],"phoenix":["Feniks","raz na walkę powstajesz z {v}% życia po śmierci",1],"chain":["Łańcuch","{v}% szans, że atak trafi także drugiego wroga (60%)",1],"echo":["Echo mocy","{v}% szans, że umiejętność nie zużyje many / energii",1],"frost":["Lodowy dotyk","{v}% szans na zamrożenie celu (nie działa na bossy)",1],"soul":["Żniwiarz dusz","zabicie wroga przywraca {v}% życia",1],"berserk":["Szał","+1% obrażeń za każde 2% brakującego życia (maks. +{v}%)",1],"mirror":["Lustro","{v}% szans na odbicie całego ciosu w atakującego",1]};
+  const pxLine = (k, v) => { const P = PXN[k]; return P ? `<div class="px${P[2] ? ' leg' : ''}"><b>✦ ${esc(P[0])}</b> – ${esc(P[1].replace('{v}', v))}</div>` : ''; };
   function drawPix(g, ic, metal, gem) {
     const p = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(x, y, w, h); };
     const wood = '#7a4f2a', dark = '#1a1420', gold = '#d8b25a', lite = 'rgba(255,255,255,.55)';
@@ -55,6 +58,18 @@
       case 'boots': p(4, 2, 5, 9, metal); p(4, 11, 9, 3, metal); p(4, 14, 10, 1, '#2a1a10'); p(3, 2, 7, 2, gold); p(4, 4, 1, 7, lite); break;
       case 'ring': p(5, 6, 6, 1, metal); p(4, 7, 1, 5, metal); p(11, 7, 1, 5, metal); p(5, 12, 6, 1, metal); p(5, 7, 1, 1, lite); p(6, 2, 4, 4, gem); p(7, 1, 2, 1, gem); p(6, 2, 1, 1, '#fff'); break;
       case 'amulet': for (const [x, y] of [[3, 1], [4, 3], [5, 5], [6, 7], [12, 1], [11, 3], [10, 5], [9, 7]]) p(x, y, 1, 2, gold); p(6, 9, 4, 5, metal); p(5, 10, 6, 3, metal); p(7, 10, 2, 3, gem); p(6, 9, 1, 1, '#fff'); break;
+      case 'hammer': p(7, 5, 2, 10, wood); p(3, 1, 10, 5, metal); p(3, 1, 10, 1, lite); p(2, 2, 1, 3, metal); p(13, 2, 1, 3, metal); p(7, 2, 2, 3, gem); p(6, 14, 4, 1, gold); break;
+      case 'sabre': p(9, 1, 2, 2, metal); p(8, 3, 2, 3, metal); p(7, 6, 2, 4, metal); p(7, 3, 1, 7, lite); p(4, 10, 8, 2, gold); p(6, 12, 2, 3, wood); p(5, 15, 4, 1, gold); break;
+      case 'spear': p(7, 4, 2, 12, wood); p(6, 0, 4, 2, metal); p(7, 2, 2, 2, metal); p(5, 4, 6, 1, gold); p(7, 0, 1, 3, lite); p(7, 6, 2, 1, gem); break;
+      case 'xbow': p(2, 5, 12, 2, wood); p(7, 2, 2, 12, wood); p(2, 7, 1, 2, metal); p(13, 7, 1, 2, metal); p(3, 8, 10, 1, '#d8d2c0'); p(7, 0, 2, 2, metal); p(6, 9, 4, 2, gem); break;
+      case 'scepter': p(7, 6, 2, 9, gold); p(5, 1, 6, 5, metal); p(6, 2, 4, 3, gem); p(6, 2, 1, 1, '#fff'); p(4, 3, 1, 2, gold); p(11, 3, 1, 2, gold); p(6, 14, 4, 1, gold); break;
+      case 'buckler': p(4, 3, 8, 10, metal); p(3, 5, 10, 6, metal); p(6, 6, 4, 4, gold); p(7, 7, 2, 2, gem); p(4, 3, 3, 1, lite); break;
+      case 'dagger': p(7, 1, 2, 8, metal); p(7, 1, 1, 8, lite); p(5, 9, 6, 1, gold); p(7, 10, 2, 4, wood); p(6, 14, 4, 1, gold); p(7, 11, 2, 1, gem); break;
+      case 'tome': p(3, 2, 10, 12, '#5a2a6a'); p(4, 3, 8, 10, '#7a3a8a'); p(12, 3, 1, 10, '#efe6d2'); p(5, 6, 6, 4, gold); p(7, 7, 2, 2, gem); p(3, 2, 10, 1, gold); break;
+      case 'cloak': p(5, 1, 6, 3, metal); p(4, 4, 8, 4, metal); p(3, 8, 10, 7, metal); p(6, 1, 4, 2, dark); p(7, 4, 2, 2, gold); p(3, 8, 1, 7, lite); p(7, 9, 2, 5, gem); break;
+      case 'mask': p(3, 4, 10, 7, metal); p(4, 11, 8, 2, metal); p(4, 6, 3, 2, dark); p(9, 6, 3, 2, dark); p(7, 8, 2, 3, gem); p(3, 4, 10, 1, lite); break;
+      case 'circlet': p(2, 7, 12, 2, gold); p(3, 6, 2, 1, gold); p(11, 6, 2, 1, gold); p(7, 3, 2, 4, gold); p(7, 4, 2, 2, gem); p(3, 7, 1, 1, gem); p(12, 7, 1, 1, gem); break;
+      case 'talisman': p(7, 1, 2, 4, gold); p(4, 5, 8, 8, metal); p(5, 4, 6, 10, metal); p(6, 6, 4, 4, gem); p(7, 7, 1, 1, '#fff'); p(5, 13, 6, 1, gold); break;
       default: p(4, 4, 8, 8, metal);
     }
   }
@@ -131,7 +146,7 @@
     if (detail) return;
     if (!tip) { tip = el('<div class="ui-tip" id="uiTip" role="tooltip" hidden></div>'); root.appendChild(tip); }
     if (tip.dataset.u !== it.u || tip.hidden) {
-      tip.innerHTML = `<div class="dcard tipc" style="border-color:${RAR[it.r].col}">${cardBody(it, ctx)}<div class="dm tiph">${touch ? 'Puść palec i dotknij, aby wybrać akcję.' : 'Kliknij, aby wybrać akcję.'}</div></div>`;
+      tip.innerHTML = `<div class="dcard tipc r${it.r|0}" style="border-color:${RAR[it.r].col}">${cardBody(it, ctx)}<div class="dm tiph">${touch ? 'Puść palec i dotknij, aby wybrać akcję.' : 'Kliknij, aby wybrać akcję.'}</div></div>`;
       tip.dataset.u = it.u;
     }
     tip.hidden = false;
@@ -175,6 +190,8 @@
       <div class="dm ${okLvl ? '' : 'bad'}">Wymagany poziom: ${it.l}</div>`}
       <div class="dst">${statLines(it.st || {}, worn ? worn.st : (it.s !== 'mat' && ctx.from !== 'worn' ? {} : null))}</div>
       ${worn ? `<div class="dm cmp">Porównanie z: ${nameHtml(worn)}</div>` : (it.s !== 'mat' && ctx.from !== 'worn' && G.gear ? '<div class="dm cmp">Nic nie masz w tym miejscu – każda statystyka to zysk.</div>' : '')}
+      ${Array.isArray(it.px) && it.px.length ? `<div class="pxs">${it.px.map((x) => pxLine(x[0], x[1])).join('')}</div>` : ''}
+      ${it.lore ? `<div class="dm lore">„${esc(it.lore)}”</div>` : ''}
       ${ctx.seller ? `<div class="dm">Sprzedający: ${esc(ctx.seller)}</div>` : ''}
       ${ctx.pr ? `<div class="dm">Cena: <b class="gold">${ctx.pr} zł</b></div>` : ''}
       <div class="dm">Wartość: ${it.v} zł</div>`;
@@ -192,7 +209,7 @@
     } else if (ctx.from === 'worn') acts += `<button type="button" data-ia="unequip">Zdejmij</button>`;
     else if (ctx.from === 'market') acts += ctx.mine ? `<button type="button" data-ia="cancel">Wycofaj ofertę</button>` : `<button type="button" data-ia="buy" ${(S.gear && S.gear.gold >= ctx.pr) ? '' : 'disabled'}>Kup za ${ctx.pr} zł</button>`;
     else if (ctx.from === 'tradeMine') acts += `<button type="button" data-ia="trrem">Usuń z wymiany</button>`;
-    detail = el(`<div class="ui-detail"><div class="dcard" style="border-color:${RAR[it.r].col}">
+    detail = el(`<div class="ui-detail"><div class="dcard r${it.r|0}" style="border-color:${RAR[it.r].col}">
       <button type="button" class="ui-x" data-dclose aria-label="Zamknij">✕</button>
       ${cardBody(it, Object.assign({}, ctx, { pr: 0 }))}
       <div class="da">${acts}</div></div></div>`);
@@ -486,6 +503,7 @@
       if (e.k === 'hit') floatNum(e.t, '-' + e.v, 'dmg'); else if (e.k === 'crit') floatNum(e.t, '-' + e.v + '!', 'crit');
       else if (e.k === 'miss') floatNum(e.t, 'unik', 'miss'); else if (e.k === 'heal') floatNum(e.t, '+' + e.v, 'heal');
       else if (e.k === 'mana') floatNum(e.t, '+' + e.v, 'mana'); else if (e.k === 'burn') floatNum(e.t, '-' + e.v, 'dmg');
+      else if (e.k === 'px') { if (e.v && e.t) floatNum(e.t, '-' + e.v, 'dmg'); else floatNum(e.a, '✦', 'px'); }
       else if (e.k === 'die') { const c = bt.el.querySelector(`.bf[data-f="${CSS.escape(e.t)}"]`); if (c) c.classList.add('dead'); }
       if (e.a) { const c = bt.el.querySelector(`.bf[data-f="${CSS.escape(e.a)}"]`); if (c) { c.classList.remove('act'); void c.offsetWidth; c.classList.add('act'); } }
       setTimeout(next, step);

@@ -53,6 +53,7 @@ function testHook(world, p, m) {
   }
   if (Array.isArray(m.items)) for (const [id, n] of m.items) p.api.addItem(id, n);
   if (Number.isInteger(m.loot) && m.loot > 0) { const I = require('./items'); world.gear.give(p, Array.from({ length: Math.min(12, m.loot) }, () => I.randomItem(P.lvl, 2))); }
+  if (typeof m.leg === 'string') { const I = require('./items'); if (I.PXD.LEG.some((d) => d.id === m.leg)) world.gear.give(p, [I.makeLeg(m.leg)]); }
   if (m.heal) { P.hp = p.api.maxHp(); P.mp = 9999; }
   if (m.dqdone && P.daily) { const q = P.daily.q[0]; q.have = q.need; q.done = true; p.dqDirty = true; }
   p.srv.dirty = true; world.gear.changed(p);

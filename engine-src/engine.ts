@@ -1198,7 +1198,7 @@ function createArdan(canvas: HTMLCanvasElement, opts: any): () => void {
   const pl: any = { fx: P.x, fy: P.y, mt: 1, dir: 0, phase: 0, cd: 0, anim: 0, hit: 0, path: [] as number[][], target: null as any, talk: null as string | null, repath: 0, dead: 0,
     skcd: [0, 0, 0], buffDef: 0, haste: 0, combat: 0, nomp: 0, resp: ["village", 18, 17] };
   const C = (): any => CLS[P.cls || "war"];
-  const xpNext = (l: number): number => Math.floor(40 * Math.pow(l, 1.65) * (l > 30 ? 1 + (l - 30) * 0.04 : 1));
+  const xpNext = (l: number): number => Math.floor(40 * Math.pow(l, 1.65) * (1 + Math.min(0.35, Math.max(0, l - 4) * 0.025)) * (l > 30 ? 1 + (l - 30) * 0.05 : 1));
   const GEARON = (): boolean => !!(P.gear && typeof P.gear === "object");
   const gs = (k: string): number => { let s0 = 0; const g = P.gear; if (g) for (const sl of Object.keys(g)) { const it = g[sl]; if (it && it.st && typeof it.st[k] === "number") s0 += it.st[k]; } return s0; };
   const maxHp = (): number => Math.round(C().hp0 + (P.lvl - 1) * C().hpL + (GEARON() ? gs("hp") : (P.eq.a ? ITEMS[P.eq.a].def * 2 : 0)));

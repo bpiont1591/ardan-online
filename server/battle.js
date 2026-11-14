@@ -27,20 +27,29 @@ function createBattles(world) {
   const R = Math.random;
   const sys = (p, t) => world.chat.sys(p, t);
   const dmgCalc = (a, d) => Math.max(1, Math.round(a * (0.85 + R() * 0.3) - d * 0.6));
-  const xpTotal = (lvl, xp) => { let s = xp; for (let l = 1; l < lvl; l++) s += Math.floor(40 * Math.pow(l, 1.65)); return s; };
+  // must match xpNext in engine-src/r4.py (round 5: ~+35% mid-game, ~+50% at the cap; levels 1-4 unchanged)
+  const xpNext = (l) => Math.floor(40 * Math.pow(l, 1.65) * (1 + Math.min(0.35, Math.max(0, l - 4) * 0.025)) * (l > 30 ? 1 + (l - 30) * 0.05 : 1));
+  const xpTotal = (lvl, xp) => { let s = xp; for (let l = 1; l < lvl; l++) s += xpNext(l); return s; };
   const rank = () => store.get('pvp', {});
   const ckey = (p) => p.ckey;
 
+  // item passives (round 5): summed per kind from worn gear, capped
+  function gearPx(P) {
+    const out = {}, g = P.gear || {};
+    for (const sl of Object.keys(g)) { const it = g[sl]; if (it && Array.isArray(it.px)) for (const [k, v] of it.px) if (I.PXD.PX[k] && Number.isFinite(v)) out[k] = Math.min(I.PXD.PX[k].cap, (out[k] || 0) + v); }
+    return out;
+  }
+  const pxEv = (ev, f, txt, extra) => ev.push(Object.assign({ a: f.id, k: 'px', txt: '✦ ' + txt }, extra || {}));
   function fPlayer(p, side) {
-    const P = p.api.P(), st = p.api.stats();
+    const P = p.api.P(), st = p.api.stats(), px = gearPx(P);
     return { id: p.pid, kind: 'p', side, p, n: p.nick, cls: P.cls, lvl: P.lvl, hp: Math.max(1, Math.round(P.hp)), mhp: st.hp, mp: Math.round(P.mp), mmp: st.mp,
       atk: st.atk, def: st.def, crit: st.crit / 100, dodge: st.dodge / 100, res: st.res, w: P.eq.w, a: P.eq.a, gt: p.guildTag || null,
-      cds: [0, 0, 0, 0, 0, 0], buf: {}, stun: 0, frz: 0, burn: 0, burnD: 0, alive: true, fled: false, choice: null, auto: !!p.autoFight || !!p.bot, bot: !!p.bot };
+      cds: [0, 0, 0, 0, 0, 0], buf: {}, stun: 0, frz: 0, burn: 0, burnD: 0, alive: true, fled: false, choice: null, auto: !!p.autoFight || !!p.bot, bot: !!p.bot, px, absorb: px.shield || 0, phx: false, poison: 0, poisonD: 0 };
   }
   function fMob(m, idx) {
     const d = m.d;
     return { id: 'm' + idx, kind: 'm', side: 1, m, k: m.k, n: d.n, lvl: d.lvl, hp: Math.max(1, Math.round(m.hp)), mhp: d.hp, mp: 0, mmp: 0, atk: d.atk, def: d.def,
-      crit: d.boss ? 0.1 : 0.05, dodge: 0.04, boss: !!d.boss, elite: !!I.ELITE[m.k] || !!m.elite, mech: m.mech || null, summon: m.summon || null, buf: {}, stun: 0, frz: 0, burn: 0, burnD: 0, alive: true, fled: false };
+      crit: d.boss ? 0.1 : 0.05, dodge: 0.04, boss: !!d.boss, elite: !!I.ELITE[m.k] || !!m.elite, mech: m.mech || null, summon: m.summon || null, buf: {}, stun: 0, frz: 0, burn: 0, burnD: 0, alive: true, fled: false, px: {}, absorb: 0, poison: 0, poisonD: 0 };
   }
   const players = (b) => b.f.filter((f) => f.kind === 'p');
   const active = (f) => f.alive && !f.fled;
@@ -154,16 +163,51 @@ function createBattles(world) {
     if (ok(0)) return { a: 'sk', i: 0, t: tgt };
     return { a: 'atk', t: tgt };
   }
-  function hit(b, a, t, mult, ev, how) {
-    if (!active(t)) return;
-    if (R() < t.dodge) { ev.push({ a: a.id, t: t.id, k: 'miss', txt: `${t.n} unika ciosu (${how}).` }); return; }
+  // death with the legendary "Feniks" passive (once per fight)
+  function down(f, ev) {
+    if (f.hp > 0) return;
+    if (f.px && f.px.phoenix && !f.phx) { f.phx = true; f.hp = Math.max(1, Math.round(f.mhp * f.px.phoenix / 100)); pxEv(ev, f, `Feniks: ${f.n} powstaje z popiołów (${Math.round(f.hp)} pż)!`, { t: f.id, hp: Math.round(f.hp) }); return; }
+    f.hp = 0; f.alive = false; ev.push({ t: f.id, k: 'die', txt: `${f.n} pada!` });
+  }
+  function hit(b, a, t, mult, ev, how, noProc) {
+    if (!active(t)) return 0;
+    if (R() < t.dodge) { ev.push({ a: a.id, t: t.id, k: 'miss', txt: `${t.n} unika ciosu (${how}).` }); return 0; }
+    const A = a.px || {}, T = t.px || {};
+    if (T.mirror && R() < T.mirror / 100) { // whole blow reflected
+      const d0 = Math.round(dmgCalc(a.atk, a.def) * mult); a.hp -= d0;
+      pxEv(ev, t, `Lustro: ${t.n} odbija cios – ${a.n} traci ${d0} pż.`, { t: a.id, v: d0, hp: Math.max(0, Math.round(a.hp)) }); down(a, ev); return 0;
+    }
+    let m = mult;
+    if (A.boss && (t.boss || t.elite)) m *= 1 + A.boss / 100;
+    if (A.exec && t.hp < t.mhp * 0.3) m *= 1 + A.exec / 100;
+    if (A.first && b.round === 1) m *= 1 + A.first / 100;
+    if (A.berserk && a.mhp) m *= 1 + Math.min(A.berserk, (1 - a.hp / a.mhp) * 50) / 100;
     const crit = R() < a.crit + (a.buf.crit ? 0.25 : 0);
-    let d = Math.round(dmgCalc(a.atk, t.def * (t.buf.def ? 1.6 : 1)) * mult);
-    if (crit) d = Math.round(d * 1.7);
+    let d = Math.round(dmgCalc(a.atk, t.def * (t.buf.def ? 1.6 : 1)) * m);
+    if (crit) d = Math.round(d * (1.7 + (A.critd || 0) / 100));
     if (t.buf.shield) d = Math.max(1, Math.round(d * 0.25));
+    let note = '';
+    if (T.block && R() < T.block / 100) { d = Math.max(1, Math.round(d / 2)); note += ' (blok)'; }
+    if (t.absorb > 0) { const ab = Math.min(t.absorb, d); t.absorb -= ab; d -= ab; note += ` (bariera -${ab})`; }
     t.hp -= d;
-    ev.push({ a: a.id, t: t.id, k: crit ? 'crit' : 'hit', v: d, txt: `${a.n} – ${how}: ${t.n} traci ${d} pż${crit ? ' (KRYTYK!)' : ''}.`, hp: Math.max(0, Math.round(t.hp)) });
-    if (t.hp <= 0) { t.hp = 0; t.alive = false; ev.push({ t: t.id, k: 'die', txt: `${t.n} pada!` }); }
+    ev.push({ a: a.id, t: t.id, k: crit ? 'crit' : 'hit', v: d, txt: `${a.n} – ${how}: ${t.n} traci ${d} pż${crit ? ' (KRYTYK!)' : ''}${note}.`, hp: Math.max(0, Math.round(t.hp)) });
+    down(t, ev);
+    if (d > 0 && T.thorns && active(a)) { const r = Math.max(1, Math.round(d * T.thorns / 100)); a.hp -= r; pxEv(ev, t, `Ciernie: ${a.n} traci ${r} pż.`, { t: a.id, v: r, hp: Math.max(0, Math.round(a.hp)) }); down(a, ev); }
+    if (!noProc && d > 0) {
+      if (A.ls && active(a) && a.hp < a.mhp) { const h = Math.max(1, Math.round(d * A.ls / 100)); a.hp = Math.min(a.mhp, a.hp + h); pxEv(ev, a, `Wampiryzm: ${a.n} +${h} pż.`, { t: a.id, hp: Math.round(a.hp) }); }
+      if (t.alive) {
+        if (A.stun && R() < A.stun / 100 * (t.boss ? 0.5 : 1)) { t.stun = 1; pxEv(ev, a, `Ogłuszenie: ${t.n} jest ogłuszony!`); }
+        if (A.frost && !t.boss && R() < A.frost / 100) { t.frz = 1; pxEv(ev, a, `Lodowy dotyk: ${t.n} zamarza!`); }
+        if (A.poison && R() < A.poison / 100) { t.poison = 3; t.poisonD = Math.max(1, Math.round(a.atk * 0.15)); pxEv(ev, a, `Trucizna: ${t.n} jest zatruty.`); }
+      } else if (A.soul && active(a)) { const h = Math.round(a.mhp * A.soul / 100); a.hp = Math.min(a.mhp, a.hp + h); pxEv(ev, a, `Żniwiarz dusz: ${a.n} +${h} pż.`, { t: a.id, hp: Math.round(a.hp) }); }
+    }
+    return d;
+  }
+  // basic attack + "Łańcuch" (second target) for players
+  function basic(b, f, t, mult, ev, how) {
+    hit(b, f, t, mult, ev, how);
+    const A = f.px || {};
+    if (A.chain && R() < A.chain / 100) { const o = enemiesOf(b, f).filter((x) => x !== t); if (o.length) { pxEv(ev, f, `Łańcuch: atak przeskakuje na ${o[0].n}!`); hit(b, f, o[Math.floor(R() * o.length)], mult * 0.6, ev, how, true); } }
   }
   function heal(f, amount, ev, how) {
     const before = f.hp; f.hp = Math.min(f.mhp, f.hp + Math.round(amount));
@@ -196,7 +240,8 @@ function createBattles(world) {
       const i = ch.i | 0, sk = (TSK[f.cls] || TSK.war)[i], nm = SKN[i] ? SKN[i].n : 'Umiejętność';
       if (!sk || f.lvl < SK_LV[i] || (f.cds[i] | 0) > 0 || f.mp < sk.cost) { ch = { a: 'atk' }; }
       else {
-        f.mp -= sk.cost; f.cds[i] = sk.cd + 1;
+        if (f.px && f.px.echo && R() < f.px.echo / 100) pxEv(ev, f, `Echo mocy: ${nm} bez kosztu!`); else f.mp -= sk.cost;
+        f.cds[i] = sk.cd + 1;
         ev.push({ a: f.id, k: 'skill', txt: `${f.n} używa: ${nm}!` });
         const k = f.cls + i;
         if (k === 'war0') { hit(b, f, t, 2.2, ev, nm); if (t.alive && (!t.boss || R() < 0.4)) { t.stun = 1; ev.push({ t: t.id, k: 'info', txt: `${t.n} jest ogłuszony!` }); } }
@@ -221,9 +266,9 @@ function createBattles(world) {
       }
     }
     if (f.cls === 'mag') {
-      if (f.mp >= 2) { f.mp -= 2; hit(b, f, t, 1, ev, 'magiczny pocisk'); }
-      else hit(b, f, t, 0.5, ev, 'cios kosturem');
-    } else hit(b, f, t, 1, ev, f.cls === 'arc' ? 'strzał' : 'cios');
+      if (f.mp >= 2) { f.mp -= 2; basic(b, f, t, 1, ev, 'magiczny pocisk'); }
+      else basic(b, f, t, 0.5, ev, 'cios kosturem');
+    } else basic(b, f, t, 1, ev, f.cls === 'arc' ? 'strzał' : 'cios');
   }
   // special boss mechanics (dungeons): summon adds, enrage, life drain, bone shield, curse
   function mechanics(b, f, en, ev) {
@@ -278,11 +323,17 @@ function createBattles(world) {
       if (sideDone(b, 0) || sideDone(b, 1)) break;
       if (f.stun > 0) { f.stun--; ev.push({ a: f.id, k: 'info', txt: `${f.n} jest ogłuszony i traci turę.` }); continue; }
       if (f.frz > 0) { f.frz--; ev.push({ a: f.id, k: 'info', txt: `${f.n} jest zamrożony i traci turę.` }); continue; }
-      if (f.kind === 'p') doPlayer(b, f, f.choice || ai(b, f), ev); else doMob(b, f, ev);
+      if (f.kind === 'p') {
+        doPlayer(b, f, f.choice || ai(b, f), ev);
+        if (f.px && f.px.xturn && active(f) && !sideDone(b, 1 - f.side) && R() < f.px.xturn / 100) { const en = enemiesOf(b, f); const t = en.slice().sort((x, y) => x.hp - y.hp)[0]; pxEv(ev, f, `Pośpiech: ${f.n} atakuje jeszcze raz!`); basic(b, f, t, 0.8, ev, 'szybki atak'); }
+      } else doMob(b, f, ev);
     }
     for (const f of b.f) {
       if (!active(f)) continue;
-      if (f.burn > 0) { f.burn--; f.hp -= f.burnD; ev.push({ t: f.id, k: 'burn', v: f.burnD, txt: `${f.n} płonie: -${f.burnD} pż.`, hp: Math.max(0, Math.round(f.hp)) }); if (f.hp <= 0) { f.hp = 0; f.alive = false; ev.push({ t: f.id, k: 'die', txt: `${f.n} pada!` }); } }
+      if (f.burn > 0) { f.burn--; f.hp -= f.burnD; ev.push({ t: f.id, k: 'burn', v: f.burnD, txt: `${f.n} płonie: -${f.burnD} pż.`, hp: Math.max(0, Math.round(f.hp)) }); down(f, ev); if (!f.alive) continue; }
+      if (f.poison > 0) { f.poison--; f.hp -= f.poisonD; ev.push({ t: f.id, k: 'burn', v: f.poisonD, txt: `${f.n} – trucizna: -${f.poisonD} pż.`, hp: Math.max(0, Math.round(f.hp)) }); down(f, ev); if (!f.alive) continue; }
+      if (f.px && f.px.hregen && f.hp < f.mhp) { const h = Math.max(1, Math.round(f.mhp * f.px.hregen / 100)); f.hp = Math.min(f.mhp, f.hp + h); pxEv(ev, f, `Odnowa: ${f.n} +${h} pż.`, { t: f.id, hp: Math.round(f.hp) }); }
+      if (f.px && f.px.regen) f.mp = Math.min(f.mmp, f.mp + f.px.regen);
       for (const k of Object.keys(f.buf)) { f.buf[k]--; if (f.buf[k] <= 0) delete f.buf[k]; }
       if (f.cds) f.cds = f.cds.map((c) => Math.max(0, c - 1));
       if (f.kind === 'p') f.mp = Math.min(f.mmp, f.mp + (f.cls === 'mag' ? 3 + f.lvl * 0.15 : 12));
