@@ -73,7 +73,7 @@ gameui += '\n' + rd(os.path.join(PUB, 'js/game-ui2.js'))
 import subprocess
 NEWS_JSON = subprocess.check_output(['node', '-e', "process.stdout.write(JSON.stringify(require(process.argv[1])))", os.path.join(SRV, 'news.js')]).decode()
 mods = {}
-for m in ['chat', 'party', 'items', 'gear', 'battle', 'market', 'trade', 'guild', 'gather', 'dungeon', 'craft', 'daily', 'ach', 'ranking', 'game']:
+for m in ['chat', 'party', 'passives', 'items', 'gear', 'battle', 'market', 'trade', 'guild', 'gather', 'dungeon', 'craft', 'daily', 'ach', 'ranking', 'game']:
     mods[m] = rd(os.path.join(SRV, m + '.js'))
 require_js = """(function(){
 const defs = {}, cache = {};
