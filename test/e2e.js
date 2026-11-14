@@ -31,7 +31,7 @@ async function main() {
   for (let i = 0; i < 50 && !log.includes('Serwer działa'); i++) await W(100);
   const browser = await puppeteer.launch({ executablePath: CHROME, args: ['--no-sandbox'] });
   const errors = [];
-  const watch = (pg, who) => { pg.on('pageerror', (e) => errors.push(`${who}: ${e}`)); pg.on('console', (m) => { if (m.type() === 'error' && !/status of 4\d\d/.test(m.text())) errors.push(`${who}: ${m.text()}`); }); };
+  const watch = (pg, who) => { pg.on('pageerror', (e) => errors.push(`${who}: ${e}`)); pg.on('console', (m) => { if (m.type() === 'error' && !/status of 4\d\d/.test(m.text()) && !/ws\?postac=.*HTTP Authentication failed/.test(m.text())) errors.push(`${who}: ${m.text()}`); }); };
   const sfx = String(Date.now()).slice(-5);
   const A = { login: 'rycerz' + sfx, email: `rycerz${sfx}@example.com`, pass: 'Mgla-Ardanu-2026', nick: 'Bronisz' + sfx.slice(-3), cls: 'war' };
   const B = { login: 'lucznik' + sfx, email: `lucznik${sfx}@example.com`, pass: 'Strzala#Bor77', nick: 'Łucja' + sfx.slice(-3), cls: 'arc' };
@@ -703,7 +703,8 @@ async function main() {
     await W(300);
     ok((await pc.$$eval('.char', (e) => e.length)) === 1, 'postać A nadal na koncie');
     // reset killed A's old sessions
-    const aSess = (await api(pa, '/me')).data.user;
+    // (the live game socket of A may be closed by the session re-check and the page may navigate to /logowanie)
+    let aSess; for (let k = 0; k < 5; k++) { try { aSess = (await api(pa, '/me')).data.user; break; } catch (e) { await W(800); } }
     ok(aSess === null, 'reset hasła wylogował stare sesje');
     // logout
     await pc.click('[data-logout]'); await W(800);
