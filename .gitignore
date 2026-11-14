@@ -7,3 +7,4 @@ data/
 shots/
 engine-src/out/
 engine-src/node_modules
+dist/

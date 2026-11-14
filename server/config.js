@@ -1,13 +1,22 @@
 'use strict';
 // Central configuration (all values come from environment variables, see README).
 const path = require('path');
+// optional .env file in the project root (local runs / VPS). Never overrides real environment variables.
+try {
+  const f = path.join(__dirname, '..', '.env');
+  if (require('fs').existsSync(f)) for (const line of require('fs').readFileSync(f, 'utf8').split(/\r?\n/)) {
+    const m = /^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/.exec(line); if (!m || line.trim().startsWith('#')) continue;
+    if (process.env[m[1]] === undefined) process.env[m[1]] = m[2].replace(/^(['"])(.*)\1$/, '$2');
+  }
+} catch (e) { /* ignore */ }
 const env = process.env;
 const isProd = env.NODE_ENV === 'production';
 module.exports = {
   isProd,
   port: Number(env.PORT) || 3000,
   host: env.HOST || '0.0.0.0',
-  baseUrl: (env.BASE_URL || `http://localhost:${Number(env.PORT) || 3000}`).replace(/\/+$/, ''),
+  // Render sets RENDER_EXTERNAL_URL automatically, Fly sets FLY_APP_NAME – so BASE_URL is optional there
+  baseUrl: (env.BASE_URL || env.RENDER_EXTERNAL_URL || (env.FLY_APP_NAME ? `https://${env.FLY_APP_NAME}.fly.dev` : '') || `http://localhost:${Number(env.PORT) || 3000}`).replace(/\/+$/, ''),
   // DATA_DIR = persistent folder (Render disk / Fly volume / Docker volume); DATABASE_PATH overrides the file itself
   dataDir: env.DATA_DIR || (env.DATABASE_PATH ? path.dirname(env.DATABASE_PATH) : path.join(__dirname, '..', 'data')),
   dbPath: env.DATABASE_PATH || path.join(env.DATA_DIR || path.join(__dirname, '..', 'data'), 'ardan.db'),

@@ -1,0 +1,41 @@
+# ARDAN – Render Blueprint z TRWAŁYM DYSKIEM (płatny plan Starter ok. 7 USD/mies. + dysk 1 GB ok. 0,25 USD/mies.).
+# Baza SQLite leży na dysku /var/data, kopie zapasowe w /var/data/backups (codziennie, 7 ostatnich).
+# W Render: New > Blueprint > w polu "Blueprint Path" wpisz: render.disk.yaml
+services:
+  - type: web
+    name: ardan-online
+    runtime: node
+    plan: starter
+    region: frankfurt
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /healthz
+    disk:
+      name: ardan-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY
+        value: "1"
+      - key: DATA_DIR
+        value: /var/data
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: ADMIN_LOGIN
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: MAIL_FROM
+        sync: false

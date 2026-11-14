@@ -1,27 +1,37 @@
-# Render Blueprint – New > Blueprint > wskaż repozytorium. Wymaga płatnego planu (trwały dysk dla SQLite).
+# ARDAN – Render Blueprint (DARMOWY plan + darmowa baza Postgres w Neon.tech jako trwały zapis).
+# Render: New > Blueprint > wybierz to repozytorium. Szczegóły: DEPLOY_PL.md
+# Darmowy plan Render nie ma trwałego dysku – dlatego kopia całej bazy gry jest co 2 minuty
+# (i przy każdym zatrzymaniu serwera) zapisywana w Postgresie (DATABASE_URL) i odtwarzana przy starcie.
+# Wersja z płatnym dyskiem (bez Postgresa): render.disk.yaml
 services:
   - type: web
     name: ardan-online
     runtime: node
-    plan: starter
+    plan: free
     region: frankfurt
     buildCommand: npm ci --omit=dev
-    startCommand: node server/index.js
+    startCommand: npm start
     healthCheckPath: /healthz
-    disk:
-      name: ardan-data
-      mountPath: /var/data
-      sizeGB: 1
     envVars:
       - key: NODE_ENV
         value: production
-      - key: DATABASE_PATH
-        value: /var/data/ardan.db
       - key: TRUST_PROXY
         value: "1"
-      - key: BASE_URL
+      - key: DATA_DIR
+        value: ./data
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: DATABASE_URL          # adres bazy z Neon.tech (postgresql://...)
         sync: false
-      - key: SMTP_HOST
+      - key: ADMIN_LOGIN           # login pierwszego administratora
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD        # min. 8 znaków, 3 rodzaje znaków
+        sync: false
+      - key: SNAPSHOT_MINUTES
+        value: "2"
+      - key: SMTP_HOST             # opcjonalnie (reset hasła): smtp-relay.brevo.com
         sync: false
       - key: SMTP_PORT
         value: "587"
