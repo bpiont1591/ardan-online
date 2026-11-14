@@ -2,14 +2,18 @@
   "name": "ardan-online",
   "version": "1.0.0",
   "description": "ARDAN – przeglądarkowa gra MMORPG (serwer Node.js: Express + WebSocket + SQLite)",
-  "main": "server/index.js",
+  "main": "server/start.js",
   "scripts": {
-    "start": "node server/index.js",
-    "dev": "NODE_ENV=development node server/index.js",
+    "start": "node server/start.js",
+    "dev": "NODE_ENV=development node server/start.js",
     "build:engine": "cd engine-src && bash build.sh",
-    "test": "node test/security.js && node test/e2e.js",
+    "test": "node test/security.js && node test/admin.js && node test/e2e.js",
     "test:security": "node test/security.js",
-    "test:passives": "node test/passives-stress.js"
+    "test:passives": "node test/passives-stress.js",
+    "make-admin": "node scripts/make-admin.js",
+    "backup": "node -e \"require('./server/backup').fileBackup(require('./server/db')).then(()=>process.exit(0))\"",
+    "test:admin": "node test/admin.js",
+    "pack": "bash scripts/pack.sh"
   },
   "license": "UNLICENSED",
   "type": "commonjs",
@@ -20,6 +24,7 @@
     "express-rate-limit": "^8.7.4",
     "helmet": "^8.3.0",
     "nodemailer": "^10.5.0",
+    "pg": "^8.23.1",
     "ws": "^8.23.0"
   },
   "private": true,

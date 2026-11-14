@@ -88,7 +88,7 @@ function createGuilds(world) {
   function gchat(p, text) {
     const g = guildOf(p); if (!g) return sys(p, 'Nie należysz do gildii.');
     text = String(text || '').trim(); if (!text) return;
-    const msg = { t: 'chat', ch: 'gu', from: p.nick, text: chat.esc(chat.filter(text.slice(0, chat.MAX_LEN))), ts: Date.now() };
+    const msg = { t: 'chat', ch: 'gu', from: p.nick, text: chat.esc(chat.filter(text.slice(0, chat.MAX_LEN))), ts: Date.now(), role: p.role === 'admin' || p.role === 'moderator' ? p.role : undefined };
     for (const o of online(g)) world.send(o, msg);
   }
   Object.assign(chat.commands, { gi: gchat, gzapros: (p, r) => invite(p, r.trim().split(/\s+/)[0]), 'gzaproś': (p, r) => invite(p, r.trim().split(/\s+/)[0]) });

@@ -12,11 +12,15 @@ const news = require('./news');
 const mail = require('./mail');
 const { ranking } = require('./ranking');
 const db = require('./db');
+const { createMod } = require('./mod');
+const admin = require('./admin');
+const backup = require('./backup');
 const qTop = db.prepare('SELECT nick, cls, lvl FROM characters ORDER BY lvl DESC, updated ASC LIMIT 20');
 
 const app = express();
 const wsOrigin = (() => { try { const u = new URL(cfg.baseUrl); return (u.protocol === 'https:' ? 'wss://' : 'ws://') + u.host; } catch (e) { return null; } })();
 const world = new World();
+world.mod = createMod(world);
 app.disable('x-powered-by');
 if (cfg.trustProxy) app.set('trust proxy', cfg.trustProxy);
 app.use(helmet({
@@ -45,6 +49,7 @@ api.use((req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next()
 api.use(auth.csrfGuard);
 api.use('/', auth.router());
 api.use('/characters', characters.router((id) => world.isOnline(id)));
+api.use('/admin', admin.router(() => world.mod));
 api.get('/stats', (req, res) => { res.setHeader('Cache-Control', 'no-store'); res.json({ online: world.online() }); });
 api.get('/news', (req, res) => res.json(news));
 let rkCache = null, rkAt = 0;
@@ -54,6 +59,13 @@ app.use('/api', api);
 
 app.get('/healthz', (req, res) => res.json({ ok: true, online: world.online() }));
 const pub = path.join(__dirname, '..', 'public');
+// moderation panel: the HTML itself is only served to logged-in moderators/admins (data routes check the role again)
+app.get(['/admin', '/admin/'], (req, res) => {
+  res.setHeader('Cache-Control', 'no-store'); res.setHeader('X-Robots-Tag', 'noindex');
+  if (!req.user) return res.redirect(302, '/logowanie?next=/admin');
+  if (world.mod.rankOf(req.user.role) < 1) return res.status(403).sendFile(path.join(pub, '404.html'));
+  res.sendFile(path.join(__dirname, 'views', 'admin.html'));
+});
 app.use(express.static(pub, { extensions: ['html'], maxAge: cfg.isProd ? '1h' : 0 }));
 app.use((req, res) => res.status(404).sendFile(path.join(pub, '404.html')));
 app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
@@ -82,6 +94,7 @@ server.on('upgrade', (req, socket, head) => {
   wss.handleUpgrade(req, socket, head, (ws) => {
     const p = world.join(ws, user, charId);
     if (!p) return;
+    p.role = user.role; world.mod.onJoin(p);
     p.sid = user.sid; wsConn.set(ip, (wsConn.get(ip) || 0) + 1);
     let gone = false; const bye = () => { if (gone) return; gone = true; const n = (wsConn.get(ip) || 1) - 1; if (n > 0) wsConn.set(ip, n); else wsConn.delete(ip); };
     ws.on('message', (data, isBinary) => { if (!isBinary) world.onMessage(p, data.toString()); });
@@ -91,6 +104,7 @@ server.on('upgrade', (req, socket, head) => {
 });
 
 world.start();
+backup.start(db);
 setInterval(() => { try { auth.cleanup(); } catch (e) { console.error(e); } }, 3600e3).unref();
 // sessions are re-validated for live game connections (logout elsewhere / password reset kicks the socket)
 setInterval(() => { for (const p of world.players.values()) if (p.sid && !auth.sessionValid(p.sid)) try { p.ws.close(4001, 'session'); } catch (e) { /* ignore */ } }, 30e3).unref();
@@ -99,6 +113,12 @@ server.listen(cfg.port, cfg.host, () => {
   console.log(`[ARDAN] Serwer działa: ${cfg.baseUrl} (port ${cfg.port}, tryb: ${cfg.isProd ? 'produkcja' : 'deweloperski'})`);
   if (!mail.configured()) console.log('[ARDAN] SMTP nieskonfigurowane – linki resetu hasła będą wypisywane w konsoli (tylko tryb deweloperski).');
 });
-function shutdown() { console.log('[ARDAN] Zamykanie – zapisywanie postaci...'); world.stop(); server.close(); setTimeout(() => process.exit(0), 300); }
+let closing = false;
+async function shutdown() {
+  if (closing) return; closing = true;
+  console.log('[ARDAN] Zamykanie – zapisywanie postaci...'); world.stop(); server.close();
+  try { await backup.finalSnapshot(db); } catch (e) { console.error('[ARDAN] snapshot przy zamykaniu', e.message); }
+  setTimeout(() => process.exit(0), 300);
+}
 process.on('SIGINT', shutdown); process.on('SIGTERM', shutdown);
 module.exports = { app, server, world };

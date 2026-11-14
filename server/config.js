@@ -8,7 +8,15 @@ module.exports = {
   port: Number(env.PORT) || 3000,
   host: env.HOST || '0.0.0.0',
   baseUrl: (env.BASE_URL || `http://localhost:${Number(env.PORT) || 3000}`).replace(/\/+$/, ''),
-  dbPath: env.DATABASE_PATH || path.join(__dirname, '..', 'data', 'ardan.db'),
+  // DATA_DIR = persistent folder (Render disk / Fly volume / Docker volume); DATABASE_PATH overrides the file itself
+  dataDir: env.DATA_DIR || (env.DATABASE_PATH ? path.dirname(env.DATABASE_PATH) : path.join(__dirname, '..', 'data')),
+  dbPath: env.DATABASE_PATH || path.join(env.DATA_DIR || path.join(__dirname, '..', 'data'), 'ardan.db'),
+  backupKeep: Math.max(1, Number(env.BACKUP_KEEP) || 7),
+  backupHours: Math.max(1, Number(env.BACKUP_HOURS) || 24),
+  // optional Postgres "snapshot" persistence for hosts without a persistent disk (Render free + Neon free)
+  databaseUrl: env.DATABASE_URL || '',
+  snapshotMinutes: Math.max(1, Number(env.SNAPSHOT_MINUTES) || 2),
+  sessionSecret: env.SESSION_SECRET || '',
   cookieSecure: env.COOKIE_SECURE ? env.COOKIE_SECURE === 'true' : isProd,
   trustProxy: env.TRUST_PROXY ? env.TRUST_PROXY : (isProd ? 1 : false),
   sessionDays: Number(env.SESSION_DAYS) || 30,

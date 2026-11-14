@@ -9,6 +9,9 @@ const mail = require('./mail');
 
 const SID = 'ardan_sid', CSRF = 'ardan_csrf';
 const sha = (s) => crypto.createHash('sha256').update(s).digest('hex');
+// session ids are stored as a keyed hash when SESSION_SECRET is set (a stolen DB file alone can't be used to forge lookups)
+const sidHash = (t) => (cfg.sessionSecret ? crypto.createHmac('sha256', cfg.sessionSecret).update(t).digest('hex') : sha(t));
+const mod = require('./mod');
 const token = () => crypto.randomBytes(32).toString('base64url');
 const now = () => Date.now();
 
@@ -31,22 +34,23 @@ function cookie(res, name, value, opts) {
 }
 
 // ---------- sessions ----------
-const qSessGet = db.prepare('SELECT s.user_id, s.expires, u.login, u.email FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.id = ?');
+const qSessGet = db.prepare('SELECT s.user_id, s.expires, u.login, u.email, u.role FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.id = ?');
 const qSessIns = db.prepare('INSERT INTO sessions (id, user_id, created, expires) VALUES (?, ?, ?, ?)');
 const qSessDel = db.prepare('DELETE FROM sessions WHERE id = ?');
 const qSessDelUser = db.prepare('DELETE FROM sessions WHERE user_id = ?');
 function userFromCookieHeader(header) {
   const c = parseCookies(header);
   const t = c[SID]; if (!t || t.length > 100) return null;
-  const row = qSessGet.get(sha(t));
+  const h = sidHash(t), row = qSessGet.get(h);
   if (!row || row.expires < now()) return null;
-  return { id: row.user_id, login: row.login, email: row.email, sid: sha(t) };
+  if (mod.banOf(row.user_id)) return null;
+  return { id: row.user_id, login: row.login, email: row.email, role: mod.RANK[row.role] !== undefined ? row.role : 'gracz', sid: h };
 }
 // re-checked periodically for every open WebSocket: logout / password reset / expiry closes live game connections too
-function sessionValid(sidHash) { const row = sidHash && qSessGet.get(sidHash); return !!row && row.expires >= now(); }
+function sessionValid(h) { const row = h && qSessGet.get(h); return !!row && row.expires >= now() && !mod.banOf(row.user_id); }
 function startSession(res, userId) {
   const t = token();
-  qSessIns.run(sha(t), userId, now(), now() + cfg.sessionDays * 864e5);
+  qSessIns.run(sidHash(t), userId, now(), now() + cfg.sessionDays * 864e5);
   cookie(res, SID, t, { httpOnly: true, maxAge: cfg.sessionDays * 86400 });
 }
 
@@ -74,6 +78,12 @@ function csrfGuard(req, res, next) {
   next();
 }
 const needUser = (req, res, next) => (req.user ? next() : res.status(401).json({ error: 'Zaloguj się.' }));
+// role check on every admin route (role is read fresh from the DB with the session on each request)
+const needRole = (role) => (req, res, next) => {
+  if (!req.user) return res.status(401).json({ error: 'Zaloguj się.' });
+  if (mod.rankOf(req.user.role) < mod.RANK[role]) return res.status(403).json({ error: 'Brak uprawnień.' });
+  next();
+};
 
 // ---------- validation ----------
 const LOGIN_RE = /^[A-Za-z0-9_]{3,20}$/;
@@ -131,7 +141,7 @@ function router() {
   r.get('/me', (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     if (!req.user) return res.json({ user: null, csrf: req.csrf });
-    res.json({ user: { login: req.user.login, email: req.user.email }, csrf: req.csrf });
+    res.json({ user: { login: req.user.login, email: req.user.email, role: req.user.role }, csrf: req.csrf });
   });
 
   r.post('/register', registerLimiter, async (req, res) => {
@@ -165,7 +175,8 @@ function router() {
     const ok = await bcrypt.compare(pass.slice(0, 128), u ? u.pass : DUMMY_HASH);
     if (!u || !ok) { loginFailed(key); return res.status(401).json({ error: 'Nieprawidłowy login lub hasło.' }); }
     failByLogin.delete(key);
-    const old = parseCookies(req.headers.cookie)[SID]; if (old && old.length <= 100) qSessDel.run(sha(old)); // session fixation: always a fresh session id
+    const ban = mod.banOf(u.id); if (ban) return res.status(403).json({ error: mod.banMessage(ban), banned: true });
+    const old = parseCookies(req.headers.cookie)[SID]; if (old && old.length <= 100) qSessDel.run(sidHash(old)); // session fixation: always a fresh session id
     qUserLast.run(now(), u.id);
     startSession(res, u.id);
     res.json({ ok: true });
@@ -173,7 +184,7 @@ function router() {
 
   r.post('/logout', logoutLimiter, (req, res) => {
     const t = parseCookies(req.headers.cookie)[SID];
-    if (t) qSessDel.run(sha(t));
+    if (t) qSessDel.run(sidHash(t));
     cookie(res, SID, '', { httpOnly: true, maxAge: 0 });
     res.json({ ok: true });
   });
@@ -216,4 +227,4 @@ function cleanup() {
   for (const [k, f] of failByLogin) if (now() - f.t > 15 * 60e3) failByLogin.delete(k);
 }
 
-module.exports = { router, attachUser, csrfGuard, needUser, userFromCookieHeader, sessionValid, apiLimiter, parseCookies, passwordProblem, NICK_RE, cleanup };
+module.exports = { router, attachUser, csrfGuard, needUser, needRole, LOGIN_RE, EMAIL_RE, userFromCookieHeader, sessionValid, apiLimiter, parseCookies, passwordProblem, NICK_RE, cleanup };

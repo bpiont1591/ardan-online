@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel moderacji – ARDAN</title>
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#0c0910">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/admin.css">
+</head>
+<body data-page="admin">
+<header id="nav" class="nav"></header>
+<main class="adm wrap">
+  <div class="adm-head">
+    <div><h1>Panel moderacji</h1><p class="muted" id="who">…</p></div>
+    <div class="adm-stats" id="stats"></div>
+  </div>
+  <nav class="adm-tabs" role="tablist">
+    <button type="button" data-tab="players" class="on">Gracze</button>
+    <button type="button" data-tab="chat">Czat</button>
+    <button type="button" data-tab="active">Kary</button>
+    <button type="button" data-tab="audit" data-admin hidden>Dziennik</button>
+  </nav>
+  <div class="adm-msg" id="msg" role="status" hidden></div>
+  <section data-pane="players">
+    <form class="adm-search" id="searchF"><input name="q" maxlength="40" placeholder="Login, e-mail lub nick postaci…" autocomplete="off"><button class="btn primary small" type="submit">Szukaj</button></form>
+    <div id="players" class="adm-list"></div>
+  </section>
+  <section data-pane="chat" hidden>
+    <form class="adm-search" id="chatF"><input name="q" maxlength="40" placeholder="Filtruj po nicku lub treści…" autocomplete="off"><button class="btn small" type="submit">Filtruj</button><button class="btn small" type="button" data-reload="chat">Odśwież</button></form>
+    <div id="chat" class="adm-chat"></div>
+  </section>
+  <section data-pane="active" hidden><div id="active"></div></section>
+  <section data-pane="audit" hidden><div id="audit"></div></section>
+</main>
+<div class="adm-modal" id="modal" hidden>
+  <form class="card" id="actF">
+    <h3 id="actT">Wyciszenie</h3>
+    <p class="muted" id="actS"></p>
+    <div class="field" id="durF"><label>Czas</label><div class="durs" id="durs"></div></div>
+    <div class="field"><label for="reason">Powód</label><input id="reason" name="reason" maxlength="200" required placeholder="np. obraźliwe wiadomości"></div>
+    <div class="row"><button type="button" class="btn small" data-close>Anuluj</button><button type="submit" class="btn primary small" id="actGo">Zatwierdź</button></div>
+  </form>
+</div>
+<footer id="foot"></footer>
+<script src="/js/site.js"></script>
+<script src="/js/admin.js"></script>
+</body>
+</html>

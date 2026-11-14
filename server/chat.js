@@ -19,12 +19,15 @@ function createChat(world) {
       if (!to) return sys(p, `Gracz „${m[1]}” nie jest teraz w grze.`);
       if (to === p) return sys(p, 'Nie możesz pisać sam do siebie.');
       const text = esc(filter(m[2].slice(0, MAX_LEN)));
-      const msg = { t: 'chat', ch: 'w', from: p.nick, to: to.nick, text, ts: Date.now() };
+      const msg = { t: 'chat', ch: 'w', from: p.nick, to: to.nick, text, ts: Date.now(), role: badge(p) };
       world.send(to, msg); world.send(p, msg); to.lastWhisper = p.nick;
     },
     r: (p, rest) => { if (!p.lastWhisper) return sys(p, 'Nikt jeszcze do ciebie nie pisał.'); commands.w(p, p.lastWhisper + ' ' + rest); },
   };
   commands.kto = commands.gracze;
+  // moderator commands (real server only – world.mod checks the role in the database on every use)
+  for (const c of ['mute', 'unmute', 'ban', 'unban', 'kick']) commands[c] = (p, rest) => { if (!(world.mod && world.mod.command(p, c, rest))) sys(p, 'Nieznana komenda. Wpisz /pomoc.'); };
+  const badge = (p) => (p.role === 'admin' || p.role === 'moderator' ? p.role : undefined);
 
   function handle(p, msg) {
     let text = clean(msg.text);
@@ -32,6 +35,7 @@ function createChat(world) {
     if (text.length > MAX_LEN) text = text.slice(0, MAX_LEN);
     const now = Date.now();
     const isCmd = text[0] === '/' && !/^\/(w|r|p|d|gi)\s/i.test(text);
+    if (p.mute && (p.mute.until === null || p.mute.until > now) && !isCmd) return sys(p, world.mod ? world.mod.muteMessage(p.mute) : 'Jesteś wyciszony.');
     if (p.muteUntil > now && !isCmd) return sys(p, `Jesteś wyciszony jeszcze ${Math.ceil((p.muteUntil - now) / 1000)} s.`);
     p.chatT = (p.chatT || []).filter((t) => now - t < 6000);
     if (p.chatT.length >= 4) {
@@ -44,6 +48,13 @@ function createChat(world) {
       if (p.lastChat === text && now - (p.lastChatT || 0) < 15000) return sys(p, 'Nie powtarzaj tej samej wiadomości.');
       p.lastChat = text; p.lastChatT = now;
     }
+    if (world.mod) { // chat log for moderators (public, party, guild and private messages)
+      const pm = /^\/(w|r|p|d|gi)\s+([\s\S]*)$/i.exec(text), k = pm && pm[1].toLowerCase();
+      if (k === 'w') { const sp = pm[2].indexOf(' '); world.mod.logChat(p, 'w', sp > 0 ? pm[2].slice(sp + 1) : pm[2], sp > 0 ? pm[2].slice(0, sp) : null); }
+      else if (k === 'r') world.mod.logChat(p, 'w', pm[2], p.lastWhisper || null);
+      else if (k) world.mod.logChat(p, k === 'gi' ? 'gu' : 'p', pm[2]);
+      else if (text[0] !== '/') world.mod.logChat(p, msg.ch === 'p' ? 'p' : msg.ch === 'gu' ? 'gu' : msg.ch === 'r' ? 'r' : 'g', text);
+    }
     if (text[0] === '/') {
       const m = /^\/(\S+)\s*([\s\S]*)$/.exec(text); const cmd = m && commands[m[1].toLowerCase()];
       if (!cmd) return sys(p, 'Nieznana komenda. Wpisz /pomoc.');
@@ -52,7 +63,7 @@ function createChat(world) {
     if (msg.ch === 'p' && commands.p) return commands.p(p, text);
     if (msg.ch === 'gu' && commands.gi) return commands.gi(p, text);
     const ch = msg.ch === 'r' ? 'r' : 'g';
-    const out = { t: 'chat', ch, from: p.nick, cls: p.cls, text: esc(filter(text)), ts: now, area: ch === 'r' ? p.area : undefined };
+    const out = { t: 'chat', ch, from: p.nick, cls: p.cls, text: esc(filter(text)), ts: now, area: ch === 'r' ? p.area : undefined, role: badge(p) };
     if (ch === 'g') world.broadcast(out); else for (const o of world.inArea(p.area)) world.send(o, out);
   }
   return { name: 'chat', handle, commands, sys, esc, filter, MAX_LEN };

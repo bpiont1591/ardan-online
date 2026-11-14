@@ -80,7 +80,7 @@ function createParties(world) {
     p(p, rest) {
       const party = partyOf(p); if (!party) return sys(p, 'Nie jesteś w drużynie.');
       const text = String(rest || '').trim(); if (!text) return;
-      const msg = { t: 'chat', ch: 'p', from: p.nick, text: chat.esc(chat.filter(text.slice(0, chat.MAX_LEN))), ts: Date.now() };
+      const msg = { t: 'chat', ch: 'p', from: p.nick, text: chat.esc(chat.filter(text.slice(0, chat.MAX_LEN))), ts: Date.now(), role: p.role === 'admin' || p.role === 'moderator' ? p.role : undefined };
       for (const m of members(party)) world.send(m, msg);
     },
   };
