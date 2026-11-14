@@ -24,7 +24,7 @@ module.exports = {
   backupHours: Math.max(1, Number(env.BACKUP_HOURS) || 24),
   // optional Postgres "snapshot" persistence for hosts without a persistent disk (Render free + Neon free)
   databaseUrl: env.DATABASE_URL || '',
-  snapshotMinutes: Math.max(1, Number(env.SNAPSHOT_MINUTES) || 2),
+  snapshotMinutes: Math.max(1, Number(env.SNAPSHOT_MINUTES) || 10),
   sessionSecret: env.SESSION_SECRET || '',
   cookieSecure: env.COOKIE_SECURE ? env.COOKIE_SECURE === 'true' : isProd,
   trustProxy: env.TRUST_PROXY ? env.TRUST_PROXY : (isProd ? 1 : false),

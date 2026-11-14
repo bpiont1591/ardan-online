@@ -1,7 +1,7 @@
 'use strict';
 // Optional Postgres snapshot persistence (DATABASE_URL). For hosts WITHOUT a persistent disk (e.g. Render free):
 // the game keeps running on fast local SQLite, and a compressed copy of the whole database is stored in Postgres
-// every SNAPSHOT_MINUTES (only if something changed) and on shutdown. On start, a missing local DB is restored
+// every SNAPSHOT_MINUTES (default 10, only if something changed) and on shutdown. On start, a missing local DB is restored
 // from the newest snapshot. Worst case after a crash: the last few minutes are lost (never corrupted).
 const fs = require('fs');
 const path = require('path');
