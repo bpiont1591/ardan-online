@@ -185,10 +185,12 @@ async function main() {
     await pg.emulate({ viewport: { width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1' });
     await setCookies(pg, P2.j);
     await pg.goto(`${BASE}/graj?postac=${P2.cid}`, { waitUntil: 'networkidle2' }); await W(2500);
-    await pg.evaluate(() => { const d = document.querySelector('.daily-login [data-close], .dl-close, [data-dl="close"]'); if (d) d.click(); });
-    await pg.evaluate(() => { const ws = window.ARDAN_UI && window.ARDAN_UI.h; if (ws) ws.send({ t: 'chat', ch: 'g', text: 'halo, czemu nie mogę pisać?' }); }); await W(800);
-    await pg.evaluate(() => { const b = document.querySelector('[data-chat-toggle], #chatBtn, .chat-btn'); const m = document.querySelector('.msgs'); if (m && !m.offsetParent && b) b.click(); }); await W(500);
-    const mutedShown = await pg.evaluate(() => [...document.querySelectorAll('.msgs .m')].some((e) => /wyciszony na czacie/.test(e.textContent)));
+    for (let i = 0; i < 4; i++) { await pg.keyboard.press('Escape'); await W(150); } // close intro dialog
+    await pg.evaluate(() => { const b = document.querySelector('[data-lt="get"]'); if (b) b.click(); }); await W(400);
+    await pg.keyboard.press('c'); await W(400);
+    await pg.type('#chatIn', 'halo, czemu nie mogę pisać?'); await pg.keyboard.press('Enter'); await W(800);
+    await pg.evaluate(() => { const i = document.getElementById('chatIn'); if (i) i.blur(); }); await W(200);
+    const mutedShown = await pg.evaluate(() => [...document.querySelectorAll('#msgs .m')].some((e) => /wyciszony na czacie/.test(e.textContent)));
     ok(mutedShown, 'game chat shows the mute notice with remaining time');
     await pg.screenshot({ path: `${SHOTS}/57_muted_chat_phone.png` });
     ok(errors.length === 0, 'no JS errors in panel/game' + (errors.length ? ': ' + errors.slice(0, 3).join(' | ') : ''));
