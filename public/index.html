@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ARDAN – przeglądarkowa gra MMORPG dark fantasy</title>
+<meta name="description" content="ARDAN – darmowa przeglądarkowa gra MMORPG. Trzy klasy, siedem krain, potężni bossowie i wspólna przygoda z innymi graczami. Graj na telefonie i komputerze.">
+<meta property="og:title" content="ARDAN – gra MMORPG w przeglądarce">
+<meta property="og:description" content="Mgła powróciła. Ardan potrzebuje bohaterów.">
+<meta property="og:image" content="/img/mount.jpg">
+<meta name="theme-color" content="#0c0910">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/fonts/cinzel-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header id="nav" class="nav"></header>
+
+<main>
+<section class="hero" style="padding:0">
+  <div class="bg"></div><div class="fog"></div>
+  <div class="hero-inner wrap">
+    <div class="emblem" data-emblem></div>
+    <h1 class="logo">ARDAN</h1>
+    <p class="tagline">Mgła powróciła. Ardan potrzebuje bohaterów.</p>
+    <p class="sub">Darmowa gra MMORPG w przeglądarce. Wybierz klasę, przemierz siedem krain, pokonaj pradawnych bossów – razem z innymi graczami, na telefonie i komputerze.</p>
+    <div class="cta">
+      <a class="btn primary big" href="/postacie" data-play>Graj teraz</a>
+      <a class="btn big" href="#swiat">Poznaj historię</a>
+    </div>
+    <div class="meta">
+      <span class="online-pill"><i></i>Teraz w grze: <b data-online>…</b></span>
+      <span class="online-pill">3 klasy · 7 krain · 4 bossów · 14 zadań</span>
+    </div>
+  </div>
+</section>
+
+<section id="swiat">
+  <div class="wrap lore">
+    <div class="text">
+      <div class="kicker">Kronika Mgieł</div>
+      <h2>Świat Ardanu</h2>
+      <p>Dawno temu, zanim pierwszy kamień Srebrnogrodu położono na wzgórzu, wschodem Ardanu władało Królestwo Piasków. Jego ostatni władca, Sethar, bał się tylko jednego – własnej śmierci. Przez lata zgłębiał zakazane księgi, aż w końcu oddał swoją duszę cieniom w zamian za wieczne życie. Cienie dotrzymały słowa, lecz zażądały zapłaty: królestwo w jedną noc zasypał piasek, a z ust umierających poddanych wydobyła się szara, zimna mgła.</p>
+      <p>Kapłani światła zamknęli Króla Cieni we wnętrzu jego świątyni i opieczętowali wrota. Mgła cofnęła się w głąb ziemi, do jaskiń pod Mrocznym Borem, a ludzie zapomnieli. Na zachodzie wyrosły wioski, nad rzeką stanęło miasto o srebrnych dachach, a o Setharze śpiewano już tylko w karczmach.</p>
+      <p>Aż do teraz. Pieczęć pęka. Z Jaskini Cieni wypełzł Upiór Mgieł, w Bagnach Żałoby dawna znachorka stała się Wiedźmą Moczarów i wskrzesza topielców, a w Szczytach Szronu przebudził się pradawny smok Szronogrzbiet. Bestie schodzą z gór, martwi wstają z piasków, a mgła z każdą nocą sięga dalej.</p>
+      <p>Twoja droga zaczyna się w Osadzie Brzozowej, na skraju Mrocznego Boru. Sołtys Radomir szuka kogoś, kto nie boi się mgły. Czy to będziesz ty?</p>
+      <blockquote>„Kto raz wejdzie w mgłę, ten pozna, ile waży odwaga. Kto z niej wróci – ten zapisze się w kronice.”<cite>— Kronikarz Leon ze Srebrnogrodu</cite></blockquote>
+    </div>
+    <div class="card">
+      <h3>Dzieje Ardanu</h3>
+      <ul class="timeline">
+        <li><b>Wiek Piasków</b>Królestwo Sethara rozkwita na wschodzie. W świątyni pośród oaz władca szuka sposobu, by oszukać śmierć.</li>
+        <li><b>Noc Cieni</b>Sethar oddaje duszę cieniom. Królestwo znika pod piaskiem, a z ruin wypływa pierwsza mgła.</li>
+        <li><b>Pieczęć Światła</b>Kapłani zamykają Króla Cieni w świątyni. Mgła kryje się w jaskiniach na północy.</li>
+        <li><b>Rok 0 Srebrnogrodu</b>Ocaleni zakładają miasto za murami. Od trzystu lat strzeże ono traktów Ardanu.</li>
+        <li><b>Rok Mgły – dziś</b>Pieczęć słabnie. Budzą się upiory, wiedźmy i smoki. Ardan wzywa bohaterów.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="klasy" class="alt">
+  <div class="wrap">
+    <div class="kicker center">Wybierz swoją ścieżkę</div>
+    <h2 class="center">Klasy postaci</h2>
+    <p class="lead center" style="margin:0 auto 36px">Każda klasa walczy inaczej: wręcz, z łuku albo magią. Ma trzy umiejętności odblokowywane wraz z poziomem i własny sprzęt – od pierwszej pałki po broń z łusek smoka.</p>
+    <div class="grid g3">
+      <article class="card hover cls">
+        <div class="portrait"><img src="/img/hero_war.png" alt="Wojownik" width="144" height="194"></div>
+        <div class="role">Walka wręcz · Energia</div>
+        <h3>Wojownik</h3>
+        <p class="muted">Mistrz walki wręcz. Najwięcej życia i obrony, nosi ciężkie zbroje i staje w pierwszym szeregu.</p>
+        <div class="stats"><span>Życie</span><span class="pips" data-pips="5"></span><span>Atak</span><span class="pips" data-pips="3"></span><span>Obrona</span><span class="pips" data-pips="5"></span><span>Zasięg</span><span class="pips" data-pips="1"></span></div>
+        <ul class="skills"><li><b>Potężny cios</b> – 220% obrażeń i ogłuszenie.</li><li><b>Wir ostrzy</b> (poz. 3) – rani wszystkich wokół.</li><li><b>Okrzyk bojowy</b> (poz. 5) – leczy i wzmacnia obronę.</li></ul>
+      </article>
+      <article class="card hover cls">
+        <div class="portrait"><img src="/img/hero_arc.png" alt="Łucznik" width="150" height="204"></div>
+        <div class="role">Dystans · Energia</div>
+        <h3>Łucznik</h3>
+        <p class="muted">Razi wrogów strzałami z daleka. Częste trafienia krytyczne i uniki – zanim wróg podejdzie, już leży.</p>
+        <div class="stats"><span>Życie</span><span class="pips" data-pips="3"></span><span>Atak</span><span class="pips" data-pips="4"></span><span>Obrona</span><span class="pips" data-pips="3"></span><span>Zasięg</span><span class="pips" data-pips="5"></span></div>
+        <ul class="skills"><li><b>Celny strzał</b> – potężna strzała z daleka.</li><li><b>Deszcz strzał</b> (poz. 3) – grad strzał na obszar.</li><li><b>Sokole oko</b> (poz. 5) – szybsze strzały i więcej krytyków.</li></ul>
+      </article>
+      <article class="card hover cls">
+        <div class="portrait"><img src="/img/hero_mag.png" alt="Mag" width="160" height="258"></div>
+        <div class="role">Magia · Mana</div>
+        <h3>Mag</h3>
+        <p class="muted">Ciska zaklęciami zużywającymi manę. Najsilniejsze ataki w Ardanie, ale wątłe ciało – ostrożnie z dystansem.</p>
+        <div class="stats"><span>Życie</span><span class="pips" data-pips="2"></span><span>Atak</span><span class="pips" data-pips="5"></span><span>Obrona</span><span class="pips" data-pips="2"></span><span>Zasięg</span><span class="pips" data-pips="5"></span></div>
+        <ul class="skills"><li><b>Kula ognia</b> – płonie i rani sąsiadów celu.</li><li><b>Nova mrozu</b> (poz. 3) – zamraża wrogów wokół.</li><li><b>Odnowa</b> (poz. 5) – przywraca 40% życia.</li></ul>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section id="krainy">
+  <div class="wrap">
+    <div class="kicker">Mapa świata</div>
+    <h2>Siedem krain Ardanu</h2>
+    <p class="lead" style="margin-bottom:34px">Każda kraina ma własny klimat, potwory, mieszkańców i zadania. Złota strzałka zawsze wskaże drogę do celu – nawet przez kilka krain.</p>
+    <div class="grid g3" id="regions"></div>
+  </div>
+</section>
+
+<section class="alt">
+  <div class="wrap">
+    <div class="kicker center">Dlaczego ARDAN?</div>
+    <h2 class="center" style="margin-bottom:34px">Co czeka w grze</h2>
+    <div class="grid g3">
+      <div class="card feat"><h3><span class="ico"><svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><circle cx="16" cy="9" r="2.5"/><path d="M2 20c0-3.5 2.7-6 6-6s6 2.5 6 6M13 20c.3-2.6 2-4.5 4.5-4.5 2.6 0 4.5 2 4.5 4.5"/></svg></span>Wspólny świat</h3><p class="muted">Widzisz innych graczy na mapie, walczycie z tymi samymi potworami, a serwer pilnuje uczciwej gry.</p></div>
+      <div class="card feat"><h3><span class="ico"><svg viewBox="0 0 24 24"><path d="M4 5h16v10H9l-5 4z"/></svg></span>Czat</h3><p class="muted">Czat globalny i regionalny oraz prywatne szepty (/w nick). Umawiaj się na bossów i handel.</p></div>
+      <div class="card feat"><h3><span class="ico"><svg viewBox="0 0 24 24"><path d="M12 2l3 7h7l-5.5 4.5L18.5 21 12 16.5 5.5 21l2-7.5L2 9h7z"/></svg></span>Zadania z przewodnikiem</h3><p class="muted">14 zadań w siedmiu krainach. Strzałka, złote kropki i minimapa prowadzą prosto do celu.</p></div>
+      <div class="card feat"><h3><span class="ico"><svg viewBox="0 0 24 24"><path d="M14.5 17.5L3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2"/></svg></span>Bossowie i łupy</h3><p class="muted">Upiór Mgieł, Wiedźma Moczarów, Szronogrzbiet i Sethar, Król Cieni. Każdy z potężnym atakiem obszarowym.</p></div>
+      <div class="card feat"><h3><span class="ico"><svg viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg></span>Telefon i komputer</h3><p class="muted">Na telefonie strzałki na ekranie i duże przyciski, na komputerze WASD lub strzałki. Bez instalacji.</p></div>
+      <div class="card feat"><h3><span class="ico"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg></span>Postęp na serwerze</h3><p class="muted">Poziom, ekwipunek i zadania zapisują się na Twoim koncie. Graj z dowolnego urządzenia.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="galeria">
+  <div class="wrap">
+    <div class="kicker">Prosto z gry</div>
+    <h2>Galeria</h2>
+    <div class="gallery" id="gallery"></div>
+  </div>
+</section>
+
+<section id="nowosci" class="alt">
+  <div class="wrap">
+    <div class="kicker">Z kroniki serwera</div>
+    <h2>Nowości</h2>
+    <div class="news" id="news"></div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <h2>Mgła nie poczeka</h2>
+    <p class="lead" style="margin:0 auto 26px">Załóż darmowe konto, stwórz bohatera i dołącz do graczy, którzy już walczą o Ardan.</p>
+    <a class="btn primary big" href="/postacie" data-play>Graj teraz</a>
+  </div>
+</section>
+</main>
+
+<div class="lightbox" id="lb"><button type="button">Zamknij ✕</button><div><img alt=""><p></p></div></div>
+<footer id="foot"></footer>
+<script src="/js/site.js"></script>
+<script src="/js/home.js"></script>
+</body>
+</html>

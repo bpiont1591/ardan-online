@@ -1,0 +1,7 @@
+node_modules
+data
+shots
+test
+engine-src
+*.db*
+.env

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Moje postacie – ARDAN</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0c0910">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body data-page="chars">
+<header id="nav" class="nav"></header>
+<main>
+<section class="auth-page"><div class="auth wide card">
+<h1>Moje postacie</h1><p class="intro" id="hello">Wybierz bohatera lub stwórz nowego.</p>
+<div class="chars" id="list"></div>
+<form id="f" novalidate>
+<h3 style="text-align:center">Nowa postać</h3>
+<div class="alert" role="alert"></div>
+<div class="pick">
+<div><input type="radio" name="cls" id="c_war" value="war"><label for="c_war"><img src="/img/hero_war.png" alt=""><b>Wojownik</b><small>Walka wręcz, dużo życia</small></label></div>
+<div><input type="radio" name="cls" id="c_arc" value="arc"><label for="c_arc"><img src="/img/hero_arc.png" alt=""><b>Łucznik</b><small>Strzały z dystansu, krytyki</small></label></div>
+<div><input type="radio" name="cls" id="c_mag" value="mag"><label for="c_mag"><img src="/img/hero_mag.png" alt=""><b>Mag</b><small>Potężne zaklęcia, mana</small></label></div>
+</div>
+<div class="field"><label for="nick">Nick postaci</label><input id="nick" name="nick" maxlength="16" autocomplete="off" required><div class="hint">3–16 znaków: litery (także polskie), cyfry, podkreślnik. Nick widzą inni gracze.</div></div>
+<button class="btn primary big" type="submit">Stwórz postać</button>
+</form>
+</div></section>
+</main>
+<footer id="foot"></footer>
+<script src="/js/site.js"></script>
+<script src="/js/pages.js"></script>
+</body>
+</html>

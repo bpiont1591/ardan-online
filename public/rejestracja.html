@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Załóż konto – ARDAN</title>
+<meta name="robots" content="index,follow">
+<meta name="theme-color" content="#0c0910">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body data-page="register">
+<header id="nav" class="nav"></header>
+<main>
+<section class="auth-page"><div class="auth card">
+<h1>Załóż konto</h1><p class="intro">Darmowe konto to Twoja przepustka do Ardanu. Postęp zapisuje się na serwerze.</p>
+<form id="f" novalidate autocomplete="on">
+<div class="alert" role="alert"></div>
+<div class="field"><label for="login">Login</label><input id="login" name="login" autocomplete="username" maxlength="20" required><div class="hint">3–20 znaków: litery (bez polskich znaków), cyfry, podkreślnik.</div></div>
+<div class="field"><label for="email">Adres e-mail</label><input id="email" name="email" type="email" autocomplete="email" maxlength="254" required><div class="hint">Potrzebny do odzyskania hasła. Nie pokazujemy go innym graczom.</div></div>
+<div class="field"><label for="password">Hasło</label><input id="password" name="password" type="password" autocomplete="new-password" maxlength="128" required><div class="meter"><i></i></div><div class="hint" id="ph"></div></div>
+<div class="field"><label for="password2">Powtórz hasło</label><input id="password2" name="password2" type="password" autocomplete="new-password" maxlength="128" required></div>
+<label class="check"><input type="checkbox" name="terms" id="terms"><span>Akceptuję <a href="/regulamin" target="_blank">regulamin</a> i <a href="/prywatnosc" target="_blank">politykę prywatności</a>.</span></label>
+<button class="btn primary big" type="submit">Załóż konto</button>
+</form>
+<p class="alt">Masz już konto? <a href="/logowanie">Zaloguj się</a></p>
+</div></section>
+</main>
+<footer id="foot"></footer>
+<script src="/js/site.js"></script>
+<script src="/js/pages.js"></script>
+</body>
+</html>
