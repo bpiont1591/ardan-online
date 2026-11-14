@@ -560,6 +560,61 @@ async function main() {
       ok(/Zwycięstwo/.test(await pa.$eval('#btEnd', (e) => e.textContent).catch(() => '')), 'chochlik pokonany na 60. poziomie');
       await pa.click('#btEnd [data-ba="close"]').catch(() => {}); await W(500);
     }
+    // ---------- round 5: legendary items + combat passives ----------
+    console.log('Legendy i pasywki');
+    await TH(pa, { leg: 'krwiop' }); await TH(pa, { leg: 'wampir' }); await TH(pa, { leg: 'midas', heal: true }); await W(900);
+    await pa.evaluate(() => window.ARDAN_UI.panel('eq')); await W(900);
+    const legU = await pa.evaluate(() => ((window.ARDAN_UI_STATE.gear || {}).bag || []).filter((x) => x.r === 3 && x.lg).map((x) => ({ u: x.u, lg: x.lg })));
+    ok(legU.length >= 3, `legendarne przedmioty w torbie (${legU.map((x) => x.lg).join(', ')})`);
+    const krw = legU.find((x) => x.lg === 'krwiop');
+    if (krw) {
+      const el = await pa.$(`.ui-panel .bag .bi[data-bag="${krw.u}"]`);
+      if (el) { await el.hover(); await W(300); }
+      const lt = await pa.evaluate(() => { const t = document.getElementById('uiTip'); if (!t || t.hidden) return null; const r = t.getBoundingClientRect(); return { txt: t.textContent, in: r.left >= 0 && r.top >= 0 && r.right <= innerWidth + 0.5 && r.bottom <= innerHeight + 0.5, leg: !!t.querySelector('.dcard.r3') }; });
+      ok(!!lt && /Krwiopijca|Wampiryzm/.test(lt.txt) && /✦ Wampiryzm/.test(lt.txt) && /✦ Szał/.test(lt.txt) && lt.leg && lt.in, 'karta legendy: nazwa, pasywki, historia, złota ramka');
+      await pa.screenshot({ path: `${SHOTS}/38_legendary_tooltip_desktop.png` });
+      await pa.mouse.move(5, 5); await W(200);
+    }
+    for (const x of legU) await pa.evaluate((u) => window.ARDAN_UI.h.send({ t: 'gear', a: 'equip', u }), x.u), await W(250);
+    await W(600);
+    const worn = await pa.evaluate(() => Object.values(((window.ARDAN_UI_STATE.gear || {}).gear) || {}).filter((x) => x && x.lg).map((x) => x.lg));
+    ok(worn.length >= 2, `legendy założone (${worn.join(', ')})`);
+    await pa.evaluate(() => window.ARDAN_UI.close()); await W(300);
+    await TH(pa, { heal: true, near: { area: 'volcano', mob: 'imp' } }); await W(1600);
+    await pa.evaluate(() => { window.ARDAN_UI.h.send({ t: 'bt', a: 'auto', on: false }); window.ARDAN_UI.h.send({ t: 'bt', a: 'speed', v: 1 }); }); await W(300);
+    await pa.keyboard.press('f');
+    const bt5 = await pa.waitForSelector('#battle', { timeout: 5000 }).then(() => true).catch(() => false);
+    ok(bt5, 'walka z legendarnym ekwipunkiem');
+    if (bt5) {
+      if (await pa.$('#btAuto:checked')) { await pa.click('#btAuto'); await W(300); }
+      const pxSeen = () => pa.$$eval('#btLog .l', (e) => e.some((l) => /^✦ /.test(l.textContent))).catch(() => false);
+      for (let k = 0; k < 8 && !(await pxSeen()); k++) {
+        await pa.waitForSelector('#battle [data-ba="atk"]:not([disabled])', { timeout: 8000 }).catch(() => {});
+        await pa.click('#battle [data-ba="atk"]').catch(() => {}); await W(2200);
+      }
+      const pxl = await pa.$$eval('#btLog .l', (e) => e.filter((l) => /^✦ /.test(l.textContent)).map((l) => l.textContent)).catch(() => []);
+      ok(pxl.length > 0, `pasywka zadziałała w walce (${(pxl[0] || '').slice(0, 60)})`);
+      await pa.screenshot({ path: `${SHOTS}/39_passive_combat_desktop.png` });
+      await pa.click('#btAuto').catch(() => {}); await pa.click('#battle [data-spd="3"]').catch(() => {});
+      await pa.waitForSelector('#btEnd:not([hidden])', { timeout: 90000 }).catch(() => {});
+      await pa.click('#btEnd [data-ba="close"]').catch(() => {}); await W(500);
+    }
+    // phone: legendary long-press card
+    await TH(pb, { leg: 'szept' }); await W(700);
+    await pb.evaluate(() => window.ARDAN_UI.panel('eq')); await W(900);
+    const szU = await pb.evaluate(() => { const it = ((window.ARDAN_UI_STATE.gear || {}).bag || []).find((x) => x.lg === 'szept'); return it ? it.u : null; });
+    const sze = szU && await pb.$(`.ui-panel .bag .bi[data-bag="${szU}"]`);
+    if (sze) {
+      await sze.scrollIntoView().catch(() => {});
+      const bb = await sze.boundingBox();
+      await pb.touchscreen.touchStart(bb.x + bb.width / 2, bb.y + bb.height / 2); await W(750);
+      const lt2 = await pb.evaluate(() => { const t = document.getElementById('uiTip'); if (!t || t.hidden) return null; const r = t.getBoundingClientRect(); return { txt: t.textContent, in: r.left >= 0 && r.top >= 0 && r.right <= innerWidth + 0.5 && r.bottom <= innerHeight + 0.5 }; });
+      ok(!!lt2 && /✦ Pośpiech/.test(lt2.txt) && lt2.in, 'telefon: karta legendy z pasywkami w granicach ekranu');
+      await pb.screenshot({ path: `${SHOTS}/40_legendary_tooltip_phone.png` });
+      await pb.touchscreen.touchEnd(); await W(400);
+      await pb.evaluate(() => { const d = document.querySelector('.ui-detail [data-dclose]'); if (d) d.click(); });
+    } else ok(false, 'telefon: legenda w torbie');
+    await pb.evaluate(() => window.ARDAN_UI.close()); await W(300);
     // new city on the phone
     await TH(pb, { near: { npc: 'portcap' } }); await W(1600);
     const sP = await snap(pb);

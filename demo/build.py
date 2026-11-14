@@ -11,7 +11,7 @@ IMG = {}
 for f in sorted(os.listdir(os.path.join(PUB, 'img'))):
     p = os.path.join(PUB, 'img', f)
     if f.endswith('.jpg'):
-        b = io.BytesIO(); Image.open(p).save(b, 'WEBP', quality=62, method=6); IMG[f] = b64(b.getvalue(), 'image/webp')
+        b = io.BytesIO(); Image.open(p).save(b, 'WEBP', quality=int(os.environ.get('DEMO_Q', '40')), method=6); IMG[f] = b64(b.getvalue(), 'image/webp')
     elif f.endswith('.png'):
         IMG[f] = b64(open(p, 'rb').read(), 'image/png')
 FONTS = {f: b64(open(os.path.join(PUB, 'fonts', f), 'rb').read(), 'font/woff2') for f in os.listdir(os.path.join(PUB, 'fonts'))}
