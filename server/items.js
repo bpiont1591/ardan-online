@@ -76,8 +76,9 @@ function make(base, tier, r, R) {
 }
 function tierFor(lvl, R) { let t = 0; for (let i = 0; i < TIERS.length; i++) if (TIERS[i].l <= lvl) t = i; if (t > 0 && R() < 0.25) t--; return t; }
 function rollRar(rank, lvl, R) {
-  const W = rank === 2 ? [0, 45, 40, 15] : rank === 1 ? [45, 38, 14, 3] : [80, 17, 3, 0];
-  const shift = Math.min(20, lvl * 0.6); W[0] = Math.max(0, W[0] - shift); W[1] += shift;
+  // 0 normal monster, 1 elite, 2 world boss, 3 dungeon elite, 4 dungeon boss
+  const W = rank === 4 ? [0, 30, 50, 20] : rank === 3 ? [18, 52, 25, 5] : rank === 2 ? [0, 50, 38, 12] : rank === 1 ? [55, 33, 10, 2] : [90, 9.5, 0.5, 0];
+  const shift = Math.min(rank === 0 ? 6 : 12, lvl * 0.4); W[0] = Math.max(0, W[0] - shift); W[1] += shift;
   let v = R() * W.reduce((a, b) => a + b, 0);
   for (let i = 0; i < 4; i++) { v -= W[i]; if (v < 0) return i; }
   return 0;
@@ -94,11 +95,51 @@ const rankOf = (mk, d) => (d.boss ? 2 : ELITE[mk] ? 1 : 0);
 function rollDrops(mk, d, cls, R) {
   R = R || Math.random;
   const rank = rankOf(mk, d);
-  const n = rank === 2 ? 2 + (R() < 0.5 ? 1 : 0) : rank === 1 ? (R() < 0.85 ? 1 : 0) + (R() < 0.2 ? 1 : 0) : (R() < 0.14 + d.lvl * 0.012 ? 1 : 0);
+  const n = rank === 2 ? 2 + (R() < 0.5 ? 1 : 0) : rank === 1 ? (R() < 0.85 ? 1 : 0) + (R() < 0.2 ? 1 : 0) : (R() < 0.08 + d.lvl * 0.008 ? 1 : 0);
   const out = [];
   for (let i = 0; i < n; i++) out.push(make(pickBase(cls, R), tierFor(d.lvl, R), rollRar(rank, d.lvl, R), R));
   return out;
 }
+// dungeon loot: rank 3 (elite) or 4 (boss); bosses always drop 2-3 items, elites often one, plus materials
+function rollDungeon(lvl, rank, cls, R) {
+  R = R || Math.random;
+  const n = rank === 4 ? 2 + (R() < 0.5 ? 1 : 0) : (R() < 0.6 ? 1 : 0);
+  const out = [];
+  for (let i = 0; i < n; i++) { const t = tierFor(lvl, () => 1); out.push(make(pickBase(cls, R), t, rollRar(rank, lvl, R), R)); }
+  if (rank === 4) out.push(mat('crystal', 1 + (R() < 0.4 ? 1 : 0)));
+  else if (R() < 0.35) out.push(mat(['ore', 'herb', 'wood'][Math.floor(R() * 3)], 1 + Math.floor(R() * 3)));
+  return out;
+}
+// ---------- crafting materials (stackable bag items, tradeable on the market) ----------
+const MATS = {
+  herb: { n: 'Ziele lecznicze', ic: 'herb', v: 3, r: 0 },
+  ore: { n: 'Ruda żelaza', ic: 'ore', v: 4, r: 0 },
+  wood: { n: 'Drewno dębowe', ic: 'wood', v: 3, r: 0 },
+  crystal: { n: 'Kryształ mgły', ic: 'crystal', v: 30, r: 2 },
+};
+const MAX_STACK = 999;
+function mat(k, q) { const M = MATS[k]; q = Math.max(1, Math.min(MAX_STACK, q | 0)); return { u: uid(), b: 'mat_' + k, m: k, n: M.n, s: 'mat', c: null, l: 1, r: M.r, t: 0, ic: M.ic, st: {}, q, v: M.v * q }; }
+// ---------- item upgrade +1..+5 ----------
+const UP_MAX = 5;
+const UP_CHANCE = [1, 0.9, 0.75, 0.55, 0.35];   // chance for +1 .. +5
+function upCost(it) { const n = it.up || 0, L = it.l || 1; return { ore: 2 + n * 2 + Math.floor(L / 6), crystal: n >= 2 ? n - 1 : 0, gold: Math.round(10 + L * 3 * (n + 1) + it.r * 15 * (n + 1)) }; }
+function applyUp(it, n) {
+  if (!it.st0) it.st0 = Object.assign({}, it.st);
+  it.up = n; const st = {};
+  for (const k of Object.keys(it.st0)) { const flat = k === 'crit' || k === 'dodge'; st[k] = flat ? it.st0[k] + Math.floor(n / 2) : Math.round(it.st0[k] * (1 + 0.1 * n) + n * 0.5); }
+  it.st = st;
+  it.n = it.n.replace(/ \+\d$/, '') + (n ? ' +' + n : '');
+  it.v = Math.round(value(it) * (1 + 0.25 * n));
+  return it;
+}
+// smithing: a new item of a chosen slot for the crafter's class, tier from level, rarity better than common drops
+function forge(slot, cls, lvl, R) {
+  R = R || Math.random;
+  const opts = (BY_SLOT[slot] || []).filter((k) => BASES[k][1] === null || BASES[k][1] === cls);
+  if (!opts.length) return null;
+  return make(opts[Math.floor(R() * opts.length)], tierFor(lvl, () => 1), rollRar(1, lvl, R), R);
+}
+function forgeCost(slot, lvl) { const t = tierFor(lvl, () => 1); return { ore: 2 + t * 2, wood: 1 + t, herb: slot === 'amulet' || slot === 'ring' ? 2 + t : 0, gold: 10 + t * t * 18 + t * 10 }; }
 function randomItem(lvl, rank, R) { R = R || Math.random; return make(pickBase(null, R), tierFor(lvl, R), rollRar(rank, lvl, R), R); }
 // convert an old shop/quest weapon or armour (engine ITEMS) into a slot item
 function fromLegacy(id, def, cls) {
@@ -115,10 +156,10 @@ function fromLegacy(id, def, cls) {
   return it;
 }
 function canEquip(it, P) {
-  if (!it || !it.s) return 'To nie jest przedmiot do założenia.';
+  if (!it || !it.s || it.s === 'mat') return 'To nie jest przedmiot do założenia.';
   if (it.c && it.c !== P.cls) return 'Ten przedmiot jest dla klasy: ' + CLS_N[it.c] + '.';
   if (it.l > P.lvl) return 'Wymagany poziom: ' + it.l + '.';
   return null;
 }
 const validItem = (it) => !!(it && typeof it === 'object' && typeof it.u === 'string' && it.st && typeof it.n === 'string' && typeof it.s === 'string');
-module.exports = { SLOTS, SLOT_N, CLS_N, CLASSES, RAR, TIERS, STAT_N, BASES, SPR, ELITE, make, rollDrops, randomItem, fromLegacy, canEquip, value, rankOf, validItem };
+module.exports = { SLOTS, SLOT_N, CLS_N, CLASSES, RAR, TIERS, STAT_N, BASES, SPR, ELITE, MATS, MAX_STACK, UP_MAX, UP_CHANCE, make, rollDrops, rollDungeon, randomItem, fromLegacy, canEquip, value, rankOf, validItem, mat, upCost, applyUp, forge, forgeCost, tierFor };

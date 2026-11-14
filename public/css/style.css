@@ -190,3 +190,17 @@ footer .copy { margin-top: 30px; padding-top: 18px; border-top: 1px solid rgba(2
 .pick small { color: var(--mute); }
 .prose { max-width: 760px; }
 .prose h2 { font-size: 1.4rem; margin-top: 1.4em; }
+/* ranking graczy */
+.rk { background: var(--panel, rgba(255,255,255,.03)); border: 1px solid rgba(201,164,92,.3); border-radius: 14px; padding: 14px; }
+.rk-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.rk-tabs button { background: rgba(255,255,255,.04); border: 1px solid rgba(201,164,92,.35); color: var(--text); border-radius: 999px; padding: 7px 14px; font: 600 .92rem Inter, system-ui, sans-serif; cursor: pointer; }
+.rk-tabs button.on { background: rgba(242,208,75,.14); border-color: var(--gold); color: var(--gold2, #f2d04b); }
+.rk table { width: 100%; border-collapse: collapse; font-size: .95rem; }
+.rk th { text-align: left; color: var(--muted, #a99d88); font-weight: 600; font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; padding: 6px 8px; border-bottom: 1px solid rgba(201,164,92,.25); }
+.rk td { padding: 8px; border-bottom: 1px solid rgba(255,255,255,.05); }
+.rk td.n { font-weight: 700; } .rk td.num { text-align: right; font-variant-numeric: tabular-nums; } .rk th.num { text-align: right; }
+.rk .pos { width: 34px; color: var(--muted, #a99d88); font-weight: 700; }
+.rk tr:nth-child(1) .pos { color: #f2d04b; } .rk tr:nth-child(2) .pos { color: #cfd6de; } .rk tr:nth-child(3) .pos { color: #d08d48; }
+.rk small { color: var(--muted, #a99d88); }
+@media (max-width: 640px) { .rk { padding: 10px; } .rk td, .rk th { padding: 7px 5px; } .rk .hide-s { display: none; } }
+.rk .cls-s { display: none; } .rk br.hide-l { display: none; } @media (max-width: 640px) { .rk .cls-s, .rk br.hide-l { display: inline; } }

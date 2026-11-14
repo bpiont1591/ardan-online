@@ -110,9 +110,12 @@
       <div class="card feat"><h3><span class="ico"><svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><circle cx="16" cy="9" r="2.5"/><path d="M2 20c0-3.5 2.7-6 6-6s6 2.5 6 6M13 20c.3-2.6 2-4.5 4.5-4.5 2.6 0 4.5 2 4.5 4.5"/></svg></span>Wspólny świat</h3><p class="muted">Widzisz innych graczy na mapie, walczycie z tymi samymi potworami, a serwer pilnuje uczciwej gry.</p></div>
       <div class="card feat"><h3><span class="ico"><svg viewBox="0 0 24 24"><path d="M4 5h16v10H9l-5 4z"/></svg></span>Czat</h3><p class="muted">Czat globalny i regionalny oraz prywatne szepty (/w nick). Umawiaj się na bossów i handel.</p></div>
       <div class="card feat"><h3><span class="ico"><svg viewBox="0 0 24 24"><path d="M12 2l3 7h7l-5.5 4.5L18.5 21 12 16.5 5.5 21l2-7.5L2 9h7z"/></svg></span>Zadania z przewodnikiem</h3><p class="muted">14 zadań w siedmiu krainach. Strzałka, złote kropki i minimapa prowadzą prosto do celu.</p></div>
-      <div class="card feat"><h3><span class="ico"><svg viewBox="0 0 24 24"><path d="M14.5 17.5L3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2"/></svg></span>Bossowie i łupy</h3><p class="muted">Upiór Mgieł, Wiedźma Moczarów, Szronogrzbiet i Sethar, Król Cieni. Każdy z potężnym atakiem obszarowym.</p></div>
+      <div class="card feat"><h3><span class="ico"><svg viewBox="0 0 24 24"><path d="M14.5 17.5L3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2"/></svg></span>Bossowie i łupy</h3><p class="muted">Upiór Mgieł, Wiedźma Moczarów, Szronogrzbiet i Sethar, Król Cieni. Walka turowa – ręczna albo automatyczna – i łupy w czterech rzadkościach.</p></div>
       <div class="card feat"><h3><span class="ico"><svg viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg></span>Telefon i komputer</h3><p class="muted">Na telefonie strzałki na ekranie i duże przyciski, na komputerze WASD lub strzałki. Bez instalacji.</p></div>
       <div class="card feat"><h3><span class="ico"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg></span>Postęp na serwerze</h3><p class="muted">Poziom, ekwipunek i zadania zapisują się na Twoim koncie. Graj z dowolnego urządzenia.</p></div>
+      <div class="card feat"><h3><span class="ico"><svg viewBox="0 0 24 24"><path d="M4 21V10a8 8 0 0116 0v11z"/><path d="M9 21v-6a3 3 0 016 0v6"/></svg></span>Lochy drużynowe</h3><p class="muted">Trzy instancje z elitarnymi potworami i bossami o własnych mechanikach. Najlepsze łupy – raz dziennie.</p></div>
+      <div class="card feat"><h3><span class="ico"><svg viewBox="0 0 24 24"><path d="M3 21l9-9M14 4l6 6-4 4-6-6zM12 12l-2-2"/></svg></span>Rzemiosło</h3><p class="muted">Zbieraj zioła, rudę i drewno. Warz mikstury, wykuwaj sprzęt i ulepszaj przedmioty aż do +5.</p></div>
+      <div class="card feat"><h3><span class="ico"><svg viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 01-10 0zM7 6H4v2a3 3 0 003 3M17 6h3v2a3 3 0 01-3 3"/></svg></span>Zadania dzienne i tytuły</h3><p class="muted">3 nowe zadania każdego dnia, nagrody za logowanie i ponad 20 osiągnięć z tytułami przy nicku.</p></div>
     </div>
   </div>
 </section>
@@ -122,6 +125,15 @@
     <div class="kicker">Prosto z gry</div>
     <h2>Galeria</h2>
     <div class="gallery" id="gallery"></div>
+  </div>
+</section>
+
+<section id="ranking">
+  <div class="wrap">
+    <div class="kicker">Najlepsi w Ardanie</div>
+    <h2>Ranking graczy</h2>
+    <p class="lead" style="margin-bottom:22px">Najwyższe poziomy, mistrzowie areny PvP i kolekcjonerzy osiągnięć. Ranking odświeża się na bieżąco.</p>
+    <div class="rk" id="rank"><div class="rk-tabs" role="tablist"><button type="button" class="on" data-rk="level" role="tab">Poziom</button><button type="button" data-rk="pvp" role="tab">PvP (Elo)</button><button type="button" data-rk="ach" role="tab">Osiągnięcia</button></div><div class="rk-body" id="rankBody"><p class="muted">Wczytywanie rankingu…</p></div></div>
   </div>
 </section>
 

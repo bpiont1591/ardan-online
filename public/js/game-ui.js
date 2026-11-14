@@ -18,6 +18,7 @@
   let NET = null, send = () => {}, cmd = () => {}, openChat = () => {};
   const S = window.ARDAN_UI_STATE = { bt: null, gear: null, mk: null, gd: null, tr: null, pvp: null, trInv: null, open: '' };
   let root, layer;
+  const EXT = { onMsg: null, key: null, click: null, open: {}, menu: '' };
 
   // ---------- pixel icons ----------
   const iconCache = {};
@@ -25,6 +26,10 @@
     const p = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(x, y, w, h); };
     const wood = '#7a4f2a', dark = '#1a1420', gold = '#d8b25a', lite = 'rgba(255,255,255,.55)';
     switch (ic) {
+      case 'herb': p(7, 8, 2, 7, '#3f7a2c'); p(3, 5, 4, 3, '#5fae3c'); p(9, 4, 4, 3, '#5fae3c'); p(5, 1, 6, 4, '#7fd04e'); p(4, 9, 3, 2, '#4f9a34'); p(9, 9, 3, 2, '#4f9a34'); p(7, 2, 2, 2, '#e85d8a'); p(4, 5, 1, 1, '#e8d35d'); p(11, 4, 1, 1, '#e8d35d'); break;
+      case 'ore': p(3, 6, 10, 8, '#6d6a72'); p(4, 4, 7, 3, '#85818b'); p(2, 9, 2, 4, '#5a5760'); p(5, 7, 2, 2, '#c98a4a'); p(9, 9, 2, 2, '#c98a4a'); p(7, 11, 2, 1, '#e0a56a'); p(5, 4, 3, 1, lite); break;
+      case 'wood': p(2, 5, 12, 4, '#8a5a30'); p(2, 10, 12, 4, '#7a4f2a'); p(2, 5, 12, 1, '#a8743f'); p(2, 10, 12, 1, '#a8743f'); p(1, 5, 2, 4, '#d8b07a'); p(1, 10, 2, 4, '#d8b07a'); p(1, 6, 1, 1, '#8a5a30'); p(1, 11, 1, 1, '#8a5a30'); break;
+      case 'crystal': p(7, 1, 2, 2, '#c9f3ff'); p(6, 3, 4, 4, '#7fd8ff'); p(5, 7, 6, 4, '#4fb6e8'); p(6, 11, 4, 2, '#3a8fc8'); p(7, 13, 2, 2, '#2c6fa0'); p(6, 4, 1, 4, '#fff'); p(3, 9, 2, 3, '#7fd8ff'); p(11, 8, 2, 3, '#7fd8ff'); break;
       case 'sword': p(7, 1, 2, 10, metal); p(7, 1, 1, 10, lite); p(7, 0, 2, 1, metal); p(4, 11, 8, 2, gold); p(7, 13, 2, 2, wood); p(6, 15, 4, 1, gold); break;
       case 'axe': p(7, 3, 2, 12, wood); p(9, 2, 4, 6, metal); p(12, 1, 2, 8, metal); p(13, 1, 1, 8, lite); p(5, 3, 2, 3, metal); p(7, 2, 2, 1, gold); break;
       case 'bow': for (const [x, y] of [[5, 1], [6, 1], [7, 2], [8, 3], [9, 4], [9, 5], [10, 6], [10, 7], [10, 8], [10, 9], [9, 10], [9, 11], [8, 12], [7, 13], [6, 14], [5, 14]]) p(x, y, 2, 1, x > 8 ? metal : wood);
@@ -77,9 +82,10 @@
       return `<div class="st"><span>${STAT_N[k]}</span><b>+${v}${PCT[k] ? '%' : ''}</b>${cmp && d ? `<i class="${d > 0 ? 'up' : 'dn'}">${d > 0 ? '▲' : '▼'}${Math.abs(d)}</i>` : ''}</div>`;
     }).join('');
   }
+  const qty = (it) => (it.s === 'mat' && (it.q || 1) > 1 ? `<i class="qn">${it.q}</i>` : '');
   const iconHtml = (it, size, extra) => `<span class="ic r${it.r}" ${extra || ''}><img src="${itemIcon(it, size || 40)}" alt="" width="${size || 40}" height="${size || 40}"></span>`;
   const nameHtml = (it) => `<b class="in" style="color:${(RAR[it.r] || RAR[0]).col}">${esc(it.n)}</b>`;
-  const meta = (it) => `${slotName(slotOf(it), it.c)} · ${it.c ? CLS_N[it.c] : 'wszystkie klasy'} · poz. ${it.l}`;
+  const meta = (it) => it.s === 'mat' ? `Materiał rzemieślniczy · ×${it.q || 1}` : `${slotName(slotOf(it), it.c)} · ${it.c ? CLS_N[it.c] : 'wszystkie klasy'} · poz. ${it.l}`;
 
   // ---------- generic layer ----------
   function el(html) { const d = document.createElement('div'); d.innerHTML = html.trim(); return d.firstChild; }
@@ -98,7 +104,7 @@
   function refocus() { const c = document.getElementById('g'); if (c && !document.activeElement.matches('input,select,textarea')) c.focus({ preventScroll: true }); }
   function toast(html, buttons, ms) {
     const t = el(`<div class="ui-toast">${html}${buttons ? `<div class="tb">${buttons}</div>` : ''}</div>`);
-    $('#uiToasts').appendChild(t);
+    const box = $('#uiToasts'); box.appendChild(t); while (box.children.length > 3) box.removeChild(box.firstChild);
     if (ms !== 0) setTimeout(() => t.remove(), ms || 4500);
     return t;
   }
@@ -115,7 +121,7 @@
     const okCls = !it.c || it.c === cls, okLvl = (G.lvl || 1) >= it.l;
     let acts = '';
     if (ctx.from === 'bag') {
-      acts += `<button type="button" data-ia="equip" ${okCls && okLvl ? '' : 'disabled'}>Załóż</button>`;
+      if (it.s !== 'mat') acts += `<button type="button" data-ia="equip" ${okCls && okLvl ? '' : 'disabled'}>Załóż</button>`;
       if (S.tr && S.tr.open) acts += `<button type="button" data-ia="trade">Dodaj do wymiany</button>`;
       acts += `<div class="sellrow"><label>Cena na rynku <input type="number" inputmode="numeric" min="1" max="999999" id="mkPrice" value="${Math.max(2, it.v * 2)}"> zł</label><button type="button" data-ia="list">Wystaw na rynek</button></div>`;
       acts += `<button type="button" class="sec" data-ia="sell">Sprzedaj kupcowi (${Math.max(1, Math.floor(it.v / 2))} zł)</button><button type="button" class="sec dng" data-ia="drop">Wyrzuć</button>`;
@@ -125,9 +131,9 @@
     detail = el(`<div class="ui-detail"><div class="dcard" style="border-color:${RAR[it.r].col}">
       <button type="button" class="ui-x" data-dclose aria-label="Zamknij">✕</button>
       <div class="dh">${iconHtml(it, 48)}<div>${nameHtml(it)}<small style="color:${RAR[it.r].col}">${RAR[it.r].n}</small></div></div>
-      <div class="dm">${esc(slotName(slotOf(it), it.c))}</div>
+      ${it.s === 'mat' ? `<div class="dm">Materiał rzemieślniczy · ilość: <b>${it.q || 1}</b></div><div class="dm">Przydaje się u kowala i alchemika. Można go sprzedać na rynku.</div>` : `<div class="dm">${esc(slotName(slotOf(it), it.c))}${it.up ? ` · ulepszenie +${it.up}` : ''}</div>
       <div class="dm ${okCls ? '' : 'bad'}">Klasa: ${it.c ? CLS_N[it.c] : 'wszystkie'}</div>
-      <div class="dm ${okLvl ? '' : 'bad'}">Wymagany poziom: ${it.l}</div>
+      <div class="dm ${okLvl ? '' : 'bad'}">Wymagany poziom: ${it.l}</div>`}
       <div class="dst">${statLines(it.st || {}, worn ? worn.st : (ctx.from === 'bag' ? {} : null))}</div>
       ${worn ? `<div class="dm cmp">Porównanie z: ${nameHtml(worn)}</div>` : ''}
       ${ctx.seller ? `<div class="dm">Sprzedający: ${esc(ctx.seller)}</div>` : ''}
@@ -165,7 +171,7 @@
     const st = G.st || {};
     const stats = [['Atak', st.atk], ['Obrona', st.def], ['Życie', st.hp], [st.res || 'Mana', st.mp], ['Cios krytyczny', (st.crit || 0) + '%'], ['Unik', (st.dodge || 0) + '%']]
       .map(([k, v]) => `<div class="st"><span>${k}</span><b>${v}</b></div>`).join('');
-    const bag = (G.bag || []).map((it) => `<button type="button" class="bi r${it.r}" data-bag="${esc(it.u)}" title="${esc(it.n)}"><img src="${itemIcon(it, 40)}" alt="${esc(it.n)}" width="40" height="40"></button>`).join('');
+    const bag = (G.bag || []).map((it) => `<button type="button" class="bi r${it.r}" data-bag="${esc(it.u)}" title="${esc(it.n)}"><img src="${itemIcon(it, 40)}" alt="${esc(it.n)}" width="40" height="40">${qty(it)}</button>`).join('');
     const nb = (G.bag || []).length, pad = nb === 0 ? 8 : (8 - nb % 8) % 8;
     const inv = (G.inv || []).map((x) => { const d = NET.api.items[x.id]; if (!d) return ''; const usable = d.heal || d.mana || d.buff; return `<div class="li"><img src="${legacyIcon(x.id, 28)}" alt="" width="28" height="28"><span>${esc(d.n)}${x.n > 1 ? ` <small>×${x.n}</small>` : ''}</span>${usable ? `<button type="button" data-use="${esc(x.id)}">Użyj</button>` : ''}</div>`; }).join('');
     return `<div class="eq-top"><div class="doll">${doll}</div><div class="eq-st"><h4>Statystyki</h4>${stats}<div class="st gold"><span>Złoto</span><b>${G.gold} zł</b></div></div></div>
@@ -196,11 +202,11 @@
     if (mkTab === 'mine') return tabs + gold + (M.mine.length ? `<div class="mlist">${M.mine.map((x) => mkRow(x, true)).join('')}</div>` : '<p class="muted">Nie masz wystawionych przedmiotów.</p>');
     if (mkTab === 'sell') {
       const bag = (S.gear && S.gear.bag) || [];
-      return tabs + gold + '<p class="muted">Wybierz przedmiot z torby, ustaw cenę i wystaw go na rynek.</p>' + (bag.length ? `<div class="bag">${bag.map((it) => `<button type="button" class="bi r${it.r}" data-bag="${esc(it.u)}"><img src="${itemIcon(it, 40)}" alt="${esc(it.n)}" width="40" height="40"></button>`).join('')}</div>` : '<p class="muted">Torba jest pusta.</p>');
+      return tabs + gold + '<p class="muted">Wybierz przedmiot lub materiały z torby, ustaw cenę i wystaw na rynek (materiały sprzedajesz całym stosem).</p>' + (bag.length ? `<div class="bag">${bag.map((it) => `<button type="button" class="bi r${it.r}" data-bag="${esc(it.u)}"><img src="${itemIcon(it, 40)}" alt="${esc(it.n)}" width="40" height="40">${qty(it)}</button>`).join('')}</div>` : '<p class="muted">Torba jest pusta.</p>');
     }
     const opt = (v, l, cur) => `<option value="${v}" ${String(cur) === String(v) ? 'selected' : ''}>${l}</option>`;
     const f = `<div class="mf">
-      <select data-f="slot" aria-label="Rodzaj">${opt('', 'Wszystkie rodzaje', mkF.slot)}${['weapon', 'offhand', 'helm', 'armor', 'gloves', 'boots', 'ring', 'amulet'].map((s) => opt(s, SLOT_N[s], mkF.slot)).join('')}</select>
+      <select data-f="slot" aria-label="Rodzaj">${opt('', 'Wszystkie rodzaje', mkF.slot)}${['weapon', 'offhand', 'helm', 'armor', 'gloves', 'boots', 'ring', 'amulet'].map((s) => opt(s, SLOT_N[s], mkF.slot)).join('')}${opt('mat', 'Materiały', mkF.slot)}</select>
       <select data-f="cls" aria-label="Klasa">${opt('', 'Każda klasa', mkF.cls)}${opt('war', 'Wojownik', mkF.cls)}${opt('arc', 'Łucznik', mkF.cls)}${opt('mag', 'Mag', mkF.cls)}${opt('all', 'Dla wszystkich klas', mkF.cls)}</select>
       <select data-f="rar" aria-label="Rzadkość">${opt('', 'Każda rzadkość', mkF.rar)}${RAR.map((r, i) => opt(i, r.n, mkF.rar)).join('')}</select>
       <select data-f="sort" aria-label="Sortowanie">${opt('new', 'Najnowsze', mkF.sort)}${opt('cheap', 'Najtańsze', mkF.sort)}${opt('lvl', 'Najwyższy poziom', mkF.sort)}</select>
@@ -286,8 +292,8 @@
       <button type="button" data-open="gd"><b>🛡</b>Gildia<small>U</small></button>
       <button type="button" data-open="pvp"><b>⚔</b>PvP i ranking<small>P</small></button>
       <button type="button" data-open="tr"><b>🤝</b>Handel</button>
-      <button type="button" data-open="chat"><b>💬</b>Czat<small>C</small></button></div>
-      <p class="muted">Walka: dotknij potwora albo stań obok i naciśnij atak. Gracza dotknij, aby handlować, zaprosić lub wyzwać.</p>`, 'menu');
+      <button type="button" data-open="chat"><b>💬</b>Czat<small>C</small></button>${EXT.menu}</div>
+      <p class="muted">Walka: dotknij potwora albo stań obok i naciśnij atak. Gracza dotknij, aby handlować, zaprosić lub wyzwać. Zioła, rudę i drewno zbierasz klawiszem E (lub przyciskiem „Zbierz”), stojąc obok.</p>`, 'menu');
   }
   function playerTap(o) {
     const z = myZone() && NET.api.pvpAt(o.area, o.x, o.y);
@@ -318,7 +324,7 @@
       const g = c.getContext('2d'); g.clearRect(0, 0, 96, 96); g.imageSmoothingEnabled = false;
       g.save();
       if (f.kind === 'm') {
-        const sc = (NET.api.mon[f.k] && NET.api.mon[f.k].sc) || 1, k = 2 / Math.max(1, sc * 0.8);
+        const sc = (NET.api.mon[f.k] && NET.api.mon[f.k].sc) || 1, k = f.boss ? 2.5 : 2 / Math.max(1, sc * 0.8);
         g.translate(48 - 16 * k, 88 - 30 * k); g.scale(k, k); try { NET.api.drawMob(g, f.k); } catch (e) {}
       } else { g.translate(16, 20); g.scale(2, 2); try { NET.api.drawChar(g, f.cls, f.w, f.a, f.side ? 1 : 0); } catch (e) {} }
       g.restore();
@@ -336,7 +342,7 @@
     if (!bt) {
       bt = { el: null, st: null, q: [], busy: false, tgt: null, chosen: false, timer: 0 };
       bt.el = el(`<div class="bt" id="battle" role="dialog" aria-label="Walka"><div class="bt-in">
-        <div class="bt-top"><b id="btTitle"></b><span id="btRound"></span><div class="bt-timer"><i id="btTime"></i></div></div>
+        <div class="bt-top"><b id="btTitle"></b><span id="btRound"></span><div class="bt-timer"><i id="btTime"></i></div></div><div class="bt-mech" id="btMech" hidden></div>
         <div class="bt-field"><div class="bt-side en" id="btEn"></div><div class="bt-vs">VS</div><div class="bt-side al" id="btAl"></div></div>
         <div class="bt-log scroll" id="btLog" aria-live="polite"></div>
         <div class="bt-acts" id="btActs"></div>
@@ -351,7 +357,8 @@
     }
     bt.st = st; bt.recvAt = Date.now();
     const me = st.f.find((f) => f.id === st.me) || {};
-    $('#btTitle', bt.el).textContent = st.kind === 'pvp' ? '⚔ Pojedynek PvP' : '⚔ Walka';
+    $('#btTitle', bt.el).textContent = st.kind === 'pvp' ? '⚔ Pojedynek PvP' : st.title ? '⚔ ' + st.title : '⚔ Walka';
+    { const mm = $('#btMech', bt.el); mm.hidden = !st.mech; if (st.mech) mm.textContent = '👑 Mechaniki bossa: ' + st.mech.join(' · '); }
     $('#btRound', bt.el).textContent = st.phase === 'end' ? 'Koniec walki' : `Runda ${st.round}`;
     $('#btEn', bt.el).innerHTML = st.f.filter((f) => f.side === 1).map((f) => fighterCard(f, st.me)).join('');
     $('#btAl', bt.el).innerHTML = st.f.filter((f) => f.side === 0).map((f) => fighterCard(f, st.me)).join('');
@@ -486,7 +493,7 @@
       }
       case 'pvp': S.pvp = msg; refreshPvp(); return true;
     }
-    return false;
+    return EXT.onMsg ? !!EXT.onMsg(msg) : false;
   }
   let lastZone = null;
   function onState() {
@@ -509,6 +516,7 @@
       return true;
     }
     if (detail) { if (lk === 'Escape') closeDetail(); return true; }
+    if (EXT.key && EXT.key(lk, !!S.open)) return true;
     if (S.open) {
       if (lk === 'Escape' || (lk === 'i' && S.open === 'eq') || (lk === 'r' && S.open === 'mk') || (lk === 'u' && S.open === 'gd') || (lk === 'p' && S.open === 'pvp')) { closePanels(); return true; }
       if (lk === 'i') { openEq(); return true; } if (lk === 'r') { openMk(); return true; } if (lk === 'u') { openGd(); return true; } if (lk === 'p') { openPvp(); return true; }
@@ -525,7 +533,8 @@
     const back = t.closest('.ui-back');
     if (t.classList.contains('ui-back') || t.closest('[data-close]')) return closePanels();
     if (!back) return;
-    const op = t.closest('[data-open]'); if (op) { const k = op.dataset.open; if (k === 'chat') { closePanels(); openChat(''); return; } return ({ eq: openEq, mk: openMk, gd: openGd, pvp: openPvp, tr: openTr })[k](); }
+    const op = t.closest('[data-open]'); if (op) { const k = op.dataset.open; if (k === 'chat') { closePanels(); openChat(''); return; } const fn = ({ eq: openEq, mk: openMk, gd: openGd, pvp: openPvp, tr: openTr })[k] || EXT.open[k]; if (fn) fn(); return; }
+    if (EXT.click && EXT.click(t, back)) return;
     const sl = t.closest('[data-slot]'); if (sl && S.gear) { const it = S.gear.gear[sl.dataset.slot]; if (it) showDetail(it, { from: 'worn', slot: sl.dataset.slot }); return; }
     const bi = t.closest('[data-bag]'); if (bi && S.gear) { const it = S.gear.bag.find((x) => x.u === bi.dataset.bag); if (it) showDetail(it, { from: 'bag' }); return; }
     const us = t.closest('[data-use]'); if (us) { send({ t: 'in', mx: 0, my: 0, acts: [{ a: 'use', id: us.dataset.use }] }); setTimeout(() => send({ t: 'gear', a: 'get' }), 200); return; }
@@ -586,7 +595,10 @@
   }
   window.ARDAN_UI = {
     init, onMsg, key, playerTap,
-    panel: (k) => { if (bt) return; if (S.open === (k === 'inv' ? 'eq' : k)) return closePanels(); ({ inv: openEq, eq: openEq, menu: openMenu, mk: openMk, gd: openGd, pvp: openPvp, tr: openTr })[k](); },
+    panel: (k) => { if (bt) return; if (S.open === (k === 'inv' ? 'eq' : k)) return closePanels(); const fn = ({ inv: openEq, eq: openEq, menu: openMenu, mk: openMk, gd: openGd, pvp: openPvp, tr: openTr })[k] || EXT.open[k]; if (fn) fn(); },
     state: S, inBattle: () => !!bt, close: closePanels,
+    ext: EXT,
+    h: { el, panel, closePanels, toast, curBody, esc, $, iconHtml, nameHtml, itemIcon, showDetail, refocus, RAR, CLS_N, SLOT_N, AREA_N, pctW, slotName,
+      send: (m) => send(m), cmd: (c) => cmd(c), NET: () => NET, root: () => root, layer: () => layer, refreshEq: () => refreshEq(), refreshMk: () => refreshMk() },
   };
 })();

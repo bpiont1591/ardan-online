@@ -53,6 +53,9 @@ async function flow(browser, label, vp, shots) {
   await pg.keyboard.press('Enter').catch(() => {});
   // close intro dialog if present
   for (let i = 0; i < 6; i++) { await pg.keyboard.press('Escape'); await W(150); }
+  { const lt = await pg.waitForSelector('#uiToasts [data-lt="get"]', { timeout: 10000 }).catch(() => null);
+    ok(!!lt, `${label}: okno nagrody za logowanie`); if (shots === 'phone' && lt) await pg.screenshot({ path: `shots/${shots}_2b_login_reward.png` });
+    if (lt) { await pg.$eval('#uiToasts [data-lt="get"]', (b) => b.click()); await W(500); } }
   const p0 = await pg.evaluate(() => ({ ...window.ARDAN_DEBUG.last.p }));
   for (const k of ['ArrowDown', 'KeyS', 'ArrowRight', 'KeyD']) { await pg.keyboard.down(k); await W(900); await pg.keyboard.up(k); }
   const p1 = await pg.evaluate(() => ({ ...window.ARDAN_DEBUG.last.p }));
@@ -99,7 +102,8 @@ async function flow(browser, label, vp, shots) {
   const tg = alive[0];
   await walkExact(tg.x, tg.y, 20000, 2);
   await pg.keyboard.press('f');
-  ok(await pg.waitForSelector('#battle', { timeout: 5000 }).then(() => true).catch(() => false), `${label}: walka turowa otwarta`);
+  if (!(await pg.waitForSelector('#battle', { timeout: 5000 }).then(() => true).catch(() => false))) { const s = await snap(); console.log('    DEBUG', JSON.stringify(s.p), JSON.stringify(tg), JSON.stringify(s.m[tg.i]), await pg.evaluate(() => window.ARDAN_UI_STATE.open), [...document.querySelectorAll('#msgs .m')].slice(-3).map((e) => e.textContent).join(' | ')); await pg.screenshot({ path: 'shots/debug_f.png' }); }
+  ok(await pg.$('#battle').then((e) => !!e), `${label}: walka turowa otwarta`);
   await W(700);
   ok((await pg.$$('#battle .bf.al')).length >= 2, `${label}: członek drużyny (bot) dołącza do walki`);
   if (shots) await pg.screenshot({ path: `shots/${shots}_6_combat.png` });
@@ -174,10 +178,96 @@ async function flow(browser, label, vp, shots) {
     if (shots) await pg.screenshot({ path: `shots/${shots}_11_pvp_result.png` });
     await tap('#btEnd [data-ba="close"]').catch(() => {});
   }
+  // ---------- runda 3: zbieractwo, rzemiosło, zadania, osiągnięcia, lochy z Jagienką ----------
+  const TH = (m) => pg.evaluate((m) => window.ARDAN_UI.h.send(Object.assign({ t: '__test' }, m)), m);
+  const X3 = async () => (await ui()).x;
+  const matQ = (g, k) => ((g && g.bag) || []).filter((x) => x.s === 'mat' && x.m === k).reduce((a, x) => a + (x.q || 1), 0);
+  await pg.evaluate(() => window.ARDAN_UI.close()); await W(300);
+  await pg.evaluate(() => window.ARDAN_UI.panel('menu')); await W(300);
+  await tap('[data-open="boost"]'); await W(1500);
+  ok(((await ui()).gear || {}).lvl >= 14, `${label}: demo – postać przygotowana (poz. ${((await ui()).gear || {}).lvl})`);
+  await TH({ near: { area: 'forest', k: 'herb' } }); await W(2500);
+  await pg.waitForSelector('#uiCtx:not([hidden])', { timeout: 5000 }).catch(() => {});
+  const h0 = matQ((await ui()).gear, 'herb');
+  if (shots) await pg.screenshot({ path: `shots/${shots}_12_gather.png` });
+  await tap('#uiCtx').catch(() => {}); await W(1200);
+  ok(matQ((await ui()).gear, 'herb') > h0, `${label}: zbieranie ziół (${h0} → ${matQ((await ui()).gear, 'herb')})`);
+  await TH({ near: { npc: 'kowal' } }); await W(2500);
+  await pg.waitForSelector('#uiCtx:not([hidden])', { timeout: 5000 }).catch(() => {});
+  await tap('#uiCtx').catch(() => {}); await W(900);
+  ok((await ui()).open === 'cr', `${label}: kuźnia kowala otwarta`);
+  await tap('[data-forge="helm"]').catch(() => {}); await W(900);
+  const hm = ((await ui()).gear.bag || []).find((x) => x.s === 'helm');
+  ok(!!hm, `${label}: wykuto ${hm && hm.n}`);
+  await tap('[data-crtab="up"]'); await W(300);
+  if (hm) { await tap(`[data-up="${hm.u}"]`).catch(() => {}); await W(900); }
+  ok(/Udało się/.test(await pg.$eval('#crRes', (e) => e.textContent).catch(() => '')), `${label}: ulepszenie +1 udane`);
+  if (shots) await pg.screenshot({ path: `shots/${shots}_13_craft_upgrade.png` });
+  await pg.evaluate(() => window.ARDAN_UI.close()); await W(200);
+  await pg.evaluate(() => window.ARDAN_UI.panel('dq')); await W(800);
+  let x3 = await X3();
+  ok(x3.dq && x3.dq.q.length === 3 && x3.dq.login.got, `${label}: 3 zadania dzienne + nagroda za logowanie odebrana`);
+  if (shots) await pg.screenshot({ path: `shots/${shots}_14_daily_login.png` });
+  await pg.evaluate(() => window.ARDAN_UI.close()); await W(200);
+  await pg.evaluate(() => window.ARDAN_UI.panel('ach')); await W(800);
+  x3 = await X3();
+  const gotA = x3.ach ? x3.ach.list.filter((a) => a.got) : [];
+  ok(gotA.length >= 2, `${label}: osiągnięcia (${gotA.map((a) => a.t).join(', ')})`);
+  if (gotA[0]) { await tap(`[data-ti="${gotA[0].id}"]`); await W(900); }
+  ok((await X3()).ach.title === (gotA[0] || {}).id, `${label}: wybrano tytuł «${(gotA[0] || {}).t}»`);
+  if (shots) await pg.screenshot({ path: `shots/${shots}_15_achievements.png` });
+  await pg.evaluate(() => window.ARDAN_UI.close()); await W(200);
+  // dungeon with bot Jagienka
+  await pg.evaluate(() => { const c = document.getElementById('chatIn'); c.value = '/zapros Jagienka'; document.getElementById('chatForm').requestSubmit(); });
+  await pg.waitForFunction(() => document.querySelectorAll('#party .pm').length >= 2, { timeout: 8000 }).catch(() => {});
+  ok((await pg.$$('#party .pm')).length >= 2, `${label}: Jagienka przyjmuje zaproszenie do drużyny`);
+  await TH({ near: { area: 'forest', k: 'gate' }, heal: true }); await W(3500);
+  await pg.waitForSelector('#uiCtx:not([hidden])', { timeout: 5000 }).catch(() => {});
+  await tap('#uiCtx').catch(() => {}); await W(900);
+  ok((await ui()).open === 'dgg', `${label}: brama lochu – okno wejścia`);
+  ok(await pg.$eval('.dg-gate', (e) => /Jagienka/.test(e.textContent)).catch(() => false), `${label}: Jagienka na liście drużyny przy wejściu`);
+  if (shots) await pg.screenshot({ path: `shots/${shots}_16_dungeon_gate.png` });
+  await tap('[data-dge]'); await W(1500);
+  let D = (await X3()).dg;
+  ok(D && D.party.some((m) => m.n === 'Jagienka'), `${label}: Jagienka wchodzi z graczem do lochu`);
+  let bossShot = false, fin = false;
+  for (let guard = 0; guard < 14 && !fin; guard++) {
+    D = (await X3()).dg; if (!D) break;
+    if (D.fin) { fin = true; break; }
+    const g = D.groups.find((x) => !x.done && !x.busy);
+    if (!g) { if (D.cleared) { await tap('[data-dg="next"]').catch(() => {}); await W(900); continue; } await W(800); continue; }
+    await tap(`[data-dgf="${g.i}"]`).catch(() => {}); await W(900);
+    await pg.waitForSelector('#battle', { timeout: 4000 }).catch(() => {});
+    if (await pg.$('#btAuto:not(:checked)')) await tap('#btAuto').catch(() => {});
+    await tap('#battle [data-spd="3"]').catch(() => {});
+    if (D.boss && !bossShot && shots) { await W(4500); await pg.screenshot({ path: `shots/${shots}_17_dungeon_boss.png` }); bossShot = true; }
+    await pg.waitForSelector('#btEnd:not([hidden])', { timeout: 150000 }).catch(() => {});
+    await tap('#btEnd [data-ba="close"]').catch(() => {}); await W(900);
+  }
+  D = (await X3()).dg;
+  ok(fin && D && D.fin, `${label}: loch ukończony razem z Jagienką`);
+  await W(2500);
+  if (shots) await pg.screenshot({ path: `shots/${shots}_18_dungeon_done.png` });
+  await tap('[data-dg="leave"]').catch(() => {}); await W(1000);
+  ok(!(await pg.$('#dungeon')), `${label}: wyjście z lochu`);
+  if (vp.isMobile) {
+    const bd = await pg.$eval('#demoBadge', (e) => { const r = e.getBoundingClientRect(); return { r: r.right, w: innerWidth, wm: getComputedStyle(e).writingMode, top: r.top, h: innerHeight }; });
+    ok(bd.r >= bd.w - 1 && /vertical/.test(bd.wm) && bd.top > bd.h * 0.25, `${label}: odznaka WERSJA DEMO pionowo przy prawej krawędzi (nie zasłania HUD)`);
+    await pg.screenshot({ path: `shots/${shots}_19_badge.png` });
+  }
   // reload keeps character saved
   await pg.evaluate(() => { location.hash = '#/postacie'; });
   await pg.waitForSelector('body[data-page=chars] .char', { timeout: 10000 });
   ok(true, `${label}: powrót do listy postaci: ${await pg.$eval('.char .muted', (e) => e.textContent)}`);
+  await pg.evaluate(() => { location.hash = '#/'; });
+  await pg.waitForSelector('#rankBody table', { timeout: 10000 }).catch(() => {});
+  ok((await pg.$$('#rankBody tbody tr')).length >= 5, `${label}: ranking graczy na stronie głównej`);
+  ok(await pg.$eval('#rankBody', (e) => e.textContent.includes('Zbyszko')), `${label}: boty w rankingu`);
+  ok(await pg.$eval('#news', (e) => /Lochy drużynowe/.test(e.textContent) && /Osiągnięcia i tytuły/.test(e.textContent)), `${label}: Nowości z funkcjami rundy 3`);
+  if (shots) { await pg.$eval('#ranking', (e) => e.scrollIntoView()); await W(400); await pg.screenshot({ path: `shots/${shots}_20_home_ranking.png` }); }
+  await pg.$eval('[data-rk="ach"]', (b) => b.click()); await W(200);
+  ok(await pg.$eval('#rankBody', (e) => /Osiągnięcia/.test(e.textContent)), `${label}: zakładka osiągnięć w rankingu`);
+  if (shots) { await pg.$eval('#nowosci', (e) => e.scrollIntoView()); await W(400); await pg.screenshot({ path: `shots/${shots}_21_news.png` }); }
   await ctx.close();
 }
 (async () => {

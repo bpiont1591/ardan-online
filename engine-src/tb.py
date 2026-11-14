@@ -57,7 +57,7 @@ ed('    if (items.length || gold > 0) bags.push({ area: P.area, x: m.x, y: m.y, 
 ed('    label(op[0] + 16, op[1] - 8, (inParty ? "◆ " : "") + o.n + " · " + o.l, inParty ? "#8fff8f" : "#9fe0ff");',
    '    const inZ = !!pvpAt(P.area, o.x, o.y) && !!pvpAt(P.area, P.x, P.y);\n    label(op[0] + 16, op[1] - 8, (inParty ? "◆ " : "") + (o.gt ? "[" + o.gt + "] " : "") + o.n + " · " + o.l, inParty ? "#8fff8f" : inZ ? "#ff9a8a" : "#9fe0ff");')
 ed('      if (NET && NET.nick) label(pp[0] + 16, pp[1] - 8, NET.nick + " · " + P.lvl, "#ffe9a8");',
-   '      if (NET && NET.nick) label(pp[0] + 16, pp[1] - 8, (NET.gtag ? "[" + NET.gtag + "] " : "") + NET.nick + " · " + P.lvl, "#ffe9a8");')
+   '      if (NET && NET.nick) label(pp[0] + 16, pp[1] - 8, (NET.gtag ? "[" + NET.gtag + "] " : "") + NET.nick + " · " + P.lvl, "#ffe9a8");\n      if (NET && NET.title) label(pp[0] + 16, pp[1] - 21, "«" + NET.title + "»", "#e8c96a");')
 
 # ---- HUD: bag opens the HTML equipment panel, extra menu button
 ed('    circleBtn(W - 10 - ur * 5 - 16, uy, ur, "bag", () => { panel = panel === "inv" ? "" : "inv"; invSel = -1; }, hintOn ? "I" : "");',
@@ -67,16 +67,23 @@ ed('    } else if (kind === "quest") {', '''    } else if (kind === "menu") {
       g.fillStyle = "#ffd25a"; for (let i = 0; i < 3; i++) g.fillRect(cx - r * 0.45, cy - r * 0.38 + i * r * 0.32, r * 0.9, Math.max(2, r * 0.14));
     } else if (kind === "quest") {''')
 
-ed('e.area = msg.a; e.bd = o.bd;', 'e.area = msg.a; e.bd = o.bd; e.gt = o.gt; e.fb = o.fb; e.i = o.i;')
-ed('label(op[0] + 16, op[1] - 8, (inParty ? "◆ " : "") + (o.gt', 'if (o.fb) label(op[0] + 16, op[1] - 22, "⚔ walczy", "#ffb347");\n    label(op[0] + 16, op[1] - 8, (inParty ? "◆ " : "") + (o.gt')
+ed('e.area = msg.a; e.bd = o.bd;', 'e.area = msg.a; e.bd = o.bd; e.gt = o.gt; e.fb = o.fb; e.i = o.i; e.ti = o.ti; e.dg = o.dg;')
+ed('label(op[0] + 16, op[1] - 8, (inParty ? "◆ " : "") + (o.gt', 'if (o.ti) label(op[0] + 16, op[1] - 21, "«" + o.ti + "»", "#e8c96a");\n    if (o.fb || o.dg) label(op[0] + 16, op[1] - (o.ti ? 34 : 21), o.dg ? "🕳 w lochu" : "⚔ walczy", "#ffb347");\n    label(op[0] + 16, op[1] - 8, (inParty ? "◆ " : "") + (o.gt')
 # monsters stand still at their spawn spot in turn-based mode (idle animation only)
 ed('      if (m.mt < 1) { m.mt = Math.min(1, m.mt + dt * m.d.spd * (m.frz > 0 ? 0.3 : 1)); continue; }\n      if (m.frz > 0) { m.frz -= dt; continue; }',
    '      if (m.mt < 1) { m.mt = Math.min(1, m.mt + dt * m.d.spd * (m.frz > 0 ? 0.3 : 1)); continue; }\n      if (TB) { m.aggro = false; continue; }\n      if (m.frz > 0) { m.frz -= dt; continue; }')
+# world objects (gathering nodes, dungeon gates) drawn by the UI layer, tap to use
+ed('    for (const m of mobs[P.area]) if (!m.dead) ents.push({ y: rpos(m)[1], f: () => { drawMob(m);',
+   '    if (NET && NET.objs && NET.drawObj) for (const o of NET.objs) if (o.a === P.area) ents.push({ y: o.y * TS - 1, f: () => { try { NET.drawObj(ctx, o, o.x * TS, o.y * TS, TS, performance.now() / 1000); } catch (e) { /* ignore */ } } });\n    for (const m of mobs[P.area]) if (!m.dead) ents.push({ y: rpos(m)[1], f: () => { drawMob(m);')
 # ---- input hooks
 ed('    if (k === "Escape") { if (dlg) { if (dlg.srv) actQ.push({ a: "dlgx" }); dlg = null; } else panel = ""; return; }',
    '    if (NET && NET.onKey && !dlg && NET.onKey(k)) { for (const kk of Object.keys(keys)) keys[kk] = false; return; }\n    if (k === "Escape") { if (dlg) { if (dlg.srv) actQ.push({ a: "dlgx" }); dlg = null; } else panel = ""; return; }')
 ed('''    const m = mobUnder(w);
-    if (m) { act({ a: "target", area: P.area, i: mobs[P.area].indexOf(m) }); return; }''', '''    if (NET && NET.onPlayerTap) for (const k of Object.keys(others)) {
+    if (m) { act({ a: "target", area: P.area, i: mobs[P.area].indexOf(m) }); return; }''', '''    if (NET && NET.objs && NET.onObjTap) for (const o of NET.objs) {
+      if (o.a !== P.area) continue; const tx = Math.floor(w[0] / TS), ty = Math.floor(w[1] / TS);
+      if (tx === o.x && (ty === o.y || (o.k === "gate" && ty === o.y - 1))) { NET.onObjTap(o); return; }
+    }
+    if (NET && NET.onPlayerTap) for (const k of Object.keys(others)) {
       const o = others[k]; if (o.area !== P.area || o.dead) continue; const op = rpos(o);
       if (Math.abs(op[0] + 16 - w[0]) < 15 && Math.abs(op[1] + 14 - w[1]) < 19) { NET.onPlayerTap(o); return; }
     }
@@ -92,10 +99,10 @@ ed('    tick: srvTick, pl, P: (): any => P, maxHp, maxMp,',
    '''    tick: srvTick, pl, P: (): any => P, maxHp, maxMp,
     stats: statsAll, items: ITEMS, mon: MON, gearIds: GEAR, sk: SK, cls: CLS, zones: PVPZ, pvpAt, npcs: NPCS, areas: AREAS,
     kill: (m: any) => { if (m && !m.dead) { m.hp = 0; killMob(m); } }, die: () => { if (!pl.dead) die(); },
-    countItem, removeItem, addItem, log, solid: (a: string, x: number, y: number) => solidT(AREAS[a], x, y),''')
+    gainXp: (n: number) => gainXp(n), countItem, removeItem, addItem, log, solid: (a: string, x: number, y: number) => solidT(AREAS[a], x, y),''')
 ed('  if (NET) NET.api = { recv: netRecv, clearKeys: onBlur, log };', '''  const withCtx = (g: CanvasRenderingContext2D, fn: () => void): void => { const o = ctx; ctx = g; try { fn(); } finally { ctx = o; } };
   if (NET) NET.api = { recv: netRecv, clearKeys: onBlur, log,
-    P: (): any => P, stats: statsAll, items: ITEMS, mon: MON, sk: SK, cls: CLS, zones: PVPZ, pvpAt, others: (): any => others, gearIds: GEAR,
+    P: (): any => P, stats: statsAll, items: ITEMS, mon: MON, sk: SK, cls: CLS, zones: PVPZ, pvpAt, others: (): any => others, gearIds: GEAR, npcs: NPCS,
     drawMob: (g: CanvasRenderingContext2D, k: string): void => { if (MON[k]) withCtx(g, () => drawMob({ k, d: MON[k], x: 0, y: 0, fx: 0, fy: 0, mt: 1, hit: 0, anim: 0, dir: 0, hp: MON[k].hp, cd: 0, frz: 0 })); },
     drawChar: (g: CanvasRenderingContext2D, cls: string, w: string, a: string, dir: number): void => { const c = CLS[cls] || CLS.war; withCtx(g, () => drawHuman(0, 0, dir || 0, 0, c.look, w && ITEMS[w] ? ITEMS[w].c : null, a && a !== "shirt" && ITEMS[a] ? ITEMS[a].c : null, false, 0, c.wk)); },
     drawIcon: (g: CanvasRenderingContext2D, id: string, x: number, y: number, sz: number): void => { if (ITEMS[id]) withCtx(g, () => drawIcon(id, x, y, sz)); },

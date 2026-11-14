@@ -10,6 +10,9 @@ const characters = require('./characters');
 const { World } = require('./game');
 const news = require('./news');
 const mail = require('./mail');
+const { ranking } = require('./ranking');
+const db = require('./db');
+const qTop = db.prepare('SELECT nick, cls, lvl FROM characters ORDER BY lvl DESC, updated ASC LIMIT 20');
 
 const app = express();
 const world = new World();
@@ -35,6 +38,8 @@ api.use('/', auth.router());
 api.use('/characters', characters.router((id) => world.isOnline(id)));
 api.get('/stats', (req, res) => { res.setHeader('Cache-Control', 'no-store'); res.json({ online: world.online() }); });
 api.get('/news', (req, res) => res.json(news));
+let rkCache = null, rkAt = 0;
+api.get('/ranking', (req, res) => { if (!rkCache || Date.now() - rkAt > 10000) { rkCache = ranking(qTop.all()); rkAt = Date.now(); } res.setHeader('Cache-Control', 'no-store'); res.json(rkCache); });
 api.use((req, res) => res.status(404).json({ error: 'Nie znaleziono.' }));
 app.use('/api', api);
 

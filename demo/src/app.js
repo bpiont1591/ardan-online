@@ -44,13 +44,7 @@
   const START_WEAPON = { war: 'club', arc: 'sbow', mag: 'wand' };
   const AREA_NAMES = { village: 'Osada Brzozowa', forest: 'Mroczny Bór', cave: 'Jaskinia Cieni', swamp: 'Bagna Żałoby', town: 'Srebrnogród', mount: 'Szczyty Szronu', desert: 'Ruiny Piasków' };
   const newState = (cls) => ({ v: 2, cls, lvl: 1, xp: 0, hp: 9999, mp: 9999, gold: 150, area: 'village', x: 18, y: 17, inv: [{ id: 'pot', n: 3 }], eq: { w: START_WEAPON[cls], a: 'shirt' }, q: {}, kills: 0, intro: false, track: '', seen: { village: 1 }, mmz: 1 });
-  const NEWS = [
-    { date: '2026-11-14', title: 'ARDAN wchodzi w świat wieloosobowy!', text: 'Od dziś wędrujesz po Ardanie razem z innymi graczami. Wspólne potwory, wspólne krainy i czat – globalny, regionalny oraz prywatne szepty (/w nick).' },
-    { date: '2026-11-14', title: 'Drużyny', text: 'Zaproś znajomych do drużyny (/zapros nick) – do 5 osób, wspólne doświadczenie i postęp zadań, własny czat drużyny.' },
-    { date: '2026-11-13', title: 'Trzy klasy postaci', text: 'Wojownik, Łucznik i Mag – każda klasa ma własny styl walki, trzy umiejętności i sprzęt. Wybierz mądrze przy tworzeniu bohatera.' },
-    { date: '2026-11-13', title: 'Nowe krainy: Bagna, Srebrnogród, Szczyty i Ruiny', text: 'Mapa świata powiększyła się o cztery krainy z nowymi bossami: Wiedźmą Moczarów, Szronogrzbietem i Setharem, Królem Cieni.' },
-    { date: '2026-11-12', title: 'Wkrótce: handel, gildie i PvP', text: 'Pracujemy nad handlem między graczami, domem aukcyjnym, gildiami i strefami PvP.' },
-  ];
+  const NEWS = window.DEMO_NEWS || [];
   const ok = (data) => ({ ok: true, status: 200, data });
   const bad = (status, error, field) => ({ ok: false, status, data: { error, field } });
   const pwProblem = (p, login) => (A.strength(p, login).s < 2 ? 'Hasło jest za słabe: min. 8 znaków i 3 rodzaje znaków, nie może zawierać loginu.' : null);
@@ -61,6 +55,7 @@
       case '/me': return ok({ user: me ? { login: me.login, email: me.email } : null });
       case '/stats': return ok({ online: BOT_DEFS.length + 1 });
       case '/news': return ok(NEWS);
+      case '/ranking': { const lv = d.chars.map((c) => ({ nick: c.nick, cls: c.cls, lvl: (c.data && c.data.lvl) || c.lvl || 1 })).concat(BOT_DEFS.map((x) => ({ nick: x.nick, cls: x.cls, lvl: x.lvl }))); return ok(window.DEMO_REQUIRE('./ranking').ranking(lv)); }
       case '/register': {
         const login = String(b.login || '').trim(), email = String(b.email || '').trim().toLowerCase();
         if (!LOGIN_RE.test(login)) return bad(400, 'Login: 3–20 znaków, tylko litery bez polskich znaków, cyfry i podkreślnik.', 'login');
@@ -157,7 +152,7 @@
     h.className = 'nav';
     h.innerHTML = `<div class="wrap"><a class="brand" href="#/">${EMBLEM}ARDAN</a>
       <button class="menu-btn" type="button" aria-label="Menu">Menu</button>
-      <nav class="links">${L('swiat', 'Świat')}${L('klasy', 'Klasy')}${L('krainy', 'Krainy')}${L('galeria', 'Galeria')}${L('nowosci', 'Nowości')}
+      <nav class="links">${L('swiat', 'Świat')}${L('klasy', 'Klasy')}${L('krainy', 'Krainy')}${L('galeria', 'Galeria')}${L('ranking', 'Ranking')}${L('nowosci', 'Nowości')}
       <span class="online-pill"><i></i><span data-online>…</span> online</span>
       ${user ? `<a href="#/postacie">Moje postacie</a><a href="#/" data-logout>Wyloguj (${A.esc(user.login)})</a><a class="btn primary small" href="#/postacie">Graj teraz</a>`
         : `<a href="#/logowanie">Zaloguj się</a><a class="btn primary small" href="#/rejestracja">Załóż konto</a>`}</nav></div>`;
@@ -177,6 +172,22 @@
   async function online() { const r = await A.api('/stats'); document.querySelectorAll('[data-online]').forEach((el) => { el.textContent = r.ok ? String(r.data.online) : '–'; }); }
 
   // ---------- pages ----------
+  // ranking graczy
+  function rankHtml(R, tab, esc) {
+    const CN = { war: 'Wojownik', arc: 'Łucznik', mag: 'Mag' };
+    const rows = (R && R[tab]) || [];
+    if (!rows.length) return '<p class="muted">Ranking jest jeszcze pusty – zagraj i zostań pierwszy!</p>';
+    const head = tab === 'level' ? '<th class="num">Poziom</th>' : tab === 'pvp' ? '<th class="num">Elo</th><th class="num hide-s">W / P</th>' : '<th class="num">Osiągnięcia</th><th class="num hide-s">Poziom</th>';
+    const cell = (r) => tab === 'level' ? `<td class="num">${r.lvl}</td>` : tab === 'pvp' ? `<td class="num"><b>${r.pts}</b></td><td class="num hide-s">${r.w} / ${r.l}</td>` : `<td class="num"><b>${r.a}</b><small>/${R.total || 23}</small></td><td class="num hide-s">${r.lvl}</td>`;
+    return `<table><thead><tr><th>#</th><th>Gracz</th><th class="hide-s">Klasa</th>${head}</tr></thead><tbody>${rows.map((r, i) => `<tr><td class="pos">${i + 1}</td><td class="n">${esc(r.n)}<br class="hide-l"><small class="cls-s">${esc(CN[r.cls] || '')}</small></td><td class="hide-s">${esc(CN[r.cls] || '')}</td>${cell(r)}</tr>`).join('')}</tbody></table>`;
+  }
+  function initRanking(R, esc) {
+    const box = document.getElementById('rank'); if (!box) return;
+    let tab = 'level';
+    const draw = () => { document.getElementById('rankBody').innerHTML = rankHtml(R, tab, esc); box.querySelectorAll('[data-rk]').forEach((b) => b.classList.toggle('on', b.dataset.rk === tab)); };
+    box.addEventListener('click', (e) => { const b = e.target.closest('[data-rk]'); if (!b) return; tab = b.dataset.rk; draw(); });
+    draw();
+  }
   const INIT = {};
   INIT.home = function (q, u) {
     document.querySelectorAll('[data-emblem]').forEach((e) => { e.innerHTML = A.emblem; });
@@ -201,6 +212,7 @@
     const lb = document.getElementById('lb');
     g.addEventListener('click', (e) => { const a = e.target.closest('a'); if (!a) return; e.preventDefault(); e.stopPropagation(); const x = GAL[+a.dataset.i]; lb.querySelector('img').src = IMG[x[0]]; lb.querySelector('p').textContent = x[1]; lb.classList.add('open'); });
     lb.addEventListener('click', (e) => { if (e.target.tagName !== 'IMG') lb.classList.remove('open'); });
+    A.api('/ranking').then((r) => initRanking(r.ok ? r.data : null, A.esc));
     A.api('/news').then((r) => {
       const fmt = (d) => new Date(d + 'T12:00:00').toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' });
       const el = document.getElementById('news'); if (el) el.innerHTML = r.data.map((n) => `<article class="card"><time datetime="${A.esc(n.date)}">${fmt(n.date)}</time><div><h3>${A.esc(n.title)}</h3><p class="muted" style="margin:0">${A.esc(n.text)}</p></div></article>`).join('');
@@ -379,6 +391,9 @@
         recv(msg) {
         if (msg.t === 'tr' && msg.open && msg.them && msg.them.ok && !msg.me.ok) setTimeout(() => { if (p.trade) world.trade.onMsg(p, { t: 'tr', a: 'ok' }); }, 900);
         if (msg.t === 'chat' && msg.ch === 'w' && msg.to === p.nick && msg.from !== p.nick) setTimeout(() => say(p, 'g', `/w ${msg.from} ${WHISPER_REPLIES[Math.floor(Math.random() * WHISPER_REPLIES.length)]}`), 1800 + Math.random() * 1500);
+        if (msg.t === 'chat' && msg.ch === 's' && /zaprasza cię do drużyny/.test(msg.text)) setTimeout(() => { if (world.players.get(p.pid) === p && !p.partyId) say(p, 'g', '/akceptuj'); }, 1300);
+        if (msg.t === 'dg' && msg.in && !p.bot.inDg) { p.bot.inDg = true; setTimeout(() => say(p, 'p', `Wchodzę z tobą do lochu „${msg.n}”! Wybierz grupę, ja strzelam z tyłu 🏹`), 1200); }
+        if (msg.t === 'dg' && msg.in === false) p.bot.inDg = false;
         if (msg.t === 'party') {
           const inP = msg.m.length > 1;
           if (inP && !p.bot.party) setTimeout(() => say(p, 'p', 'Super, że jesteś! Trzymam się blisko, idziemy razem :)'), 1500);
@@ -393,6 +408,7 @@
     function seedBot(p, i) {
       if (i === 3 || i === 4) { const P = p.api.P(); const x = i === 3 ? 17 : 21; if (!p.api.solid('village', x, 22)) { P.x = x; P.y = 22; } }
       const rk = store.get('pvp', {});
+      const ac = store.get('achc', {}); if (!ac[p.ckey]) { ac[p.ckey] = { n: p.nick, cls: BOT_DEFS[i].cls, lvl: BOT_DEFS[i].lvl, a: [9, 6, 11, 4, 3][i] }; store.set('achc', ac); }
       if (!rk[p.ckey]) { const [pts, w, l] = SEED_PVP[i]; rk[p.ckey] = { n: p.nick, cls: BOT_DEFS[i].cls, lvl: BOT_DEFS[i].lvl, pts, w, l }; store.set('pvp', rk); }
       if (i === 0 || i === 2) {
         const gd = world.guilds.data(); let g = Object.values(gd.g).find((x) => x.tag === 'SM');
@@ -423,7 +439,9 @@
         if (t > nextLine && bots.length) { nextLine = t + 14 + Math.random() * 16; const [ch, text] = BOT_LINES[lineIdx++ % BOT_LINES.length]; say(bots[Math.floor(Math.random() * bots.length)], ch, text); }
         for (const b of bots) {
           if (world.players.get(b.pid) !== b) continue;
+          if (b.dg && (!player || !player.dg)) { world.onMessage(b, JSON.stringify({ t: 'dg', a: 'leave' })); continue; }
           const B = b.bot, P = b.api.P();
+          if (B.party && player && !b.battle && !b.dg && !player.dg) { const Q = player.api.P(); if (Q.area !== P.area) { for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (!b.api.solid(Q.area, Math.round(Q.x) + dx, Math.round(Q.y) + dy)) { P.area = Q.area; P.x = Math.round(Q.x) + dx; P.y = Math.round(Q.y) + dy; break; } } }
           B.t -= dt; if (B.t > 0) continue;
           let tx = null, ty = null;
           if (B.party && player) { const Q = player.api.P(); if (Q.area === P.area && Math.max(Math.abs(Q.x - P.x), Math.abs(Q.y - P.y)) > 2) { tx = Q.x; ty = Q.y; } }

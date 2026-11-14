@@ -1847,7 +1847,7 @@ function createArdan(canvas: HTMLCanvasElement, opts: any): () => void {
         let e = others[o.i];
         if (!e) { e = others[o.i] = { x: o.x, y: o.y, fx: o.x, fy: o.y, mt: 1, phase: 0, an: 0, hit: 0, area: msg.a }; }
         netPos(e, e, o.x, o.y);
-        e.i = o.i; e.n = o.n; e.c = o.c; e.l = o.l; e.dir = o.d; e.hp = o.hp; e.mh = o.mh; e.w = o.w; e.a = o.a; e.dead = o.dd; e.area = msg.a; e.bd = o.bd; e.gt = o.gt; e.fb = o.fb; e.i = o.i;
+        e.i = o.i; e.n = o.n; e.c = o.c; e.l = o.l; e.dir = o.d; e.hp = o.hp; e.mh = o.mh; e.w = o.w; e.a = o.a; e.dead = o.dd; e.area = msg.a; e.bd = o.bd; e.gt = o.gt; e.fb = o.fb; e.i = o.i; e.ti = o.ti; e.dg = o.dg;
         if (o.an > e.an + 0.05) e.an = o.an;
         if (o.ht > e.hit + 0.05) e.hit = o.ht;
       }
@@ -1914,7 +1914,8 @@ function createArdan(canvas: HTMLCanvasElement, opts: any): () => void {
     drawHuman(op[0], op[1], o.dir || 0, o.mt < 1 ? o.phase : 0, c.look, w, ar, o.hit > 0, o.an, c.wk);
     const inParty = !!(NET && NET.party && NET.party[o.i]);
     const inZ = !!pvpAt(P.area, o.x, o.y) && !!pvpAt(P.area, P.x, P.y);
-    if (o.fb) label(op[0] + 16, op[1] - 22, "⚔ walczy", "#ffb347");
+    if (o.ti) label(op[0] + 16, op[1] - 21, "«" + o.ti + "»", "#e8c96a");
+    if (o.fb || o.dg) label(op[0] + 16, op[1] - (o.ti ? 34 : 21), o.dg ? "🕳 w lochu" : "⚔ walczy", "#ffb347");
     label(op[0] + 16, op[1] - 8, (inParty ? "◆ " : "") + (o.gt ? "[" + o.gt + "] " : "") + o.n + " · " + o.l, inParty ? "#8fff8f" : inZ ? "#ff9a8a" : "#9fe0ff");
     const hpk = o.mh ? clamp(o.hp / o.mh, 0, 1) : 1;
     ctx.fillStyle = "rgba(0,0,0,0.6)"; ctx.fillRect(op[0] + 4, op[1] - 4, 24, 4); ctx.fillStyle = "#5fd35a"; ctx.fillRect(op[0] + 4, op[1] - 4, 24 * hpk, 4);
@@ -2352,6 +2353,7 @@ function createArdan(canvas: HTMLCanvasElement, opts: any): () => void {
     const ents: any[] = [];
     for (const k of Object.keys(NPCS)) if (NPCS[k].area === P.area) ents.push({ y: NPCS[k].y * TS, f: () => drawNpc(k) });
     for (const d of DECOR) if (d.area === P.area) ents.push({ y: d.y * TS, f: () => drawDecor(d) });
+    if (NET && NET.objs && NET.drawObj) for (const o of NET.objs) if (o.a === P.area) ents.push({ y: o.y * TS - 1, f: () => { try { NET.drawObj(ctx, o, o.x * TS, o.y * TS, TS, performance.now() / 1000); } catch (e) { /* ignore */ } } });
     for (const m of mobs[P.area]) if (!m.dead) ents.push({ y: rpos(m)[1], f: () => { drawMob(m); if (m.inB) { const mp = rpos(m); label(mp[0] + 16, mp[1] - 12 - (m.d.sc ? (m.d.sc - 1) * 26 : 0), "⚔ walka", "#ffb347"); } } });
     if (NET) for (const k of Object.keys(others)) { const o = others[k]; if (o.area !== P.area || o.dead) continue; const op = rpos(o); ents.push({ y: op[1] + 0.4, f: () => drawOther(o, op) }); }
     if (!pl.dead && P.cls) ents.push({ y: pp[1] + 0.5, f: () => {
@@ -2359,6 +2361,7 @@ function createArdan(canvas: HTMLCanvasElement, opts: any): () => void {
       if (pl.haste > 0 && R() < 0.3) fx.push({ k: "p", x: pp[0] + 6 + R() * 20, y: pp[1] + 10 + R() * 16, vx: 0, vy: -30, c: "#9dff9a", life: 0.4, max: 0.8 });
       drawPlayerAt(pp[0], pp[1], pl.dir, pl.mt < 1 ? pl.phase : 0, pl.hit > 0, pl.anim);
       if (NET && NET.nick) label(pp[0] + 16, pp[1] - 8, (NET.gtag ? "[" + NET.gtag + "] " : "") + NET.nick + " · " + P.lvl, "#ffe9a8");
+      if (NET && NET.title) label(pp[0] + 16, pp[1] - 21, "«" + NET.title + "»", "#e8c96a");
     } });
     ents.sort((p: any, q: any) => p.y - q.y);
     for (const e of ents) e.f();
@@ -3064,6 +3067,10 @@ function createArdan(canvas: HTMLCanvasElement, opts: any): () => void {
     if (pl.dead || trans) return;
     const w = worldAt(p[0], p[1]);
     const tx = Math.floor(w[0] / TS), ty = Math.floor(w[1] / TS);
+    if (NET && NET.objs && NET.onObjTap) for (const o of NET.objs) {
+      if (o.a !== P.area) continue; const tx = Math.floor(w[0] / TS), ty = Math.floor(w[1] / TS);
+      if (tx === o.x && (ty === o.y || (o.k === "gate" && ty === o.y - 1))) { NET.onObjTap(o); return; }
+    }
     if (NET && NET.onPlayerTap) for (const k of Object.keys(others)) {
       const o = others[k]; if (o.area !== P.area || o.dead) continue; const op = rpos(o);
       if (Math.abs(op[0] + 16 - w[0]) < 15 && Math.abs(op[1] + 14 - w[1]) < 19) { NET.onPlayerTap(o); return; }
@@ -3159,7 +3166,7 @@ function createArdan(canvas: HTMLCanvasElement, opts: any): () => void {
     tick: srvTick, pl, P: (): any => P, maxHp, maxMp,
     stats: statsAll, items: ITEMS, mon: MON, gearIds: GEAR, sk: SK, cls: CLS, zones: PVPZ, pvpAt, npcs: NPCS, areas: AREAS,
     kill: (m: any) => { if (m && !m.dead) { m.hp = 0; killMob(m); } }, die: () => { if (!pl.dead) die(); },
-    countItem, removeItem, addItem, log, solid: (a: string, x: number, y: number) => solidT(AREAS[a], x, y),
+    gainXp: (n: number) => gainXp(n), countItem, removeItem, addItem, log, solid: (a: string, x: number, y: number) => solidT(AREAS[a], x, y),
     drain: (): any => ({ fx: fx.splice(0, fx.length), msgs: msgs.splice(0, msgs.length) }),
     shots: (): any[] => shots, warns: (): any[] => warns, bags: (): any[] => bags,
     dlgView: (): any => dlg ? { name: dlg.name, text: dlg.text, opts: dlg.opts.map((o: any) => o.l) } : null,
@@ -3176,7 +3183,7 @@ function createArdan(canvas: HTMLCanvasElement, opts: any): () => void {
   };
   const withCtx = (g: CanvasRenderingContext2D, fn: () => void): void => { const o = ctx; ctx = g; try { fn(); } finally { ctx = o; } };
   if (NET) NET.api = { recv: netRecv, clearKeys: onBlur, log,
-    P: (): any => P, stats: statsAll, items: ITEMS, mon: MON, sk: SK, cls: CLS, zones: PVPZ, pvpAt, others: (): any => others, gearIds: GEAR,
+    P: (): any => P, stats: statsAll, items: ITEMS, mon: MON, sk: SK, cls: CLS, zones: PVPZ, pvpAt, others: (): any => others, gearIds: GEAR, npcs: NPCS,
     drawMob: (g: CanvasRenderingContext2D, k: string): void => { if (MON[k]) withCtx(g, () => drawMob({ k, d: MON[k], x: 0, y: 0, fx: 0, fy: 0, mt: 1, hit: 0, anim: 0, dir: 0, hp: MON[k].hp, cd: 0, frz: 0 })); },
     drawChar: (g: CanvasRenderingContext2D, cls: string, w: string, a: string, dir: number): void => { const c = CLS[cls] || CLS.war; withCtx(g, () => drawHuman(0, 0, dir || 0, 0, c.look, w && ITEMS[w] ? ITEMS[w].c : null, a && a !== "shirt" && ITEMS[a] ? ITEMS[a].c : null, false, 0, c.wk)); },
     drawIcon: (g: CanvasRenderingContext2D, id: string, x: number, y: number, sz: number): void => { if (ITEMS[id]) withCtx(g, () => drawIcon(id, x, y, sz)); },

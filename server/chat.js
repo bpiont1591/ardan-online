@@ -9,7 +9,7 @@ const filter = (s) => BAD.reduce((t, re) => t.replace(re, (m) => m[0] + '*'.repe
 function createChat(world) {
   const sys = (p, text) => world.send(p, { t: 'chat', ch: 's', text: esc(text), ts: Date.now() });
   const commands = {
-    pomoc: (p) => sys(p, 'Komendy: /w nick wiadomość – prywatna, /r wiadomość – odpowiedz, /gracze – kto jest w tej krainie, /online – liczba graczy. Drużyna: /zapros nick, /akceptuj, /odrzuc, /opusc, /wyrzuc nick, /druzyna, /p wiadomość. Gildia: /gi wiadomość, /gzapros nick. Skróty: I – ekwipunek, R – rynek, U – gildia, P – PvP.'),
+    pomoc: (p) => sys(p, 'Komendy: /w nick wiadomość – prywatna, /r wiadomość – odpowiedz, /gracze – kto jest w tej krainie, /online – liczba graczy. Drużyna: /zapros nick, /akceptuj, /odrzuc, /opusc, /wyrzuc nick, /druzyna, /p wiadomość. Gildia: /gi wiadomość, /gzapros nick. Skróty: I – ekwipunek, R – rynek, U – gildia, P – PvP, J – zadania dzienne, O – osiągnięcia, E – rozmowa / zbieranie / kuźnia / wejście do lochu.'),
     gracze: (p) => { const list = world.inArea(p.area).map((o) => o.nick); sys(p, `W tej krainie (${list.length}): ${list.join(', ')}`); },
     online: (p) => sys(p, `Graczy online: ${world.players.size}.`),
     w: (p, rest) => {

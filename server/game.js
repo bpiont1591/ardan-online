@@ -11,6 +11,11 @@ const { createBattles } = require('./battle');
 const { createMarket } = require('./market');
 const { createTrade } = require('./trade');
 const { createGuilds } = require('./guild');
+const { createGather } = require('./gather');
+const { createDungeons } = require('./dungeon');
+const { createCraft } = require('./craft');
+const { createDaily } = require('./daily');
+const { createAch } = require('./ach');
 const cfg = require('./config');
 
 const stub = new Proxy(function () {}, { get: (t, k) => (k === 'canvas' ? {} : stub), apply: () => stub, set: () => true });
@@ -31,6 +36,26 @@ function sanitizeAct(a) {
   return o;
 }
 
+// Test-only hooks (enabled only by ARDAN_TEST_HOOKS=1 outside production) used by the automated e2e test.
+const TEST_HOOKS = typeof process !== 'undefined' && process.env && process.env.ARDAN_TEST_HOOKS === '1' && process.env.NODE_ENV !== 'production';
+function testHook(world, p, m) {
+  const P = p.api.P();
+  if (Number.isInteger(m.lvl)) { P.lvl = Math.max(1, Math.min(30, m.lvl)); P.xp = 0; }
+  if (Number.isInteger(m.gold)) P.gold = m.gold;
+  if (m.mats) world.gear.give(p, Object.keys(m.mats).map((k) => require('./items').mat(k, m.mats[k])));
+  if (m.tp) { P.area = m.tp.area; P.x = m.tp.x; P.y = m.tp.y; }
+  if (m.near) { // stand on a free tile next to a gathering node / gate / NPC
+    const area = m.near.area || P.area; let t = null;
+    if (m.near.npc) { const n = p.api.npcs[m.near.npc]; if (n) t = { a: n.area, x: n.x, y: n.y }; }
+    else { const o = (world.gather.objs[area] || []).find((x) => x.k === m.near.k && !x.rt); if (o) t = { a: area, x: o.x, y: o.y }; }
+    if (t) for (const [dx, dy] of [[0, 1], [1, 0], [-1, 0], [0, -1], [1, 1], [-1, 1]]) if (!p.api.solid(t.a, t.x + dx, t.y + dy)) { P.area = t.a; P.x = t.x + dx; P.y = t.y + dy; break; }
+  }
+  if (Array.isArray(m.items)) for (const [id, n] of m.items) p.api.addItem(id, n);
+  if (m.heal) { P.hp = p.api.maxHp(); P.mp = 9999; }
+  if (m.dqdone && P.daily) { const q = P.daily.q[0]; q.have = q.need; q.done = true; p.dqDirty = true; }
+  p.srv.dirty = true; world.gear.changed(p);
+}
+
 class World {
   constructor() {
     this.mobs = {};             // shared monsters: area -> [mob]
@@ -44,6 +69,11 @@ class World {
     this.market = this.use(createMarket(this));
     this.trade = this.use(createTrade(this));
     this.guilds = this.use(createGuilds(this));
+    this.gather = this.use(createGather(this));
+    this.dungeons = this.use(createDungeons(this));
+    this.craft = this.use(createCraft(this));
+    this.daily = this.use(createDaily(this));
+    this.ach = this.use(createAch(this));
     this.lastSave = Date.now();
     this.timer = null;
   }
@@ -96,11 +126,15 @@ class World {
     if (data.length > 4096) return;
     let msg; try { msg = JSON.parse(data); } catch (e) { return; }
     if (!msg || typeof msg !== 'object') return;
+    if (msg.t === '__test') { if (TEST_HOOKS) testHook(this, p, msg); return; }
     if (msg.t === 'in') {
-      p.mx = p.battle ? 0 : dir1(msg.mx); p.my = p.battle ? 0 : dir1(msg.my);
+      const frozen = !!(p.battle || p.dg);
+      p.mx = frozen ? 0 : dir1(msg.mx); p.my = frozen ? 0 : dir1(msg.my);
       if (Array.isArray(msg.acts)) for (const a of msg.acts.slice(0, 8)) {
         const s = sanitizeAct(a);
         if (!s || p.actBudget-- <= 0) continue;
+        if (p.dg) continue;
+        if (s.a === 'talk' && !p.battle && (this.craft.interceptTalk(p) || this.gather.useNear(p))) continue;
         if (this.battle.intercept(p, s)) continue;
         if (p.acts.length < 12) p.acts.push(s);
       }
@@ -140,7 +174,7 @@ class World {
 
   tick(dt) {
     for (const p of this.players.values()) {
-      try { if (p.battle) { p.acts.length = 0; p.api.tick(dt, { mx: 0, my: 0, acts: [] }); } else p.api.tick(dt, { mx: p.mx, my: p.my, acts: p.acts.splice(0, 6) }); }
+      try { if (p.battle || p.dg) { p.acts.length = 0; p.api.tick(dt, { mx: 0, my: 0, acts: [] }); } else p.api.tick(dt, { mx: p.mx, my: p.my, acts: p.acts.splice(0, 6) }); }
       catch (e) { console.error('[ARDAN] player tick', p.nick, e); }
     }
     this.mobOwnership(dt);
@@ -167,7 +201,7 @@ class World {
       const mp = ml.map((m) => [m.x, m.y, Math.max(0, Math.round(m.hp)), (m.dead ? 1 : 0) | (m.aggro ? 2 : 0) | (m.frz > 0 ? 4 : 0) | (m.hit > 0 ? 8 : 0) | (m.anim > 0 ? 16 : 0) | (m.inB ? 32 : 0), m.dir | 0]);
       const plist = groups[a].map((p) => {
         const P = p.api.P(), pl = p.api.pl;
-        return { i: p.pid, n: p.nick, c: P.cls, l: P.lvl, x: P.x, y: P.y, d: pl.dir | 0, hp: Math.max(0, Math.round(P.hp)), mh: p.api.maxHp(), w: P.eq.w, a: P.eq.a, an: r2(pl.anim), ht: r2(pl.hit), dd: pl.dead > 0 ? 1 : 0, bd: pl.buffDef > 0 ? 1 : 0, gt: p.guildTag || undefined, fb: p.battle ? 1 : undefined };
+        return { i: p.pid, n: p.nick, c: P.cls, l: P.lvl, x: P.x, y: P.y, d: pl.dir | 0, hp: Math.max(0, Math.round(P.hp)), mh: p.api.maxHp(), w: P.eq.w, a: P.eq.a, an: r2(pl.anim), ht: r2(pl.hit), dd: pl.dead > 0 ? 1 : 0, bd: pl.buffDef > 0 ? 1 : 0, gt: p.guildTag || undefined, fb: p.battle ? 1 : undefined, dg: p.dg ? 1 : undefined, ti: p.title || undefined };
       });
       for (const p of groups[a]) {
         const P = p.api.P(), pl = p.api.pl;

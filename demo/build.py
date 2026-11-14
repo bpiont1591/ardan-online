@@ -28,7 +28,7 @@ site_css = '\n'.join(l for l in site_css.splitlines() if not l.startswith('@font
 game_css = '\n'.join(l for l in rd(os.path.join(PUB, 'css/game.css')).splitlines() if not l.startswith('@font-face'))
 demo_css = """
 #demoBadge{position:fixed;left:8px;bottom:8px;z-index:9999;pointer-events:none;font:700 10px/1 Inter,system-ui,sans-serif;letter-spacing:.14em;color:#ffd84a;background:rgba(12,9,16,.72);border:1px solid rgba(255,216,74,.35);border-radius:999px;padding:5px 9px;opacity:.85}
-body.game-mode #demoBadge{left:50%;bottom:auto;top:4px;transform:translateX(-50%);font-size:9px;padding:3px 8px;opacity:.7}
+body.game-mode #demoBadge{left:auto;right:0;bottom:auto;top:50%;transform:translateY(-50%);writing-mode:vertical-rl;text-orientation:mixed;font-size:8px;letter-spacing:.18em;padding:8px 3px;border-radius:8px 0 0 8px;border-right:0;opacity:.6}
 .demo-mail{margin-top:16px;padding:16px 18px;border-radius:12px;border:1px dashed rgba(255,216,74,.6);background:rgba(255,216,74,.07)}
 .demo-mail p{margin:8px 0 12px;color:#cfc4ad;font-size:.95rem}
 """
@@ -69,17 +69,21 @@ client = "window.DEMO_GAME_CLIENT = function () {\n" + client + "\n};"
 
 engine = rd(os.path.join(PUB, 'js/engine.js'))
 gameui = rd(os.path.join(PUB, 'js/game-ui.js'))
+gameui += '\n' + rd(os.path.join(PUB, 'js/game-ui2.js'))
+import subprocess
+NEWS_JSON = subprocess.check_output(['node', '-e', "process.stdout.write(JSON.stringify(require(process.argv[1])))", os.path.join(SRV, 'news.js')]).decode()
 mods = {}
-for m in ['chat', 'party', 'items', 'gear', 'battle', 'market', 'trade', 'guild', 'game']:
+for m in ['chat', 'party', 'items', 'gear', 'battle', 'market', 'trade', 'guild', 'gather', 'dungeon', 'craft', 'daily', 'ach', 'ranking', 'game']:
     mods[m] = rd(os.path.join(SRV, m + '.js'))
 require_js = """(function(){
 const defs = {}, cache = {};
 %s
 const builtins = { './engine': () => ({ createArdan: window.createArdan }), './characters': () => window.DEMO.charsMock, './config': () => ({ tickMs: 50 }), './store': () => STORE };
 const STORE = (function () { const P = 'ardan_demo_kv_', cache = {}; return { get(k, def) { if (!(k in cache)) { let v = def; try { const r = localStorage.getItem(P + k); if (r) v = JSON.parse(r); } catch (e) {} cache[k] = v; } return cache[k]; }, set(k, v) { cache[k] = v; try { localStorage.setItem(P + k, JSON.stringify(v)); } catch (e) {} } }; })();
-function req(n) { if (cache[n]) return cache[n].exports; if (builtins[n]) return builtins[n](); const module = cache[n] = { exports: {} }; defs[n](module, module.exports, req); return module.exports; }
+function req(n) { if (cache[n]) return cache[n].exports; if (builtins[n]) return builtins[n](); const module = cache[n] = { exports: {} }; defs[n](module, module.exports, req, PROC); return module.exports; }
+const PROC = { env: { ARDAN_TEST_HOOKS: '1', NODE_ENV: 'demo' } };
 window.DEMO_REQUIRE = req;
-})();""" % '\n'.join("defs['./%s'] = function (module, exports, require) {\n%s\n};" % (k, v) for k, v in mods.items())
+})();""" % '\n'.join("defs['./%s'] = function (module, exports, require, process) {\n%s\n};" % (k, v) for k, v in mods.items())
 
 app = rd(os.path.join(HERE, 'src/app.js'))
 safe = lambda s: s.replace('</script', '<\\/script')
@@ -103,6 +107,7 @@ html = f"""<!doctype html>
 <footer id="foot"></footer>
 <script>
 window.DEMO_IMG = {json.dumps(IMG)};
+window.DEMO_NEWS = {safe(NEWS_JSON)};
 window.DEMO_PAGES = {safe(json.dumps(PAGES, ensure_ascii=False))};
 window.DEMO_GAME_HTML = {safe(json.dumps(game_html, ensure_ascii=False))};
 </script>

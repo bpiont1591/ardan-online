@@ -11,7 +11,7 @@ function createMarket(world) {
   const mail = () => store.get('mail', {});
   const save = (d) => store.set('market', d);
   function pay(key, nick, amount, what) {
-    for (const q of world.players.values()) if (q.ckey === key) { q.api.P().gold += amount; q.srv.dirty = true; if (!q.bot) sys(q, `Rynek: ${what} kupił(a) ${nick}. Otrzymujesz ${amount} zł.`); return; }
+    for (const q of world.players.values()) if (q.ckey === key) { q.api.P().gold += amount; q.srv.dirty = true; world.emit('onEvent', q, 'sold', {}); if (!q.bot) sys(q, `Rynek: ${what} kupił(a) ${nick}. Otrzymujesz ${amount} zł.`); return; }
     const m = mail(); m[key] = m[key] || { gold: 0, n: 0 }; m[key].gold += amount; m[key].n++; store.set('mail', m);
   }
   function list(p, it, price) {
@@ -19,6 +19,7 @@ function createMarket(world) {
     if (d.list.filter((x) => x.s === p.ckey).length >= MAX_OWN) { sys(p, `Możesz mieć najwyżej ${MAX_OWN} ofert na rynku.`); return null; }
     const L = { id: d.next++, s: p.ckey, sn: p.nick, it, pr: price, t: Date.now() };
     d.list.push(L); save(d);
+    world.emit('onEvent', p, 'list', { it });
     return L;
   }
   function browse(p, f) {

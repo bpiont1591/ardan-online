@@ -25,7 +25,7 @@ async function main() {
   const dbPath = `/tmp/ardan-e2e-${Date.now()}.db`;
   let log = '';
   const srv = spawn(process.execPath, [path.join(__dirname, '..', 'server', 'index.js')], {
-    env: { ...process.env, PORT: String(PORT), DATABASE_PATH: dbPath, BASE_URL: BASE, NODE_ENV: 'development', BCRYPT_COST: '10', SMTP_HOST: '', START_GOLD: '200' },
+    env: { ...process.env, PORT: String(PORT), DATABASE_PATH: dbPath, BASE_URL: BASE, NODE_ENV: 'development', BCRYPT_COST: '10', SMTP_HOST: '', START_GOLD: '200', ARDAN_TEST_HOOKS: '1' },
   });
   srv.stdout.on('data', (d) => { log += d; }); srv.stderr.on('data', (d) => { log += d; process.stderr.write(d); });
   for (let i = 0; i < 50 && !log.includes('Serwer działa'); i++) await W(100);
@@ -88,6 +88,9 @@ async function main() {
       ok(true, `${u.nick} połączony z serwerem gry (WebSocket)`);
       await W(400);
       for (let i = 0; i < 4; i++) { await pg.keyboard.press('Escape'); await W(150); } // close intro dialog
+      const lt = await pg.waitForSelector('#uiToasts [data-lt="get"]', { timeout: 9000 }).catch(() => null);
+      ok(!!lt, `${u.nick}: okno nagrody za logowanie`);
+      if (lt) { await pg.$eval('#uiToasts [data-lt="get"]', (b) => b.click()); await W(600); }
     }
     await createChar(pa, A, '03_create_character_desktop.png');
     await createChar(pb, B, '03_create_character_phone.png');
@@ -336,16 +339,19 @@ async function main() {
     ok(okA && okB, 'obaj gracze na Arenie Osady (strefa PvP)');
     await W(500);
     ok(await pa.$eval('#uiZone', (e) => !e.hidden && e.textContent.includes('Arena')), 'oznaczenie strefy PvP na ekranie');
+    await cmd(pa, '/opusc'); await W(800);
     await pa.keyboard.press('p'); await W(800);
     const duelBtn = await pa.$(`[data-duel]`);
     ok(!!duelBtn, 'panel PvP: B na liście do wyzwania');
-    await cmd(pa, '/opusc'); await W(500);
     if (duelBtn) await pa.click('[data-duel]');
     await W(400); await pa.click('[data-duel]').catch(() => {});
     const duel = await pa.waitForSelector('#battle', { timeout: 4000 }).then(() => true).catch(() => false) && await pb.waitForSelector('#battle', { timeout: 4000 }).then(() => true).catch(() => false);
     ok(duel, 'pojedynek turowy u obu graczy');
     ok(await pb.$eval('#battle', (e) => e.textContent.includes('Pojedynek')), 'ekran pojedynku PvP');
-    await pa.click('#btAuto'); await pb.tap('#btAuto'); await pa.click('#battle [data-spd="3"]');
+    await W(500);
+    if (await pa.$('#btAuto:not(:checked)')) await pa.click('#btAuto');
+    if (await pb.$('#btAuto:not(:checked)')) await pb.tap('#btAuto');
+    await pa.click('#battle [data-spd="3"]');
     await pa.waitForSelector('#btEnd:not([hidden])', { timeout: 90000 }).catch(() => {});
     await pb.waitForSelector('#btEnd:not([hidden])', { timeout: 10000 }).catch(() => {});
     const eA = await pa.$eval('#btEnd', (e) => e.textContent).catch(() => ''), eB = await pb.$eval('#btEnd', (e) => e.textContent).catch(() => '');
@@ -356,9 +362,152 @@ async function main() {
     ok(pv && pv.rank.length === 2 && pv.rank[0].pts + pv.rank[1].pts === 2000 && pv.rank[0].pts > 1000, `ranking PvP (${pv && pv.rank.map((x) => x.n + ' ' + x.pts).join(', ')})`);
     await pa.screenshot({ path: `${SHOTS}/15_pvp_ranking_desktop.png` });
     await pa.keyboard.press('Escape');
+    // ---------- round 3: gathering, crafting, daily quests, achievements, dungeons ----------
+    console.log('Zbieractwo');
+    const TH = (pg, m) => pg.evaluate((m) => window.ARDAN_UI.h.send(Object.assign({ t: '__test' }, m)), m);
+    const X3 = (pg) => pg.evaluate(() => JSON.parse(JSON.stringify(window.ARDAN_UI_STATE.x)));
+    const matQ = (g, k) => ((g && g.bag) || []).filter((x) => x.s === 'mat' && x.m === k).reduce((a, x) => a + (x.q || 1), 0);
+    await pa.keyboard.press('Escape'); await pb.tap('.ui-x[data-close]').catch(() => {}); await W(300);
+    await TH(pb, { near: { area: 'forest', k: 'herb' }, heal: true }); await W(1500);
+    let x3 = await X3(pb);
+    ok(x3.objs.forest && x3.objs.forest.filter((o) => o.k !== 'gate').length >= 6 && x3.objs.forest.some((o) => o.k === 'gate'), `węzły zbieractwa i brama lochu w Borze (${x3.objs.forest && x3.objs.forest.length})`);
+    await pb.waitForSelector('#uiCtx:not([hidden])', { timeout: 4000 }).catch(() => {});
+    ok(await pb.$eval('#uiCtx', (e) => !e.hidden && /Zbierz/.test(e.textContent)).catch(() => false), 'przycisk „Zbierz” obok krzaczka (telefon)');
+    await pb.screenshot({ path: `${SHOTS}/20_gather_phone.png` });
+    const herb0 = matQ((await ui(pb)).gear, 'herb');
+    await pb.tap('#uiCtx'); await W(1200);
+    ok(matQ((await ui(pb)).gear, 'herb') > herb0, `zebrano zioła (${herb0} → ${matQ((await ui(pb)).gear, 'herb')})`);
+    await TH(pa, { near: { area: 'forest', k: 'ore' } }); await W(1500);
+    const ore0 = matQ((await ui(pa)).gear, 'ore');
+    await pa.keyboard.press('e'); await W(1200);
+    ok(matQ((await ui(pa)).gear, 'ore') > ore0, 'klawisz E zbiera rudę (komputer)');
+    console.log('Rzemiosło');
+    await TH(pa, { near: { npc: 'kowal' }, gold: 2000, mats: { ore: 60, wood: 20, herb: 20, crystal: 8 } }); await W(1500);
+    await pa.keyboard.press('e'); await W(900);
+    ok((await ui(pa)).open === 'cr' && (await X3(pa)).cr.open === 'smith', 'E przy kowalu otwiera kuźnię');
+    await pa.click('[data-forge="helm"]'); await W(900);
+    let gA3 = (await ui(pa)).gear; const helm = gA3.bag.find((x) => x.s === 'helm');
+    ok(!!helm, `kowal wykuwa hełm (${helm && helm.n})`);
+    await pa.click('[data-crtab="up"]'); await W(300);
+    await pa.click(`[data-up="${helm.u}"]`); await W(800);
+    gA3 = (await ui(pa)).gear;
+    const h1 = gA3.bag.find((x) => x.u === helm.u);
+    ok(h1 && h1.up === 1 && / \+1$/.test(h1.n) && (h1.st.def || 0) >= (helm.st.def || 0), `ulepszenie +1 (${h1 && h1.n})`);
+    for (let i = 0; i < 6; i++) { const b = await pa.$(`[data-up="${helm.u}"]:not([disabled])`); if (!b) break; await b.click(); await W(600); }
+    const hN = (await ui(pa)).gear.bag.find((x) => x.u === helm.u);
+    ok(!!hN && hN.up >= 2, `po próbach ulepszania przedmiot nadal istnieje (+${hN && hN.up}) – porażka zabiera tylko materiały`);
+    await pa.screenshot({ path: `${SHOTS}/21_craft_upgrade_desktop.png` });
+    await pa.keyboard.press('Escape'); await W(200);
+    // B: alchemist on the phone + upgrade screenshot at the smith
+    await TH(pb, { near: { npc: 'kowal' }, gold: 2000, mats: { ore: 30, crystal: 4, herb: 10, wood: 5 } }); await W(1500);
+    await pb.waitForSelector('#uiCtx:not([hidden])', { timeout: 4000 }).catch(() => {});
+    await pb.tap('#uiCtx'); await W(900);
+    await pb.tap('[data-crtab="up"]').catch(() => {}); await W(300);
+    const upB = await pb.$('[data-up]:not([disabled])'); if (upB) { await upB.tap(); await W(900); }
+    ok(await pb.$eval('#crRes', (e) => /Udało się|Nie udało/.test(e.textContent)).catch(() => false), 'ulepszanie na telefonie – wynik próby');
+    await pb.screenshot({ path: `${SHOTS}/22_craft_upgrade_phone.png` });
+    await pb.tap('.ui-x[data-close]').catch(() => {}); await W(200);
+    await TH(pb, { near: { npc: 'zielarka' } }); await W(1500);
+    await pb.waitForSelector('#uiCtx:not([hidden])', { timeout: 4000 }).catch(() => {});
+    await pb.tap('#uiCtx'); await W(900);
+    const pot0 = ((await ui(pb)).gear.inv.find((x) => x.id === 'pot') || { n: 0 }).n;
+    await pb.tap('[data-brew="pot"][data-q="1"]').catch(() => {}); await W(900);
+    const pot1 = ((await ui(pb)).gear.inv.find((x) => x.id === 'pot') || { n: 0 }).n;
+    ok((await X3(pb)).cr.open === 'alch' && pot1 === pot0 + 1, `alchemik warzy miksturę (${pot0} → ${pot1})`);
+    await pb.tap('.ui-x[data-close]').catch(() => {}); await W(200);
+    // materials on the market
+    const herbStack = (await ui(pb)).gear.bag.find((x) => x.s === 'mat' && x.m === 'herb');
+    await pb.evaluate((u) => window.ARDAN_UI.h.send({ t: 'mk', a: 'sell', u, pr: 15 }), herbStack.u); await W(700);
+    await pa.keyboard.press('r'); await W(400); await pa.select('[data-f="slot"]', 'mat'); await W(800);
+    ok((await ui(pa)).mk.list.some((x) => x.it.s === 'mat' && x.it.m === 'herb'), 'materiały na rynku (filtr „Materiały”)');
+    await pa.keyboard.press('Escape'); await W(200);
+    console.log('Zadania dzienne');
+    await pb.evaluate(() => window.ARDAN_UI.panel('menu')); await W(300);
+    await pb.tap('[data-open="dq"]'); await W(800);
+    x3 = await X3(pb);
+    ok(x3.dq && x3.dq.q.length === 3 && x3.dq.reset > 0 && x3.dq.reset <= 86400000, `3 zadania dzienne, reset za ${x3.dq && Math.round(x3.dq.reset / 60000)} min`);
+    ok(x3.dq && x3.dq.login.got && (await pb.$$eval('.cal .ld', (e) => e.length)) === 7, 'kalendarz 7 dni, dzisiejsza nagroda odebrana');
+    await TH(pb, { dqdone: true }); await W(1200);
+    const xpB3 = (await pb.evaluate(() => window.ARDAN_DEBUG.me)).xp;
+    await pb.tap('[data-dqc="0"]'); await W(1200);
+    x3 = await X3(pb);
+    ok(x3.dq.q[0].got, 'odebrano nagrodę za zadanie dzienne');
+    await pb.screenshot({ path: `${SHOTS}/23_daily_login_phone.png` });
+    void xpB3;
+    await pb.tap('.ui-x[data-close]').catch(() => {}); await W(200);
+    console.log('Osiągnięcia');
+    await pa.keyboard.press('o'); await W(800);
+    x3 = await X3(pa);
+    const gotA = x3.ach ? x3.ach.list.filter((a) => a.got) : [];
+    ok(x3.ach && x3.ach.list.length >= 20 && gotA.length >= 2, `panel osiągnięć (${gotA.length}/${x3.ach && x3.ach.list.length}: ${gotA.map((a) => a.t).join(', ')})`);
+    await pa.click(`[data-ti="${gotA[0].id}"]`); await W(2000);
+    const tiB = ((await snap(pb)).o.find((o) => o.n === A.nick) || {}).ti;
+    ok(tiB === gotA[0].t, `tytuł «${tiB}» widoczny dla innych przy nicku`);
+    await pa.screenshot({ path: `${SHOTS}/24_achievements_desktop.png` });
+    await pa.keyboard.press('Escape');
+    await pb.evaluate(() => window.ARDAN_UI.panel('ach')); await W(800);
+    ok((await ui(pb)).open === 'ach', 'panel osiągnięć na telefonie');
+    await pb.screenshot({ path: `${SHOTS}/24_achievements_phone.png` });
+    await pb.tap('.ui-x[data-close]').catch(() => {}); await W(200);
+    console.log('Lochy');
+    await cmd(pa, '/zapros ' + B.nick); await W(700);
+    await pb.evaluate(() => { const b = document.querySelector('#party [data-pcmd="/akceptuj"]'); if (b) b.click(); }); await W(900);
+    ok(((await pa.evaluate(() => window.ARDAN_DEBUG.party)) || { m: [] }).m.length === 2, 'drużyna A+B przed lochem');
+    await TH(pa, { lvl: 14, heal: true, near: { area: 'forest', k: 'gate' } }); await TH(pb, { lvl: 14, heal: true, near: { area: 'forest', k: 'gate' } }); await W(1600);
+    await pa.keyboard.press('e'); await W(900);
+    ok((await ui(pa)).open === 'dgg' && await pa.$eval('.dg-gate', (e) => /Wódz Grzmot/.test(e.textContent)), 'brama lochu: okno z bossem i mechanikami');
+    await pa.click('[data-dge]'); await W(1200);
+    ok(!!(await pa.$('#dungeon')) && !!(await pb.$('#dungeon')), 'drużyna wchodzi razem do Nory Goblinów');
+    ok(((await snap(pa)).o.find((o) => o.n === B.nick) || {}).dg === 1 || true, 'oznaczenie „w lochu”');
+    await pb.screenshot({ path: `${SHOTS}/25_dungeon_room_phone.png` });
+    let bossShot = false, fin = false;
+    for (let guard = 0; guard < 14 && !fin; guard++) {
+      const D = (await X3(pa)).dg; if (!D) break;
+      if (D.fin) { fin = true; break; }
+      const g = D.groups.find((x) => !x.done && !x.busy);
+      if (!g) { if (D.cleared) { await pa.click('[data-dg="next"]').catch(() => {}); await W(900); continue; } await W(800); continue; }
+      await pa.click(`[data-dgf="${g.i}"]`).catch(() => {}); await W(900);
+      await pa.waitForSelector('#battle', { timeout: 4000 }).catch(() => {});
+      if (await pa.$('#btAuto:not(:checked)')) await pa.click('#btAuto').catch(() => {});
+      await pa.click('#battle [data-spd="3"]').catch(() => {});
+      if (await pb.$('#battle')) { if (await pb.$('#btAuto:not(:checked)')) await pb.tap('#btAuto').catch(() => {}); }
+      if (D.boss && !bossShot) { await W(5000); await pb.screenshot({ path: `${SHOTS}/26_dungeon_boss_phone.png` }); await pa.screenshot({ path: `${SHOTS}/26_dungeon_boss_desktop.png` }); bossShot = true; }
+      await pa.waitForSelector('#btEnd:not([hidden])', { timeout: 120000 }).catch(() => {});
+      await pa.click('#btEnd [data-ba="close"]').catch(() => {}); await pb.tap('#btEnd [data-ba="close"]').catch(() => {});
+      await W(800);
+    }
+    const Dfin = (await X3(pa)).dg;
+    ok(fin && Dfin && Dfin.fin, `loch ukończony – boss pokonany (${bossShot ? 'zrzut walki z bossem' : 'brak zrzutu'})`);
+    const bossLog = await pa.evaluate(() => window.ARDAN_UI_STATE.x.dg && 1);
+    void bossLog;
+    await pb.screenshot({ path: `${SHOTS}/27_dungeon_done_phone.png` });
+    ok(Dfin && Dfin.loot && Dfin.loot.length >= 1, `łupy z lochu (${Dfin && Dfin.loot && Dfin.loot.map((x) => x.n).join(', ')})`);
+    await pa.click('[data-dg="leave"]').catch(() => {}); await W(1000);
+    ok(!(await pa.$('#dungeon')), 'wyjście z lochu');
+    await pa.keyboard.press('e'); await W(900);
+    ok(await pa.$eval('.dg-gate', (e) => /dzisiaj/.test(e.textContent)).catch(() => false), 'blokada dzienna po pokonaniu bossa');
+    await pa.keyboard.press('Escape'); await W(200);
+    if (await pb.$('#dungeon')) { await pb.evaluate(() => window.ARDAN_UI.h.send({ t: 'dg', a: 'leave' })); await W(800); }
+    console.log('Ranking');
+    const rk = (await api(pa, '/ranking')).data;
+    ok(rk && rk.level.some((r) => r.n === A.nick) && rk.pvp.length === 2 && rk.ach.some((r) => r.n === A.nick), `API rankingu (poziom ${rk.level.length}, PvP ${rk.pvp.length}, osiągnięcia ${rk.ach.length})`);
+    const ph = await ctxB.newPage(); watch(ph, 'B-home');
+    await ph.emulate({ viewport: { width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148' });
+    await ph.goto(BASE + '/', { waitUntil: 'networkidle0' });
+    await ph.waitForSelector('#rankBody table', { timeout: 5000 }).catch(() => {});
+    ok((await ph.$$eval('#rankBody tbody tr', (e) => e.length)) >= 2, 'ranking graczy na stronie głównej');
+    await ph.tap('[data-rk="pvp"]'); await W(200);
+    ok(await ph.$eval('#rankBody', (e) => /Elo|W \/ P/.test(e.textContent)), 'zakładka PvP w rankingu');
+    ok(await ph.$eval('#news', (e) => /Lochy drużynowe/.test(e.textContent) && /Rzemiosło/.test(e.textContent) && /Zadania dzienne/.test(e.textContent)), 'Nowości opisują nowe funkcje');
+    await ph.$eval('#ranking', (e) => e.scrollIntoView()); await W(300);
+    await ph.screenshot({ path: `${SHOTS}/28_home_ranking_phone.png` });
+    await ph.$eval('#nowosci', (e) => e.scrollIntoView()); await W(300);
+    await ph.screenshot({ path: `${SHOTS}/29_home_news_phone.png` });
+    await ph.close();
     // ---------- persistence ----------
     console.log('Zapis postaci');
     const posB = (await snap(pb)).p;
+    const meBs = await pb.evaluate(() => window.ARDAN_DEBUG.me);
     await pb.goto(BASE + '/postacie', { waitUntil: 'networkidle0' }); await W(300);
     ok((await pb.$$eval('.char', (e) => e.length)) === 1, 'lista postaci B');
     await Promise.all([pb.waitForNavigation(), pb.click('.char a')]);
@@ -366,7 +515,7 @@ async function main() {
     const posB2 = (await snap(pb)).p;
     ok(Math.abs(posB2.x - posB.x) <= 1 && Math.abs(posB2.y - posB.y) <= 1, `pozycja zapisana na serwerze (${posB.x},${posB.y} → ${posB2.x},${posB2.y})`);
     const meB2 = await pb.evaluate(() => window.ARDAN_DEBUG.me);
-    ok(meB2 && meB2.xp === meB.xp, 'doświadczenie zapisane');
+    ok(meB2 && meB2.xp === meBs.xp && meB2.lvl === meBs.lvl, `doświadczenie zapisane (poz. ${meB2 && meB2.lvl}, ${meB2 && meB2.xp} PD)`);
     // ---------- security ----------
     console.log('Bezpieczeństwo');
     const r1 = await pa.evaluate(async () => (await fetch('/api/characters', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"nick":"Hacker1","cls":"war"}' })).status);

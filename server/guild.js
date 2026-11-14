@@ -34,7 +34,7 @@ function createGuilds(world) {
     if (!free) { if (P.gold < COST) return sys(p, `Założenie gildii kosztuje ${COST} zł.`); P.gold -= COST; p.srv.dirty = true; }
     const g = { id: String(d.next++), name, tag, leader: p.ckey, m: {}, motd: 'Witajcie w gildii!', t: Date.now() };
     g.m[p.ckey] = { n: p.nick, r: 2, c: P.cls, l: P.lvl };
-    d.g[g.id] = g; save(); attach(p);
+    d.g[g.id] = g; save(); attach(p); world.emit('onEvent', p, 'guild', {});
     sys(p, `Założono gildię ${name} [${tag}]${free ? '' : ` (–${COST} zł)`}. Zapraszaj graczy w oknie gildii lub komendą /gzapros nick.`);
     return g;
   }
@@ -55,7 +55,7 @@ function createGuilds(world) {
     if (!g) return sys(q, 'Zaproszenie do gildii wygasło.');
     if (guildOf(q)) return sys(q, 'Należysz już do gildii.');
     if (Object.keys(g.m).length >= 50) return sys(q, 'Gildia jest pełna.');
-    add(q, g, 0);
+    add(q, g, 0); world.emit('onEvent', q, 'guild', {});
     for (const o of online(g)) sys(o, `${q.nick} dołącza do gildii ${g.name}!`);
   }
   function leave(p) {

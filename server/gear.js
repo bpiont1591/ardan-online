@@ -28,13 +28,28 @@ function createGear(world) {
   const space = (p) => BAG - bag(p).length;
   function give(p, list, why) {
     const P = p.api.P(), got = [], lost = [];
-    for (const it of list) { if (P.gbag.length < BAG) { P.gbag.push(it); got.push(it); } else lost.push(it); }
+    for (const it of list) {
+      if (it.s === 'mat') {
+        const st = P.gbag.find((x) => x.s === 'mat' && x.m === it.m && (x.q || 1) + (it.q || 1) <= I.MAX_STACK);
+        if (st) { st.q = (st.q || 1) + (it.q || 1); st.v = I.MATS[st.m].v * st.q; got.push(it); continue; }
+      }
+      if (P.gbag.length < BAG) { P.gbag.push(it); got.push(it); if (world.emit) world.emit('onEvent', p, 'item', it); } else lost.push(it);
+    }
     if (lost.length) sys(p, `Torba jest pełna – przepadło: ${lost.map((x) => x.n).join(', ')}.`);
     if (list.length) changed(p);
     return got;
   }
   function take(p, u) { const b = bag(p), i = b.findIndex((x) => x.u === u); if (i < 0) return null; const it = b.splice(i, 1)[0]; changed(p); return it; }
   const find = (p, u) => bag(p).find((x) => x.u === u) || null;
+  const countMat = (p, k) => bag(p).reduce((a, x) => a + (x.s === 'mat' && x.m === k ? x.q || 1 : 0), 0);
+  function useMat(p, k, n) {
+    if (n <= 0) return true;
+    if (countMat(p, k) < n) return false;
+    const b = bag(p);
+    for (let i = b.length - 1; i >= 0 && n > 0; i--) { const x = b[i]; if (x.s !== 'mat' || x.m !== k) continue; const d = Math.min(n, x.q || 1); x.q = (x.q || 1) - d; n -= d; if (x.q <= 0) b.splice(i, 1); else x.v = I.MATS[k].v * x.q; }
+    changed(p); return true;
+  }
+  function findAny(p, u) { const P = p.api.P(); const it = find(p, u); if (it) return it; for (const k of Object.keys(P.gear)) if (P.gear[k] && P.gear[k].u === u) return P.gear[k]; return null; }
 
   function equip(p, u) {
     const P = p.api.P(), it = find(p, u); if (!it) return;
@@ -62,7 +77,7 @@ function createGear(world) {
   }
   function push(p) { const v = view(p); const s = JSON.stringify(v); if (s !== p.lastGear) { p.lastGear = s; world.send(p, v); } }
   return {
-    name: 'gear', BAG, give, take, find, space, ensure, changed,
+    name: 'gear', BAG, give, take, find, findAny, countMat, useMat, space, ensure, changed,
     onJoin(p) { ensure(p); p.gearDirty = true; },
     onTick() {
       for (const p of world.players.values()) {
@@ -83,7 +98,7 @@ function createGear(world) {
     },
     onMsg(p, msg) {
       if (msg.t !== 'gear') return false;
-      if (p.battle) return true;
+      if (p.battle) { if (msg.a === 'get') { p.lastGear = ''; push(p); } return true; }
       const u = typeof msg.u === 'string' && U_RE.test(msg.u) ? msg.u : null;
       if (msg.a === 'equip' && u) equip(p, u);
       else if (msg.a === 'unequip' && typeof msg.slot === 'string') unequip(p, msg.slot);

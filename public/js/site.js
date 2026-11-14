@@ -22,7 +22,7 @@
     h.className = 'nav';
     h.innerHTML = `<div class="wrap"><a class="brand" href="/">${EMBLEM}ARDAN</a>
       <button class="menu-btn" type="button" aria-label="Menu">Menu</button>
-      <nav class="links">${L('#swiat', 'Świat')}${L('#klasy', 'Klasy')}${L('#krainy', 'Krainy')}${L('#galeria', 'Galeria')}${L('#nowosci', 'Nowości')}
+      <nav class="links">${L('#swiat', 'Świat')}${L('#klasy', 'Klasy')}${L('#krainy', 'Krainy')}${L('#galeria', 'Galeria')}${L('#ranking', 'Ranking')}${L('#nowosci', 'Nowości')}
       <span class="online-pill"><i></i><span data-online>…</span> online</span>
       ${user ? `<a href="/postacie">Moje postacie</a><a href="#" data-logout>Wyloguj (${A.esc(user.login)})</a><a class="btn primary small" href="/postacie">Graj teraz</a>`
         : `<a href="/logowanie">Zaloguj się</a><a class="btn primary small" href="/rejestracja">Załóż konto</a>`}</nav></div>`;

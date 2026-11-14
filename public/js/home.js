@@ -24,6 +24,23 @@
   g.addEventListener('click', (e) => { const a = e.target.closest('a'); if (!a) return; e.preventDefault(); const x = GAL[+a.dataset.i]; lb.querySelector('img').src = '/img/' + x[0]; lb.querySelector('p').textContent = x[1]; lb.classList.add('open'); });
   lb.addEventListener('click', (e) => { if (e.target.tagName !== 'IMG') lb.classList.remove('open'); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') lb.classList.remove('open'); });
+  // ranking graczy
+  function rankHtml(R, tab, esc) {
+    const CN = { war: 'Wojownik', arc: 'Łucznik', mag: 'Mag' };
+    const rows = (R && R[tab]) || [];
+    if (!rows.length) return '<p class="muted">Ranking jest jeszcze pusty – zagraj i zostań pierwszy!</p>';
+    const head = tab === 'level' ? '<th class="num">Poziom</th>' : tab === 'pvp' ? '<th class="num">Elo</th><th class="num hide-s">W / P</th>' : '<th class="num">Osiągnięcia</th><th class="num hide-s">Poziom</th>';
+    const cell = (r) => tab === 'level' ? `<td class="num">${r.lvl}</td>` : tab === 'pvp' ? `<td class="num"><b>${r.pts}</b></td><td class="num hide-s">${r.w} / ${r.l}</td>` : `<td class="num"><b>${r.a}</b><small>/${R.total || 23}</small></td><td class="num hide-s">${r.lvl}</td>`;
+    return `<table><thead><tr><th>#</th><th>Gracz</th><th class="hide-s">Klasa</th>${head}</tr></thead><tbody>${rows.map((r, i) => `<tr><td class="pos">${i + 1}</td><td class="n">${esc(r.n)}<br class="hide-l"><small class="cls-s">${esc(CN[r.cls] || '')}</small></td><td class="hide-s">${esc(CN[r.cls] || '')}</td>${cell(r)}</tr>`).join('')}</tbody></table>`;
+  }
+  function initRanking(R, esc) {
+    const box = document.getElementById('rank'); if (!box) return;
+    let tab = 'level';
+    const draw = () => { document.getElementById('rankBody').innerHTML = rankHtml(R, tab, esc); box.querySelectorAll('[data-rk]').forEach((b) => b.classList.toggle('on', b.dataset.rk === tab)); };
+    box.addEventListener('click', (e) => { const b = e.target.closest('[data-rk]'); if (!b) return; tab = b.dataset.rk; draw(); });
+    draw();
+  }
+  A.api('/ranking').then((r) => initRanking(r.ok ? r.data : null, A.esc));
   A.api('/news').then((r) => {
     const list = r.ok ? r.data : [];
     const fmt = (d) => new Date(d + 'T12:00:00').toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' });
