@@ -25,7 +25,7 @@ async function main() {
   const dbPath = `/tmp/ardan-e2e-${Date.now()}.db`;
   let log = '';
   const srv = spawn(process.execPath, [path.join(__dirname, '..', 'server', 'index.js')], {
-    env: { ...process.env, PORT: String(PORT), DATABASE_PATH: dbPath, BASE_URL: BASE, NODE_ENV: 'development', BCRYPT_COST: '10', SMTP_HOST: '', START_GOLD: '200', ARDAN_TEST_HOOKS: '1' },
+    env: { ...process.env, PORT: String(PORT), DATABASE_PATH: dbPath, BASE_URL: BASE, NODE_ENV: 'development', BCRYPT_COST: '10', SMTP_HOST: '', START_GOLD: '200', ARDAN_TEST_HOOKS: '1', API_PER_MIN: '5000', WS_PER_MIN: '500', WS_PER_IP: '50' },
   });
   srv.stdout.on('data', (d) => { log += d; }); srv.stderr.on('data', (d) => { log += d; process.stderr.write(d); });
   for (let i = 0; i < 50 && !log.includes('Serwer działa'); i++) await W(100);

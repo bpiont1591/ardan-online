@@ -53,4 +53,6 @@ function load(charId, userId) {
 function save(charId, P) {
   qSave.run(JSON.stringify(P), P.lvl | 0, String(P.area), Date.now(), charId);
 }
-module.exports = { router, load, save, CLASSES };
+// run fn and the character saves it triggers in ONE SQLite transaction (market/trade/mail: no item or gold duplication on crash)
+const atomic = (fn) => db.transaction(fn)();
+module.exports = { router, load, save, atomic, CLASSES };

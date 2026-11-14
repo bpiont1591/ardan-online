@@ -40,8 +40,10 @@ function userFromCookieHeader(header) {
   const t = c[SID]; if (!t || t.length > 100) return null;
   const row = qSessGet.get(sha(t));
   if (!row || row.expires < now()) return null;
-  return { id: row.user_id, login: row.login, email: row.email };
+  return { id: row.user_id, login: row.login, email: row.email, sid: sha(t) };
 }
+// re-checked periodically for every open WebSocket: logout / password reset / expiry closes live game connections too
+function sessionValid(sidHash) { const row = sidHash && qSessGet.get(sidHash); return !!row && row.expires >= now(); }
 function startSession(res, userId) {
   const t = token();
   qSessIns.run(sha(t), userId, now(), now() + cfg.sessionDays * 864e5);
@@ -101,10 +103,14 @@ const loginLimiter = limiter(15, 10, 'Zbyt wiele prób logowania. Spróbuj ponow
 const registerLimiter = limiter(60, 8, 'Zbyt wiele rejestracji z tego adresu. Spróbuj później.');
 const forgotLimiter = limiter(60, 5, 'Zbyt wiele próśb o reset hasła. Spróbuj za godzinę.');
 const resetLimiter = limiter(15, 10, 'Zbyt wiele prób. Spróbuj ponownie później.');
+const logoutLimiter = limiter(1, 30, 'Zbyt wiele żądań.');
+// global API limiter (per IP) – stops scraping/brute force against every endpoint
+const apiLimiter = limiter(1, cfg.apiPerMin, 'Zbyt wiele żądań. Zwolnij na chwilę.');
 // extra per-account throttle for login (independent of IP)
 const failByLogin = new Map();
+const FAIL_MAX_KEYS = 20000;
 function loginThrottled(key) { const f = failByLogin.get(key); return f && f.n >= 8 && now() - f.t < 15 * 60e3; }
-function loginFailed(key) { const f = failByLogin.get(key) || { n: 0, t: now() }; if (now() - f.t > 15 * 60e3) { f.n = 0; f.t = now(); } f.n++; failByLogin.set(key, f); }
+function loginFailed(key) { const f = failByLogin.get(key) || { n: 0, t: now() }; if (now() - f.t > 15 * 60e3) { f.n = 0; f.t = now(); } f.n++; if (failByLogin.size >= FAIL_MAX_KEYS && !failByLogin.has(key)) failByLogin.delete(failByLogin.keys().next().value); failByLogin.set(key, f); }
 
 const DUMMY_HASH = bcrypt.hashSync('dummy-password-for-timing', 10);
 
@@ -132,6 +138,7 @@ function router() {
     const b = req.body || {};
     const login = String(b.login || '').trim(), email = String(b.email || '').trim().toLowerCase();
     const pass = b.password, pass2 = b.password2;
+    if (typeof b.login !== 'string' || typeof b.email !== 'string' || typeof pass !== 'string' || typeof pass2 !== 'string') return res.status(400).json({ error: 'Nieprawidłowe dane.' });
     if (!LOGIN_RE.test(login)) return res.status(400).json({ error: 'Login: 3–20 znaków, tylko litery bez polskich znaków, cyfry i podkreślnik.', field: 'login' });
     if (!EMAIL_RE.test(email) || email.length > 254) return res.status(400).json({ error: 'Podaj poprawny adres e-mail.', field: 'email' });
     const pp = passwordProblem(pass, login, email); if (pp) return res.status(400).json({ error: pp, field: 'password' });
@@ -148,20 +155,23 @@ function router() {
 
   r.post('/login', loginLimiter, async (req, res) => {
     const b = req.body || {};
-    const id = String(b.login || '').trim().slice(0, 254), pass = String(b.password || '');
+    if (typeof b.login !== 'string' || typeof b.password !== 'string') return res.status(400).json({ error: 'Podaj login i hasło.' });
+    const id = b.login.trim().slice(0, 254), pass = b.password;
     const key = id.toLowerCase();
     if (!id || !pass) return res.status(400).json({ error: 'Podaj login i hasło.' });
+    if (pass.length > 128) return res.status(400).json({ error: 'Nieprawidłowy login lub hasło.' });
     if (loginThrottled(key)) return res.status(429).json({ error: 'Zbyt wiele nieudanych prób dla tego konta. Spróbuj za 15 minut lub zresetuj hasło.' });
     const u = qUserByLogin.get(id, id.toLowerCase());
     const ok = await bcrypt.compare(pass.slice(0, 128), u ? u.pass : DUMMY_HASH);
     if (!u || !ok) { loginFailed(key); return res.status(401).json({ error: 'Nieprawidłowy login lub hasło.' }); }
     failByLogin.delete(key);
+    const old = parseCookies(req.headers.cookie)[SID]; if (old && old.length <= 100) qSessDel.run(sha(old)); // session fixation: always a fresh session id
     qUserLast.run(now(), u.id);
     startSession(res, u.id);
     res.json({ ok: true });
   });
 
-  r.post('/logout', (req, res) => {
+  r.post('/logout', logoutLimiter, (req, res) => {
     const t = parseCookies(req.headers.cookie)[SID];
     if (t) qSessDel.run(sha(t));
     cookie(res, SID, '', { httpOnly: true, maxAge: 0 });
@@ -203,6 +213,7 @@ function router() {
 function cleanup() {
   db.prepare('DELETE FROM sessions WHERE expires < ?').run(now());
   db.prepare('DELETE FROM resets WHERE expires < ? OR used = 1').run(now() - 864e5);
+  for (const [k, f] of failByLogin) if (now() - f.t > 15 * 60e3) failByLogin.delete(k);
 }
 
-module.exports = { router, attachUser, csrfGuard, needUser, userFromCookieHeader, parseCookies, passwordProblem, NICK_RE, cleanup };
+module.exports = { router, attachUser, csrfGuard, needUser, userFromCookieHeader, sessionValid, apiLimiter, parseCookies, passwordProblem, NICK_RE, cleanup };

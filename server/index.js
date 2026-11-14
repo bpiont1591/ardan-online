@@ -15,6 +15,7 @@ const db = require('./db');
 const qTop = db.prepare('SELECT nick, cls, lvl FROM characters ORDER BY lvl DESC, updated ASC LIMIT 20');
 
 const app = express();
+const wsOrigin = (() => { try { const u = new URL(cfg.baseUrl); return (u.protocol === 'https:' ? 'wss://' : 'ws://') + u.host; } catch (e) { return null; } })();
 const world = new World();
 app.disable('x-powered-by');
 if (cfg.trustProxy) app.set('trust proxy', cfg.trustProxy);
@@ -23,16 +24,24 @@ app.use(helmet({
     useDefaults: true,
     directives: {
       'default-src': ["'self'"], 'script-src': ["'self'"], 'style-src': ["'self'", "'unsafe-inline'"],
-      'img-src': ["'self'", 'data:', 'blob:'], 'font-src': ["'self'"], 'connect-src': ["'self'", 'ws:', 'wss:'],
+      'img-src': ["'self'", 'data:', 'blob:'], 'font-src': ["'self'"],
+      // same-origin WebSocket only (CSP3 'self' covers ws/wss; the explicit origin is for older Safari). Dev keeps ws: for localhost ports.
+      'connect-src': cfg.isProd ? ["'self'"].concat(wsOrigin ? [wsOrigin] : []) : ["'self'", 'ws:', 'wss:'],
+      'object-src': ["'none'"], 'base-uri': ["'self'"], 'script-src-attr': ["'none'"], 'worker-src': ["'self'", 'blob:'], 'manifest-src': ["'self'"],
       'frame-ancestors': ["'none'"], 'form-action': ["'self'"], 'upgrade-insecure-requests': cfg.isProd ? [] : null,
     },
   },
   crossOriginEmbedderPolicy: false,
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  hsts: cfg.isProd ? { maxAge: 31536000, includeSubDomains: true } : false,
 }));
+app.use((req, res, next) => { res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=()'); next(); });
 app.use(express.json({ limit: '16kb' }));
 app.use(auth.attachUser);
 
 const api = express.Router();
+api.use(auth.apiLimiter);
+api.use((req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); });
 api.use(auth.csrfGuard);
 api.use('/', auth.router());
 api.use('/characters', characters.router((id) => world.isOnline(id)));
@@ -49,11 +58,16 @@ app.use(express.static(pub, { extensions: ['html'], maxAge: cfg.isProd ? '1h' : 
 app.use((req, res) => res.status(404).sendFile(path.join(pub, '404.html')));
 app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
   if (err && err.type === 'entity.parse.failed') return res.status(400).json({ error: 'Nieprawidłowe dane.' });
-  console.error('[ARDAN]', err); res.status(500).json({ error: 'Błąd serwera.' });
+  if (err && (err.type === 'entity.too.large' || err.status === 413)) return res.status(413).json({ error: 'Za duże żądanie.' });
+  console.error('[ARDAN]', err); if (res.headersSent) return; res.status(500).json({ error: 'Błąd serwera.' }); // never leak stack traces
 });
 
 const server = http.createServer(app);
 const wss = new WebSocketServer({ noServer: true, maxPayload: 8 * 1024 });
+// per-IP WebSocket caps: concurrent connections and connection attempts per minute
+const wsConn = new Map(), wsHits = new Map();
+const ipOf = (req) => (cfg.trustProxy && req.headers['x-forwarded-for'] ? String(req.headers['x-forwarded-for']).split(',')[0].trim() : req.socket.remoteAddress) || '?';
+setInterval(() => wsHits.clear(), 60e3).unref();
 server.on('upgrade', (req, socket, head) => {
   const url = new URL(req.url, 'http://x');
   if (url.pathname !== '/ws') return socket.destroy();
@@ -62,18 +76,25 @@ server.on('upgrade', (req, socket, head) => {
   let ok = false; try { ok = !!origin && new URL(origin).host === host; } catch (e) { ok = false; }
   const user = auth.userFromCookieHeader(req.headers.cookie);
   const charId = Number(url.searchParams.get('postac'));
-  if (!ok || !user || !Number.isInteger(charId)) { socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n'); return socket.destroy(); }
+  const ip = ipOf(req), hits = (wsHits.get(ip) || 0) + 1; wsHits.set(ip, hits);
+  if (hits > cfg.wsPerMin || (wsConn.get(ip) || 0) >= cfg.wsPerIp) { socket.write('HTTP/1.1 429 Too Many Requests\r\n\r\n'); return socket.destroy(); }
+  if (!ok || !user || !Number.isInteger(charId) || charId <= 0) { socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n'); return socket.destroy(); }
   wss.handleUpgrade(req, socket, head, (ws) => {
     const p = world.join(ws, user, charId);
     if (!p) return;
-    ws.on('message', (data) => world.onMessage(p, data.toString()));
-    ws.on('close', () => world.leave(p));
+    p.sid = user.sid; wsConn.set(ip, (wsConn.get(ip) || 0) + 1);
+    let gone = false; const bye = () => { if (gone) return; gone = true; const n = (wsConn.get(ip) || 1) - 1; if (n > 0) wsConn.set(ip, n); else wsConn.delete(ip); };
+    ws.on('message', (data, isBinary) => { if (!isBinary) world.onMessage(p, data.toString()); });
+    ws.on('close', () => { bye(); world.leave(p); });
     ws.on('error', () => world.leave(p));
   });
 });
 
 world.start();
 setInterval(() => { try { auth.cleanup(); } catch (e) { console.error(e); } }, 3600e3).unref();
+// sessions are re-validated for live game connections (logout elsewhere / password reset kicks the socket)
+setInterval(() => { for (const p of world.players.values()) if (p.sid && !auth.sessionValid(p.sid)) try { p.ws.close(4001, 'session'); } catch (e) { /* ignore */ } }, 30e3).unref();
+process.on('unhandledRejection', (e) => console.error('[ARDAN] unhandled', e));
 server.listen(cfg.port, cfg.host, () => {
   console.log(`[ARDAN] Serwer działa: ${cfg.baseUrl} (port ${cfg.port}, tryb: ${cfg.isProd ? 'produkcja' : 'deweloperski'})`);
   if (!mail.configured()) console.log('[ARDAN] SMTP nieskonfigurowane – linki resetu hasła będą wypisywane w konsoli (tylko tryb deweloperski).');

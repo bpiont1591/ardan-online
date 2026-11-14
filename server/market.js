@@ -41,17 +41,20 @@ function createMarket(world) {
     if (L.s === p.ckey) return sys(p, 'To twoja oferta.');
     if (P.gold < L.pr) return sys(p, 'Za mało złota.');
     if (world.gear.space(p) <= 0) return sys(p, 'Torba jest pełna!');
-    d.list.splice(i, 1); save(d);
-    P.gold -= L.pr; world.gear.give(p, [L.it]);
+    const seller = [...world.players.values()].find((q) => q.ckey === L.s);
+    world.atomic([p, seller], () => {
+      d.list.splice(i, 1); save(d);
+      P.gold -= L.pr; world.gear.give(p, [L.it]);
+      pay(L.s, p.nick, L.pr - Math.floor(L.pr * TAX), L.it.n);
+    });
     sys(p, `Kupiono na rynku: ${L.it.n} za ${L.pr} zł.`);
-    pay(L.s, p.nick, L.pr - Math.floor(L.pr * TAX), L.it.n);
     return true;
   }
   return {
     name: 'market', list, buy, data,
     onJoin(p) {
       const m = mail(); const e = m[p.ckey];
-      if (e && e.gold) { p.api.P().gold += e.gold; p.srv.dirty = true; delete m[p.ckey]; store.set('mail', m); sys(p, `Rynek: podczas twojej nieobecności sprzedano przedmioty (${e.n}). Otrzymujesz ${e.gold} zł.`); }
+      if (e && e.gold) { world.atomic([p], () => { p.api.P().gold += e.gold; p.srv.dirty = true; delete m[p.ckey]; store.set('mail', m); }); sys(p, `Rynek: podczas twojej nieobecności sprzedano przedmioty (${e.n}). Otrzymujesz ${e.gold} zł.`); }
     },
     onMsg(p, msg) {
       if (msg.t !== 'mk') return false;
@@ -60,12 +63,12 @@ function createMarket(world) {
         const pr = Math.floor(Number(msg.pr));
         if (!(pr >= 1 && pr <= MAX_PRICE)) sys(p, 'Podaj cenę od 1 do 10 000 000 zł.');
         else if (typeof msg.u === 'string' && U_RE.test(msg.u) && world.gear.find(p, msg.u)) {
-          const it = world.gear.take(p, msg.u);
-          if (!list(p, it, pr)) world.gear.give(p, [it]); else sys(p, `Wystawiono na rynku: ${it.n} za ${pr} zł.`);
+          const ok = world.atomic([p], () => { const it = world.gear.take(p, msg.u); if (!it) return null; if (!list(p, it, pr)) { world.gear.give(p, [it]); return null; } return it; });
+          if (ok) sys(p, `Wystawiono na rynku: ${ok.n} za ${pr} zł.`);
         }
       } else if (msg.a === 'cancel' && Number.isInteger(msg.id)) {
         const d = data(), i = d.list.findIndex((x) => x.id === msg.id && x.s === p.ckey);
-        if (i >= 0) { if (world.gear.space(p) <= 0) sys(p, 'Torba jest pełna!'); else { const L = d.list.splice(i, 1)[0]; save(d); world.gear.give(p, [L.it]); sys(p, `Wycofano z rynku: ${L.it.n}.`); } }
+        if (i >= 0) { if (world.gear.space(p) <= 0) sys(p, 'Torba jest pełna!'); else { const L = world.atomic([p], () => { const L = d.list.splice(i, 1)[0]; save(d); world.gear.give(p, [L.it]); return L; }); sys(p, `Wycofano z rynku: ${L.it.n}.`); } }
       } else if (msg.a === 'buy' && Number.isInteger(msg.id)) buy(p, msg.id);
       browse(p, msg.f);
       return true;

@@ -13,7 +13,7 @@ module.exports = {
   trustProxy: env.TRUST_PROXY ? env.TRUST_PROXY : (isProd ? 1 : false),
   sessionDays: Number(env.SESSION_DAYS) || 30,
   resetMinutes: Number(env.RESET_TOKEN_MINUTES) || 30,
-  bcryptCost: Number(env.BCRYPT_COST) || 12,
+  bcryptCost: Math.min(15, Math.max(10, Number(env.BCRYPT_COST) || 12)), // never below 10
   maxCharacters: Number(env.MAX_CHARACTERS) || 3,
   smtp: {
     host: env.SMTP_HOST || '',
@@ -23,5 +23,9 @@ module.exports = {
     pass: env.SMTP_PASS || '',
     from: env.MAIL_FROM || 'ARDAN <no-reply@localhost>',
   },
+  // abuse limits (per IP); overridable for load tests
+  apiPerMin: Number(env.API_PER_MIN) || 240,
+  wsPerMin: Number(env.WS_PER_MIN) || 30,
+  wsPerIp: Number(env.WS_PER_IP) || 8,
   tickMs: 50,
 };

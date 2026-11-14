@@ -40,9 +40,12 @@ function createTrade(world) {
     if (ia.some((x) => !x) || ib.some((x) => !x) || A.gold < p.trade.gold || B.gold < q.trade.gold) return close(p, 'Wymiana przerwana – oferta się zmieniła.');
     if (A.gbag.length - ia.length + ib.length > world.gear.BAG || B.gbag.length - ib.length + ia.length > world.gear.BAG) return close(p, 'Wymiana przerwana – brak miejsca w torbie.');
     const ga = p.trade.gold, gb = q.trade.gold;
-    for (const it of ia) world.gear.take(p, it.u); for (const it of ib) world.gear.take(q, it.u);
-    world.gear.give(p, ib); world.gear.give(q, ia);
-    A.gold += gb - ga; B.gold += ga - gb; p.srv.dirty = q.srv.dirty = true;
+    if (!(ga >= 0 && gb >= 0)) return close(p, 'Wymiana przerwana.');
+    world.atomic([p, q], () => {
+      for (const it of ia) world.gear.take(p, it.u); for (const it of ib) world.gear.take(q, it.u);
+      world.gear.give(p, ib); world.gear.give(q, ia);
+      A.gold += gb - ga; B.gold += ga - gb; p.srv.dirty = q.srv.dirty = true;
+    });
     close(p, `Wymiana zakończona: ${q.nick} ⇄ ${p.nick}.`);
   }
   return {
@@ -57,7 +60,7 @@ function createTrade(world) {
       else if (!p.trade) state(p);
       else if (msg.a === 'add' && typeof msg.u === 'string' && U_RE.test(msg.u) && world.gear.find(p, msg.u) && p.trade.items.indexOf(msg.u) < 0 && p.trade.items.length < MAX_ITEMS) { p.trade.items.push(msg.u); reset(p); }
       else if (msg.a === 'rem' && typeof msg.u === 'string') { p.trade.items = p.trade.items.filter((u) => u !== msg.u); reset(p); }
-      else if (msg.a === 'gold') { const g = Math.floor(Number(msg.v)); if (g >= 0 && g <= p.api.P().gold) { p.trade.gold = g; reset(p); } else sys(p, 'Nie masz tyle złota.'); }
+      else if (msg.a === 'gold') { const g = Math.floor(Number(msg.v)); if (Number.isSafeInteger(g) && g >= 0 && g <= p.api.P().gold) { p.trade.gold = g; reset(p); } else sys(p, 'Nie masz tyle złota.'); }
       else if (msg.a === 'ok') { p.trade.ok = true; const q = peer(p); if (q && q.trade && q.trade.ok) { execute(p, q); return true; } }
       else if (msg.a === 'cancel') { close(p, 'Wymiana anulowana.'); return true; }
       if (p.trade) { state(p); const q = peer(p); if (q) state(q); }

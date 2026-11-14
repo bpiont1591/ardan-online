@@ -37,6 +37,7 @@ function sanitizeAct(a) {
 }
 
 // Test-only hooks (enabled only by ARDAN_TEST_HOOKS=1 outside production) used by the automated e2e test.
+const MAX_GOLD = 2000000000; // fits in int32, far above anything legit
 const TEST_HOOKS = typeof process !== 'undefined' && process.env && process.env.ARDAN_TEST_HOOKS === '1' && process.env.NODE_ENV !== 'production';
 function testHook(world, p, m) {
   const P = p.api.P();
@@ -120,6 +121,11 @@ class World {
     for (const area of Object.keys(this.mobs)) for (const m of this.mobs[area]) if (m.own === p.pid) m.own = null;
     this.emit('onLeave', p);
   }
+  // state-changing economy ops: mutate + persist every involved character (and kv store writes) atomically
+  atomic(ps, fn) {
+    const run = () => { const r = fn(); for (const p of ps) if (p && !p.bot && p.charId && this.players.has(p.pid)) { chars.save(p.charId, p.api.P()); p.srv.dirty = false; p.saveT = Date.now(); } return r; };
+    return typeof chars.atomic === 'function' ? chars.atomic(run) : run();
+  }
   persist(p) { try { chars.save(p.charId, p.api.P()); p.srv.dirty = false; p.saveT = Date.now(); } catch (e) { console.error('[ARDAN] save error', e); } }
 
   onMessage(p, data) {
@@ -185,6 +191,8 @@ class World {
     const areaEv = {}, groups = {};
     for (const p of this.players.values()) {
       const P = p.api.P(), a = P.area; p.area = a;
+      // anti-cheat sanity: gold is always a finite integer in [0, MAX_GOLD]
+      if (!Number.isFinite(P.gold) || P.gold < 0) P.gold = 0; else if (P.gold > MAX_GOLD) P.gold = MAX_GOLD; else if (P.gold % 1) P.gold = Math.floor(P.gold);
       (groups[a] = groups[a] || []).push(p);
       const ev = areaEv[a] = areaEv[a] || [];
       const d = p.api.drain();
