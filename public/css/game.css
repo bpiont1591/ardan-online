@@ -338,7 +338,7 @@ em.bad, .bad { color: #ff9a8a; }
 
 /* round 4: item tooltip (hover on desktop, long-press on touch) */
 .ui-tip { position: fixed; left: 0; top: 0; z-index: 30; pointer-events: none; width: min(300px, calc(100vw - 16px)); }
-.ui-tip .dcard { width: 100%; max-height: inherit; overflow: hidden; padding: 12px 14px; box-shadow: 0 12px 40px rgba(0,0,0,.75); animation: tipIn .08s ease-out; }
+.ui-tip .dcard { width: 100%; box-sizing: border-box; max-width: 100%; max-height: inherit; overflow: hidden; padding: 12px 14px; box-shadow: 0 12px 40px rgba(0,0,0,.75); animation: tipIn .08s ease-out; }
 .ui-tip .tiph { margin-top: 6px; color: #8a8070; font-size: 11px; font-style: italic; }
 @keyframes tipIn { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
 .bi, .slot, .mrow, .lt, [data-tri], [data-tradd] { -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }

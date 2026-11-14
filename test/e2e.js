@@ -497,7 +497,7 @@ async function main() {
     await pa.waitForSelector(bagSel, { timeout: 4000 }).catch(() => {});
     const hb = await pa.$(bagSel);
     if (hb) { await hb.hover(); await W(250); }
-    const tipA = await pa.evaluate(() => { const t = document.getElementById('uiTip'); if (!t || t.hidden) return null; const r = t.getBoundingClientRect(); return { txt: t.textContent, in: r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight, w: r.width }; });
+    const tipA = await pa.evaluate(() => { const t = document.getElementById('uiTip'); if (!t || t.hidden) return null; const r = (t.querySelector('.dcard') || t).getBoundingClientRect(); return { txt: t.textContent, in: r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight, w: r.width }; });
     ok(!!tipA && /Wymagany poziom|Materiał/.test(tipA.txt) && tipA.in, `najechanie myszką na przedmiot w torbie pokazuje kartę (w oknie: ${tipA && tipA.in})`);
     ok(!(await pa.$('.ui-detail')), 'samo najechanie nie otwiera okna akcji');
     await pa.screenshot({ path: `${SHOTS}/30_tooltip_hover_desktop.png` });
@@ -523,7 +523,7 @@ async function main() {
     if (pbi) {
       const bb = await pbi.boundingBox();
       await pb.touchscreen.touchStart(bb.x + bb.width / 2, bb.y + bb.height / 2); await W(750);
-      lp = await pb.evaluate(() => { const t = document.getElementById('uiTip'); if (!t || t.hidden) return null; const r = t.getBoundingClientRect(); return { in: r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight }; });
+      lp = await pb.evaluate(() => { const t = document.getElementById('uiTip'); if (!t || t.hidden) return null; const r = (t.querySelector('.dcard') || t).getBoundingClientRect(); return { in: r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight }; });
       await pb.screenshot({ path: `${SHOTS}/31_tooltip_longpress_phone.png` });
       await pb.touchscreen.touchEnd(); await W(400);
     }
@@ -570,7 +570,7 @@ async function main() {
     if (krw) {
       const el = await pa.$(`.ui-panel .bag .bi[data-bag="${krw.u}"]`);
       if (el) { await el.hover(); await W(300); }
-      const lt = await pa.evaluate(() => { const t = document.getElementById('uiTip'); if (!t || t.hidden) return null; const r = t.getBoundingClientRect(); return { txt: t.textContent, in: r.left >= 0 && r.top >= 0 && r.right <= innerWidth + 0.5 && r.bottom <= innerHeight + 0.5, leg: !!t.querySelector('.dcard.r3') }; });
+      const lt = await pa.evaluate(() => { const t = document.getElementById('uiTip'); if (!t || t.hidden) return null; const r = (t.querySelector('.dcard') || t).getBoundingClientRect(); return { txt: t.textContent, in: r.left >= 0 && r.top >= 0 && r.right <= innerWidth + 0.5 && r.bottom <= innerHeight + 0.5, leg: !!t.querySelector('.dcard.r3') }; });
       ok(!!lt && /Krwiopijca|Wampiryzm/.test(lt.txt) && /✦ Wampiryzm/.test(lt.txt) && /✦ Szał/.test(lt.txt) && lt.leg && lt.in, 'karta legendy: nazwa, pasywki, historia, złota ramka');
       await pa.screenshot({ path: `${SHOTS}/38_legendary_tooltip_desktop.png` });
       await pa.mouse.move(5, 5); await W(200);
@@ -608,7 +608,7 @@ async function main() {
       await sze.scrollIntoView().catch(() => {});
       const bb = await sze.boundingBox();
       await pb.touchscreen.touchStart(bb.x + bb.width / 2, bb.y + bb.height / 2); await W(750);
-      const lt2 = await pb.evaluate(() => { const t = document.getElementById('uiTip'); if (!t || t.hidden) return null; const r = t.getBoundingClientRect(); return { txt: t.textContent, in: r.left >= 0 && r.top >= 0 && r.right <= innerWidth + 0.5 && r.bottom <= innerHeight + 0.5 }; });
+      const lt2 = await pb.evaluate(() => { const t = document.getElementById('uiTip'); if (!t || t.hidden) return null; const r = (t.querySelector('.dcard') || t).getBoundingClientRect(); return { txt: t.textContent, in: r.left >= 0 && r.top >= 0 && r.right <= innerWidth + 0.5 && r.bottom <= innerHeight + 0.5 }; });
       ok(!!lt2 && /✦ Pośpiech/.test(lt2.txt) && lt2.in, 'telefon: karta legendy z pasywkami w granicach ekranu');
       await pb.screenshot({ path: `${SHOTS}/40_legendary_tooltip_phone.png` });
       await pb.touchscreen.touchEnd(); await W(400);
