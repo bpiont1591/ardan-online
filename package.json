@@ -8,7 +8,8 @@
     "dev": "NODE_ENV=development node server/index.js",
     "build:engine": "cd engine-src && bash build.sh",
     "test": "node test/security.js && node test/e2e.js",
-    "test:security": "node test/security.js"
+    "test:security": "node test/security.js",
+    "test:passives": "node test/passives-stress.js"
   },
   "license": "UNLICENSED",
   "type": "commonjs",
