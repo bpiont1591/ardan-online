@@ -1,9 +1,11 @@
 'use strict';
 // Party dungeons (lochy): instanced per party, several rooms with stationary elite groups and a final boss
-// with special turn-based mechanics. Entrance gates stand on the world map. One clear per day per character.
+// with special turn-based mechanics. Entrance gates stand on the world map. One entry per 12 hours per character (cooldown starts on entry).
 const I = require('./items');
 const cheb = (ax, ay, bx, by) => Math.max(Math.abs(ax - bx), Math.abs(ay - by));
 const PULL_RANGE = 12;
+const DG_CD = 12 * 3600 * 1000; // dungeon cooldown per character (from entry)
+const fmtLeft = (ms) => { const m = Math.ceil(ms / 60000); return m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m} min`; };
 function dayKey(d) { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Warsaw', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d || new Date()); }
 function msToMidnight() {
   const now = new Date(), k = dayKey(now);
@@ -84,7 +86,13 @@ function createDungeons(world) {
     return o;
   }
   const P = (p) => p.api.P();
-  const locked = (p, id) => (P(p).dgLock || {})[id] === dayKey();
+  // round 7: every dungeon has a 12 h cooldown per character, counted from the moment of entry (win or lose).
+  // dgLock[id] = entry timestamp (ms). Old day-key strings from before round 7 count as expired.
+  const lockLeft = (p, id) => { const v = (P(p).dgLock || {})[id]; return typeof v === 'number' ? Math.max(0, v + DG_CD - Date.now()) : 0; };
+  const locked = (p, id) => lockLeft(p, id) > 0;
+  // a member of a still-running instance may come back in (their cooldown started with this very run)
+  const inRun = (p, x) => !!x && !x.fin && typeof (P(p).dgLock || {})[x.D.id] === 'number' && P(p).dgLock[x.D.id] >= x.t0;
+  const stamp = (q, id) => { const Q = P(q); Q.dgLock = Q.dgLock || {}; Q.dgLock[id] = Date.now(); q.srv.dirty = true; };
   function members(x) { return [...x.m].map((pid) => world.players.get(pid)).filter((q) => q && q.dg === x); }
   function state(x, p) {
     const D = x.D, R = D.rooms[x.room], api = p.api;
@@ -108,23 +116,23 @@ function createDungeons(world) {
     const party = p.partyId && world.parties ? world.parties.parties.get(p.partyId) : null;
     const near = party ? [...party.members].map((pid) => world.players.get(pid)).filter((q) => q && P(q).area === P(p).area && cheb(P(q).x, P(q).y, o.x, o.y) <= PULL_RANGE) : [p];
     const active = [...inst.values()].find((x) => x.D === D && x.key === (p.partyId || p.pid));
-    world.send(p, { t: 'dg', gate: true, id: D.id, n: D.n, lv: D.lv, rooms: D.rooms.length, bn: D.boss.n, mech: D.boss.mech.map((m) => MECH_N[m]), locked: locked(p, D.id), reset: msToMidnight(),
-      party: near.map((q) => ({ n: q.nick, l: P(q).lvl, c: P(q).cls, locked: locked(q, D.id) })), solo: !party, active: !!active, lvl: P(p).lvl });
+    world.send(p, { t: 'dg', gate: true, id: D.id, n: D.n, lv: D.lv, rooms: D.rooms.length, bn: D.boss.n, mech: D.boss.mech.map((m) => MECH_N[m]), locked: locked(p, D.id) && !(active && inRun(p, active)), cd: lockLeft(p, D.id), cdH: DG_CD / 3600000,
+      party: near.map((q) => ({ n: q.nick, l: P(q).lvl, c: P(q).cls, locked: locked(q, D.id), cd: lockLeft(q, D.id) })), solo: !party, active: !!active, lvl: P(p).lvl });
   }
   function enter(p, id) {
     const D = DUNGEONS[id]; if (!D || p.dg || p.battle) return;
     const g = gates[id]; if (!g || P(p).area !== g.a || cheb(P(p).x, P(p).y, g.x, g.y) > 2) return sys(p, 'Musisz stać przy wejściu do lochu.');
-    if (locked(p, id)) return sys(p, `Ukończyłeś już dziś „${D.n}”. Loch odnowi się o północy.`);
     const key = p.partyId || p.pid;
     let x = [...inst.values()].find((y) => y.D === D && y.key === key);
+    if (locked(p, id) && !inRun(p, x)) return sys(p, `Byłeś już w „${D.n}”. Loch będzie dostępny za ${fmtLeft(lockLeft(p, id))} (odnowienie 12 h od wejścia).`);
     const party = p.partyId && world.parties ? world.parties.parties.get(p.partyId) : null;
     const pull = [p];
     if (!x) {
-      x = { id: nextId++, D, key, m: new Set(), room: 0, done: D.rooms.map((r) => r.g.map(() => false)), busy: {}, fin: false, loot: {} };
+      x = { id: nextId++, t0: Date.now(), D, key, m: new Set(), room: 0, done: D.rooms.map((r) => r.g.map(() => false)), busy: {}, fin: false, loot: {} };
       inst.set(x.id, x);
-      if (party) for (const pid of party.members) { const q = world.players.get(pid); if (!q || q === p || q.dg || q.battle) continue; if (P(q).area !== g.a || cheb(P(q).x, P(q).y, g.x, g.y) > PULL_RANGE) continue; if (locked(q, id)) { sys(q, `Ukończyłeś już dziś „${D.n}” – nie wchodzisz z drużyną.`); continue; } pull.push(q); }
+      if (party) for (const pid of party.members) { const q = world.players.get(pid); if (!q || q === p || q.dg || q.battle) continue; if (P(q).area !== g.a || cheb(P(q).x, P(q).y, g.x, g.y) > PULL_RANGE) continue; if (locked(q, id)) { sys(q, `Loch „${D.n}” odnowi się dla ciebie za ${fmtLeft(lockLeft(q, id))} – nie wchodzisz z drużyną.`); continue; } pull.push(q); }
     }
-    for (const q of pull) { q.dg = x; x.m.add(q.pid); q.mx = q.my = 0; q.api.pl.target = null; }
+    for (const q of pull) { if (!inRun(q, x)) stamp(q, id); q.dg = x; x.m.add(q.pid); q.mx = q.my = 0; q.api.pl.target = null; }
     const names = pull.map((q) => q.nick).join(', ');
     for (const q of members(x)) sys(q, `🕳 ${names} ${pull.length > 1 ? 'wchodzą' : 'wchodzi'} do lochu: ${D.n}.${members(x).length === 1 ? ' Samotna wyprawa będzie trudna!' : ''}`);
     push(x);
@@ -149,7 +157,7 @@ function createDungeons(world) {
           for (const q of winners) world.emit('onEvent', q, 'dgroom', { id: D.id });
           if (isBoss) {
             x.fin = true;
-            for (const q of members(x)) { const Q = P(q); Q.dgLock = Q.dgLock || {}; Q.dgLock[D.id] = dayKey(); q.srv.dirty = true; world.emit('onEvent', q, 'dungeon', { id: D.id }); sys(q, `🏆 Loch „${D.n}” ukończony! Wróć jutro po kolejną wyprawę.`); }
+            for (const q of members(x)) { q.srv.dirty = true; world.emit('onEvent', q, 'dungeon', { id: D.id }); sys(q, `🏆 Loch „${D.n}” ukończony! Kolejna wyprawa za ${fmtLeft(lockLeft(q, D.id))}.`); }
           }
         }
         setTimeout(() => push(x), 50);
@@ -159,7 +167,7 @@ function createDungeons(world) {
     push(x);
   }
   return {
-    name: 'dungeons', DUNGEONS, inst, atGate, enter, leave, dayKey, msToMidnight,
+    name: 'dungeons', DUNGEONS, DG_CD, lockLeft, inst, atGate, enter, leave, dayKey, msToMidnight,
     onJoin(p) {
       if (!Object.keys(gates).length && world.gather) for (const id of Object.keys(DUNGEONS)) { const D = DUNGEONS[id]; gates[id] = world.gather.add(p.api, D.area, D.at[0], D.at[1], { k: 'gate', dg: id, n: D.n, lv: D.lv[0] + '–' + D.lv[1] }); }
     },
@@ -181,4 +189,4 @@ function createDungeons(world) {
     },
   };
 }
-module.exports = { createDungeons, DUNGEONS, dayKey, msToMidnight };
+module.exports = { createDungeons, DUNGEONS, DG_CD, dayKey, msToMidnight };

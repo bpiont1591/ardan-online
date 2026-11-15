@@ -539,7 +539,7 @@ async function main() {
     await pa.click('[data-dg="leave"]').catch(() => {}); await W(1000);
     ok(!(await pa.$('#dungeon')), 'wyjście z lochu');
     await pa.keyboard.press('e'); await W(900);
-    ok(await pa.$eval('.dg-gate', (e) => /dzisiaj/.test(e.textContent)).catch(() => false), 'blokada dzienna po pokonaniu bossa');
+    ok(await pa.$eval('.dg-gate', (e) => /Ponowne wejście za/.test(e.textContent) && /12 h/.test(e.textContent)).catch(() => false), 'blokada 12 h od wejścia pokazana przy wejściu do lochu');
     await pa.keyboard.press('Escape'); await W(200);
     if (await pb.$('#dungeon')) { await pb.evaluate(() => window.ARDAN_UI.h.send({ t: 'dg', a: 'leave' })); await W(800); }
     // ---------- round 4: tooltips, level 60, new cities ----------

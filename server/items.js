@@ -143,7 +143,7 @@ function make(base, tier, r, R) {
   }
   if (b[0] === 'weapon') it.spr = SPR[cls].w[Math.min(tier, 5)];
   if (b[0] === 'armor') it.spr = SPR[cls].a[Math.min(tier, 5)];
-  it.v = value(it);
+  it.v = value(it); it.dm = DUR_MAX; it.d = DUR_MAX;
   return it;
 }
 // hand-designed legendary: fixed name, base, level and passives (server/passives.js)
@@ -156,7 +156,7 @@ function makeLeg(id, R) {
   const it = { u: uid(), b: D.b, lg: D.id, n: D.n, s: b[0], c: b[1], l: L, r: 3, t, ic: b[3], st, px: D.px.map(([k, v]) => [k, PXD.PX[k].lvl ? v * L : v]), lore: D.lore };
   if (b[0] === 'weapon') it.spr = SPR[b[1]].w[Math.min(t, 5)];
   if (b[0] === 'armor') it.spr = SPR[b[1]].a[Math.min(t, 5)];
-  it.v = value(it);
+  it.v = value(it); it.dm = DUR_MAX; it.d = DUR_MAX;
   return it;
 }
 // legendary drop chance per item roll: tiny from normal monsters, real chance only from bosses and dungeons
@@ -264,7 +264,7 @@ function fromLegacy(id, def, cls) {
   if (def.mp) st.mp = def.mp;
   const it = { u: uid(), b: def.t === 'w' ? (c === 'arc' ? 'bow' : c === 'mag' ? 'staff' : 'sword') : (c === 'mag' ? 'robe' : c === 'arc' ? 'jerkin' : 'plate'),
     n: def.n, s: def.t === 'w' ? 'weapon' : 'armor', c: def.t === 'a' && !def.cls ? null : c, l: tier === 0 ? 1 : TIERS[tier].l, r: 0, t: tier, ic: def.ic === 'staff' ? 'staff' : def.ic === 'bow' ? 'bow' : def.ic === 'axe' ? 'axe' : def.ic === 'club' ? 'club' : def.ic === 'robe' ? 'robe' : def.ic === 'shirt' ? 'shirt' : def.t === 'w' ? 'sword' : 'plate', st, spr: id, legacy: 1 };
-  it.v = value(it);
+  it.v = value(it); it.dm = DUR_MAX; it.d = DUR_MAX;
   return it;
 }
 function canEquip(it, P) {
@@ -273,5 +273,13 @@ function canEquip(it, P) {
   if (it.l > P.lvl) return 'Wymagany poziom: ' + it.l + '.';
   return null;
 }
+// durability (round 7): every death costs each worn item DUR_LOSS points; at 0 the item is broken and gives no stats.
+// Repair at a blacksmith: cost scales with the missing durability and the item value. Items without the field count as new.
+const DUR_MAX = 100, DUR_LOSS = 10, REP_K = 0.15;
+const durMax = (it) => (it && Number.isFinite(it.dm) && it.dm > 0 ? it.dm : DUR_MAX);
+const durOf = (it) => (it && Number.isFinite(it.d) ? Math.max(0, Math.min(durMax(it), it.d)) : durMax(it));
+function wear(it, n) { if (!it || it.s === 'mat') return 0; const before = durOf(it); it.dm = durMax(it); it.d = Math.max(0, before - n); return before - it.d; }
+function repairCost(it) { if (!it || it.s === 'mat') return 0; const dm = durMax(it), miss = dm - durOf(it); if (miss <= 0) return 0; return Math.max(1, Math.ceil((miss / dm) * Math.max(10, it.v || 0) * REP_K)); }
+function repair(it) { it.dm = durMax(it); it.d = it.dm; }
 const validItem = (it) => !!(it && typeof it === 'object' && typeof it.u === 'string' && it.st && typeof it.n === 'string' && typeof it.s === 'string');
-module.exports = { BOSS_LEG, BOSS_LEG_CH, rollBossLeg, makeLeg, rollLeg, LEG_CH, PXD, SLOTS, SLOT_N, CLS_N, CLASSES, RAR, TIERS, STAT_N, BASES, SPR, ELITE, MATS, MAX_STACK, UP_MAX, UP_CHANCE, make, rollDrops, rollDungeon, randomItem, fromLegacy, canEquip, value, rankOf, validItem, mat, upCost, applyUp, forge, forgeCost, tierFor };
+module.exports = { DUR_MAX, DUR_LOSS, REP_K, durMax, durOf, wear, repairCost, repair, BOSS_LEG, BOSS_LEG_CH, rollBossLeg, makeLeg, rollLeg, LEG_CH, PXD, SLOTS, SLOT_N, CLS_N, CLASSES, RAR, TIERS, STAT_N, BASES, SPR, ELITE, MATS, MAX_STACK, UP_MAX, UP_CHANCE, make, rollDrops, rollDungeon, randomItem, fromLegacy, canEquip, value, rankOf, validItem, mat, upCost, applyUp, forge, forgeCost, tierFor };

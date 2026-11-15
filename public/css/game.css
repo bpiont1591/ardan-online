@@ -183,7 +183,7 @@ table.rank { width: 100%; border-collapse: collapse; font-size: 13px; }
 .ui-toasts { position: fixed; left: 50%; transform: translateX(-50%); top: 64px; width: min(380px, calc(100vw - 20px)); display: flex; flex-direction: column; gap: 8px; z-index: 14; pointer-events: none; }
 .ui-toast { pointer-events: none; background: rgba(20,15,28,.96); border: 1px solid rgba(201,164,92,.6); border-radius: 12px; padding: 10px 12px; font-size: 14px; box-shadow: 0 8px 30px rgba(0,0,0,.6); }
 .ui-toast .tb { display: flex; gap: 8px; margin-top: 8px; } .ui-toast .tb button { flex: 1; padding: 8px; }
-.ui-zone { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(10px + env(safe-area-inset-bottom)); background: rgba(120,30,20,.85); border: 1px solid #ff8a7a; color: #ffe0da; font: 700 12px Inter, sans-serif; padding: 5px 12px; border-radius: 999px; pointer-events: none !important; white-space: nowrap; }
+.ui-zone { position: fixed; left: 50%; transform: translateX(-50%); top: calc(8px + env(safe-area-inset-top)); background: rgba(120,30,20,.88); border: 1px solid #ff8a7a; color: #ffe0da; max-width: calc(100vw - 420px); overflow: hidden; text-overflow: ellipsis; font: 700 12px Inter, sans-serif; padding: 5px 12px; border-radius: 999px; pointer-events: none !important; white-space: nowrap; }
 
 /* ---------- walka turowa ---------- */
 .bt { position: fixed; inset: 0; z-index: 11; background: radial-gradient(ellipse at 50% 30%, rgba(70,40,90,.55), rgba(8,6,12,.94) 70%), #0c0910; display: grid; place-items: center; padding: 8px; padding-top: max(8px, env(safe-area-inset-top)); }
@@ -360,3 +360,18 @@ em.bad, .bad { color: #ff9a8a; }
 .msgs .rb.adm { background: #d9533f; } .msgs .rb.mod { background: #3f7fd9; }
 .msgs .n.r-adm { color: #ff8a73 !important; font-weight: 800; } .msgs .n.r-mod { color: #7fb3ff !important; font-weight: 800; }
 .bi .pr { position: absolute; left: 3px; bottom: 1px; font-size: 10px; font-weight: 700; color: #f5d98a; text-shadow: 0 1px 2px #000, 0 0 2px #000; pointer-events: none; }
+/* round 7: durability, repairs, zone badge */
+.dm.warn { color: #ffb45a; }
+.dm.dur { display: flex; align-items: center; gap: 8px; }
+.durbar { flex: 1; max-width: 120px; height: 6px; background: rgba(255,255,255,.12); border-radius: 3px; overflow: hidden; display: inline-block; }
+.durbar > i { display: block; height: 100%; }
+.slot.broken { box-shadow: inset 0 0 0 2px #d83a2e; }
+.slot.broken img { filter: grayscale(1) brightness(.7); }
+.li.rep { justify-content: space-between; gap: 10px; }
+.li.rep button { white-space: nowrap; }
+.dg-cd { font-size: 14px; }
+
+.ui-zone.safe { background: rgba(28,96,48,.88); border-color: #7fd890; color: #e4ffe8; }
+.ui-zone.arena { background: rgba(150,90,16,.9); border-color: #ffc46a; color: #fff2d8; }
+.ui-zone.pvp { background: rgba(150,20,20,.92); border-color: #ff6a5a; color: #fff; }
+@media (max-width: 700px) { .ui-zone { max-width: calc(100vw - 200px); top: calc(4px + env(safe-area-inset-top)); font-size: 11px; } }

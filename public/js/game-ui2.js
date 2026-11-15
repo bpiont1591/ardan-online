@@ -95,12 +95,12 @@
 
   // ---------- dungeon gate dialog ----------
   function gateHtml(g) {
-    const party = (g.party || []).map((m) => `<div class="gm"><i class="dot on"></i><span><b>${esc(m.n)}</b><small>${esc(CLS_N[m.c] || '')} · poz. ${m.l}${m.locked ? ' · <em class="bad">już był dziś</em>' : ''}${m.far ? ' · za daleko' : ''}</small></span></div>`).join('');
+    const party = (g.party || []).map((m) => `<div class="gm"><i class="dot on"></i><span><b>${esc(m.n)}</b><small>${esc(CLS_N[m.c] || '')} · poz. ${m.l}${m.locked ? ` · <em class="bad">odnowienie za ${fmtT(m.cd)}</em>` : ''}${m.far ? ' · za daleko' : ''}</small></span></div>`).join('');
     const lv = Array.isArray(g.lv) ? `${g.lv[0]}–${g.lv[1]}` : g.lv;
     return `<div class="dg-gate"><p class="muted">Instancja dla twojej drużyny · zalecany poziom <b>${lv}</b> · komnat: <b>${g.rooms}</b></p>
       <div class="card"><h4>👑 Boss: ${esc(g.bn)}</h4><ul class="mech">${(g.mech || []).map((m) => `<li>${esc(m)}</li>`).join('')}</ul>
       <p class="muted">Najlepsze łupy w grze: elity i boss mają dużą szansę na przedmioty <b style="color:${RAR[2].col}">heroiczne</b> i <b style="color:${RAR[3].col}">legendarne</b>.</p></div>
-      ${g.locked ? `<div class="card bad">Już pokonałeś tego bossa dzisiaj. Loch odnowi się za <b>${fmtT(g.reset)}</b> (o północy).</div>` : ''}
+      ${g.locked ? `<div class="card bad dg-cd">⏳ Byłeś już w tym lochu. Ponowne wejście za <b>${fmtT(g.cd)}</b> (odnowienie ${g.cdH || 12} h od wejścia – liczy się każda wyprawa, wygrana czy przegrana).</div>` : `<p class="muted">⏳ Po wejściu loch odnowi się dla ciebie dopiero po ${g.cdH || 12} godzinach – niezależnie od wyniku.</p>`}
       <h4>Drużyna</h4><div class="glist">${party || '<p class="muted">Wchodzisz sam.</p>'}</div>
       ${g.solo ? '<p class="muted warn">⚠ Wejście w pojedynkę jest możliwe, ale bardzo trudne. Zaproś znajomych (dotknij gracza → „Zaproś do drużyny”).</p>' : '<p class="muted">Członkowie drużyny stojący w pobliżu wejdą razem z tobą.</p>'}
       ${g.lvl < (Array.isArray(g.lv) ? g.lv[0] : 1) ? `<p class="muted warn">⚠ Twój poziom (${g.lvl}) jest niższy niż zalecany.</p>` : ''}
@@ -152,7 +152,7 @@
       <small>${g.foes.map((f) => `${esc(f.n)} (${f.lvl})`).join(', ')}</small></button>`).join('');
     const party = D.party.map((m) => `<div class="dgp"><b>${esc(m.n)}</b> <small>${esc(CLS_N[m.c] || '')} ${m.l}${m.bt ? ' · walczy' : ''}</small><div class="bar hp"><i style="width:${pctW(m.hp, m.mh)}%"></i><span>${m.hp}/${m.mh}</span></div></div>`).join('');
     const loot = D.loot && D.loot.length ? `<h4>Twoje łupy z lochu</h4><div class="loot">${D.loot.map((it) => `<button type="button" class="lt" data-dgl="${esc(it.u)}">${iconHtml(it, 36)}<span>${nameHtml(it)}<small style="color:${RAR[it.r].col}">${RAR[it.r].n}${it.q > 1 ? ' ×' + it.q : ''}</small></span></button>`).join('')}</div>` : '';
-    const fin = D.fin ? `<div class="card win"><h3>🏆 Loch ukończony!</h3><p>${esc(D.bn)} pokonany. Następna próba po północy (czas polski).</p></div>` : '';
+    const fin = D.fin ? `<div class="card win"><h3>🏆 Loch ukończony!</h3><p>${esc(D.bn)} pokonany. Następna wyprawa po 12 godzinach od wejścia.</p></div>` : '';
     const boss = D.boss && !D.fin ? `<div class="card mechc"><b>👑 ${esc(D.bn)}</b><ul class="mech">${D.mech.map((m) => `<li>${esc(m)}</li>`).join('')}</ul></div>` : '';
     return `<div class="dg-head"><div><b>🕳 ${esc(D.n)}</b><small>Komnata ${D.room + 1}/${D.rooms.length}: ${esc(D.rn)}</small></div><div class="pips">${pips}</div></div>
       <canvas id="dgRoom" width="352" height="224" aria-label="Komnata lochu"></canvas>
@@ -253,7 +253,7 @@
   // ---------- wiring ----------
   E.menu = `<button type="button" data-open="dq"><b>📜</b>Zadania dzienne<small>J</small></button><button type="button" data-open="ach"><b>🏆</b>Osiągnięcia<small>O</small></button><button type="button" data-open="dgi"><b>🕳</b>Lochy</button>`;
   function openDgInfo() {
-    panel('dgi', '🕳 Lochy drużynowe', `<p class="muted">Lochy to instancje dla drużyny: kilka komnat z elitarnymi potworami i boss z własnymi mechanikami. Każdy loch możesz ukończyć raz dziennie (reset o północy czasu polskiego).</p>
+    panel('dgi', '🕳 Lochy drużynowe', `<p class="muted">Lochy to instancje dla drużyny: kilka komnat z elitarnymi potworami i boss z własnymi mechanikami. Do każdego lochu możesz wejść raz na 12 godzin (odliczanie od wejścia, niezależnie od wyniku).</p>
       <div class="glist"><div class="gm"><span><b>Nora Goblinów</b><small>Szepczący Bór · poz. 4–8 · boss Wódz Grzmot</small></span></div>
       <div class="gm"><span><b>Zatopiona Krypta</b><small>Bagna · poz. 10–15 · boss Pani Topieli</small></span></div>
       <div class="gm"><span><b>Grobowiec Sethara</b><small>Ruiny Piasków · poz. 18–24 · boss Arcykapłan Anubhet</small></span></div>

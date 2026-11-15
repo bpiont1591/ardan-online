@@ -194,7 +194,14 @@
       ${it.lore ? `<div class="dm lore">„${esc(it.lore)}”</div>` : ''}
       ${ctx.seller ? `<div class="dm">Sprzedający: ${esc(ctx.seller)}</div>` : ''}
       ${ctx.pr ? `<div class="dm">Cena: <b class="gold">${ctx.pr} zł</b></div>` : ''}
+      ${it.s !== 'mat' ? durHtml(it) : ''}
       <div class="dm">Wartość: ${it.v} zł</div>`;
+  }
+  // durability (round 7): worn gear loses durability on every death; at 0 it gives no stats until repaired
+  const durOf = (it) => { const dm = it.dm > 0 ? it.dm : 100; return { d: Number.isFinite(it.d) ? Math.max(0, Math.min(dm, it.d)) : dm, dm }; };
+  function durHtml(it) {
+    const { d, dm } = durOf(it), k = d / dm, col = d === 0 ? '#ff6a5a' : k < 0.3 ? '#ffa04a' : k < 0.6 ? '#ffd25a' : '#8fe08a';
+    return `<div class="dm dur">Wytrzymałość: <b style="color:${col}">${d}/${dm}</b><i class="durbar"><i style="width:${Math.round(k * 100)}%;background:${col}"></i></i></div>${d === 0 ? '<div class="dm bad">⚠ Zepsuty – nie daje żadnych statystyk. Napraw go u kowala lub płatnerza w mieście.</div>' : k < 0.3 ? '<div class="dm warn">Mocno zużyty – odwiedź kowala, zanim się zepsuje.</div>' : ''}`;
   }
   function showDetail(it, ctx) {
     closeDetail(); hideTip();
@@ -242,7 +249,7 @@
       if (s === null) { doll += '<i></i>'; continue; }
       if (s === '@') { doll += `<div class="portrait"><canvas id="eqPortrait" width="96" height="96"></canvas><small>${esc(CLS_N[G.cls] || '')} · poz. ${G.lvl}</small></div>`; continue; }
       const it = G.gear && G.gear[s];
-      doll += `<button type="button" class="slot ${it ? 'r' + it.r : 'empty'}" data-slot="${s}" title="${esc(slotName(s, G.cls))}">${it ? `<img src="${itemIcon(it, 40)}" alt="${esc(it.n)}" width="40" height="40">` : `<span>${esc(slotName(s, G.cls))}</span>`}</button>`;
+      doll += `<button type="button" class="slot ${it ? 'r' + it.r : 'empty'}${it && durOf(it).d === 0 ? ' broken' : ''}" data-slot="${s}" title="${esc(slotName(s, G.cls))}">${it ? `<img src="${itemIcon(it, 40)}" alt="${esc(it.n)}" width="40" height="40">` : `<span>${esc(slotName(s, G.cls))}</span>`}</button>`;
     }
     const st = G.st || {};
     const stats = [['Atak', st.atk], ['Obrona', st.def], ['Życie', st.hp], [st.res || 'Mana', st.mp], ['Cios krytyczny', (st.crit || 0) + '%'], ['Unik', (st.dodge || 0) + '%']]
@@ -312,8 +319,26 @@
         ${commons.length ? `<button type="button" data-np="common">Sprzedaj zwykłe przedmioty (${commons.length}) · ${sum} zł</button>` : ''}
         ${N.junk && N.junk.n ? `<button type="button" class="sec" data-np="junk">Sprzedaj łupy (${N.junk.n}) · ${N.junk.sum} zł</button>` : ''}</div>`;
   }
+  // ---- blacksmith repairs (Kowal / Płatnerz) ----
+  function repHtml() {
+    const N = S.rep; if (!N) return '<p class="muted">Wczytywanie…</p>';
+    const G = S.gear || {}, gold = G.gold != null ? G.gold : N.gold;
+    const rows = N.items.map((x) => { const k = x.d / x.dm, col = x.d === 0 ? '#ff6a5a' : k < 0.3 ? '#ffa04a' : k < 0.6 ? '#ffd25a' : '#8fe08a';
+      return `<div class="li rep"><span><b style="color:${RAR[x.r] ? RAR[x.r].col : '#fff'}">${esc(x.n)}</b>${x.sl ? ` <small>(${esc(slotName(x.sl === 'ring1' || x.sl === 'ring2' ? 'ring' : x.sl, G.cls))}, założony)</small>` : ' <small>(w torbie)</small>'}<br><small>Wytrzymałość <b style="color:${col}">${x.d}/${x.dm}</b>${x.d === 0 ? ' · <em class="bad">zepsuty</em>' : ''}</small></span>
+        ${x.c > 0 ? `<button type="button" data-rep="${esc(x.u)}" ${gold >= x.c ? '' : 'disabled'}>Napraw · ${x.c} zł</button>` : '<small class="okm">✓ sprawny</small>'}</div>`; }).join('');
+    return `<p class="muted">${esc(N.n)} naprawi twój ekwipunek. Po każdej śmierci założone przedmioty tracą 10 pkt wytrzymałości, a zepsute (0) nie dają statystyk. Masz <b class="gold">${gold} zł</b>.</p>
+      <div class="legacy">${rows || '<p class="muted">Nie masz ekwipunku do naprawy.</p>'}</div>
+      <div class="da" style="margin-top:12px">${N.all > 0 ? `<button type="button" data-rep="*" ${gold >= N.all ? '' : 'disabled'}>⚒ Napraw wszystko · ${N.all} zł</button>` : '<span class="okm">✓ Cały ekwipunek jest sprawny.</span>'}</div>`;
+  }
+  function refreshRep() { if (S.open !== 'rep') return; const b = curBody(); if (!b) return; const top = b.scrollTop; b.innerHTML = repHtml(); b.scrollTop = top; }
   function refreshSkup() { if (S.open !== 'skup') return; const b = curBody(); if (!b) return; const top = b.scrollTop; b.innerHTML = skupHtml(); b.scrollTop = top; }
   function onNpcUi(msg) {
+    if (msg.k === 'naprawa') {
+      if (msg.closed) { S.rep = null; if (S.open === 'rep') closePanels(); return; }
+      S.rep = msg; if (S.gear) S.gear.gold = msg.gold;
+      if (S.open !== 'rep') { panel('rep', `⚒ Naprawa · ${esc(msg.n)}`, repHtml(), 'wide'); send({ t: 'gear', a: 'get' }); } else refreshRep();
+      return;
+    }
     if (msg.closed) { if (msg.k === 'skup') { S.npc = null; if (S.open === 'skup') closePanels(); } return; }
     if (msg.k === 'skup') { S.npc = msg; if (S.gear) S.gear.gold = msg.gold; if (S.open !== 'skup') { panel('skup', `Skup · ${esc(msg.n)}`, skupHtml(), 'wide'); send({ t: 'gear', a: 'get' }); } else refreshSkup(); }
   }
@@ -374,14 +399,14 @@
   }
   function pvpHtml() {
     const z = myZone();
-    const zones = NET.api.zones.map((q) => `<li>${esc(q.n)} – ${esc(AREA_N[q.area] || q.area)}</li>`).join('');
+    const zones = NET.api.zones.map((q) => `<li>${q.lethal ? '<b class="bad">⚔ mapa PvP</b>' : 'arena'}: ${esc(q.n)}${q.lethal ? '' : ' – ' + esc(AREA_N[q.area] || q.area)}</li>`).join('');
     const near = z ? nearPlayers().filter((x) => NET.api.pvpAt(x.area, x.x, x.y) && !(NET.party && NET.party[x.i]) && !x.fb) : [];
     const R = S.pvp;
     const rows = R ? R.rank.map((x) => `<tr class="${x.me ? 'me' : ''}"><td>${x.i}</td><td>${esc(x.n)}</td><td>${esc(CLS_N[x.cls] || '')}</td><td>${x.lvl || ''}</td><td><b>${x.pts}</b></td><td>${x.w}/${x.l}</td></tr>`).join('') : '';
-    return `<div class="card ${z ? 'zone-on' : ''}">${z ? `⚔ Jesteś w strefie PvP: <b>${esc(z.n)}</b>. Możesz wyzwać innych graczy na pojedynek turowy.` : 'Nie jesteś w strefie PvP. Pojedynki są możliwe tylko w strefach zaznaczonych na czerwono:'}<ul class="zl">${z ? '' : zones}</ul></div>
-      ${z ? `<h4>Gracze w pobliżu</h4>${near.length ? near.map((x) => `<div class="gm"><span><b>${x.gt ? '[' + esc(x.gt) + '] ' : ''}${esc(x.n)}</b><small>${esc(CLS_N[x.c] || '')} · poz. ${x.l}</small></span><span class="ga"><button type="button" data-duel="${esc(x.i)}">⚔ Wyzwij</button></span></div>`).join('') : '<p class="muted">Nikogo nie ma w pobliżu na arenie.</p>'}` : ''}
+    return `<div class="card ${z ? 'zone-on' : ''}">${z ? (z.lethal ? `⚔ Jesteś na mapie PvP: <b>${esc(z.n)}</b>. Możesz zaatakować innych graczy – przegrany ginie (traci 10% złota i wytrzymałość ekwipunku, przedmiotów nikt nie zabiera).` : `⚔ Jesteś na arenie: <b>${esc(z.n)}</b>. Możesz wyzwać innych graczy na pojedynek o punkty rankingu (bez śmierci).`) : 'Jesteś w strefie bezpiecznej – tu nikt cię nie zaatakuje. Walki z graczami są możliwe tylko tutaj:'}<ul class="zl">${z ? '' : zones}</ul></div>
+      ${z ? `<h4>Gracze w pobliżu</h4>${near.length ? near.map((x) => `<div class="gm"><span><b>${x.gt ? '[' + esc(x.gt) + '] ' : ''}${esc(x.n)}</b><small>${esc(CLS_N[x.c] || '')} · poz. ${x.l}</small></span><span class="ga"><button type="button" data-duel="${esc(x.i)}">${z.lethal ? '⚔ Zaatakuj' : '⚔ Wyzwij'}</button></span></div>`).join('') : '<p class="muted">Nikogo nie ma w pobliżu na arenie.</p>'}` : ''}
       <h4>Ranking PvP</h4>${R ? `<table class="rank"><thead><tr><th>#</th><th>Gracz</th><th>Klasa</th><th>Poz.</th><th>Pkt</th><th>W/P</th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="muted">Brak pojedynków.</td></tr>'}</tbody></table>${R.mine && !R.rank.some((x) => x.me) ? `<p class="muted">Twoje miejsce: ${R.mine.i} (${R.mine.pts} pkt)</p>` : ''}` : '<p class="muted">Wczytywanie rankingu…</p>'}
-      <p class="muted">Każdy zaczyna z 1000 punktami. Wygrana z silniejszym daje więcej punktów. Przegrany zostaje z 1 pż, bez utraty przedmiotów.</p>`;
+      <p class="muted">Areny: każdy zaczyna z 1000 punktami, wygrana z silniejszym daje więcej punktów, przegrany zostaje z 1 pż. Mapy PvP: walka na śmierć; gracze poniżej 10. poziomu są chronieni, nie można atakować graczy słabszych o więcej niż 10 poziomów, a tego samego gracza można zaatakować ponownie dopiero po 3 minutach.</p>`;
   }
   function openPvp() { panel('pvp', 'PvP i ranking', pvpHtml(), 'wide'); send({ t: 'pvp', a: 'rank' }); }
   function refreshPvp() { if (S.open !== 'pvp') return; const b = curBody(); if (b) b.innerHTML = pvpHtml(); }
@@ -402,7 +427,7 @@
     const inGd = S.gd && S.gd.g;
     panel('pl', `${o.gt ? '[' + esc(o.gt) + '] ' : ''}${esc(o.n)}`, `<p class="muted">${esc(CLS_N[o.c] || '')} · poziom ${o.l}${o.fb ? ' · teraz walczy' : ''}</p>
       <div class="plist">
-        <button type="button" data-pa="duel" data-i="${esc(o.i)}" ${z && !o.fb ? '' : 'disabled'}>⚔ Wyzwij na pojedynek${z ? '' : '<small>tylko w strefie PvP</small>'}</button>
+        <button type="button" data-pa="duel" data-i="${esc(o.i)}" ${z && !o.fb ? '' : 'disabled'}>${z && z.lethal ? '⚔ Zaatakuj (walka na śmierć)' : '⚔ Wyzwij na pojedynek'}${z ? '' : '<small>strefa bezpieczna – tylko na mapach PvP i arenach</small>'}</button>
         <button type="button" data-pa="trade" data-i="${esc(o.i)}">🤝 Handel</button>
         <button type="button" data-pa="party" data-n="${esc(o.n)}">◆ Zaproś do drużyny</button>
         ${inGd && S.gd.g.my >= 1 ? `<button type="button" data-pa="guild" data-n="${esc(o.n)}">🛡 Zaproś do gildii</button>` : ''}
@@ -490,7 +515,8 @@
   function showEnd(st) {
     const e = st.end, box = $('#btEnd', bt.el);
     let h;
-    if (e.pvp) h = `<h2 class="${e.win ? 'win' : 'lose'}">${e.win ? 'Zwycięstwo!' : 'Porażka'}</h2><p>${e.win ? 'Pokonujesz' : 'Przegrywasz z'} ${esc(e.vs)}.</p><p class="big">${e.pts > 0 ? '+' : ''}${e.pts} pkt rankingu · razem ${e.total}</p>`;
+    if (e.pvp && e.lethal) h = `<h2 class="${e.win ? 'win' : 'lose'}">${e.win ? 'Zwycięstwo!' : 'Zginąłeś'}</h2><p>${e.win ? `Zabijasz gracza ${esc(e.vs)} w strefie PvP.` : `Zabija cię ${esc(e.vs)}. Tracisz 10% złota, a założony ekwipunek traci wytrzymałość. Budzisz się w najbliższym mieście.`}</p>`;
+    else if (e.pvp) h = `<h2 class="${e.win ? 'win' : 'lose'}">${e.win ? 'Zwycięstwo!' : 'Porażka'}</h2><p>${e.win ? 'Pokonujesz' : 'Przegrywasz z'} ${esc(e.vs)}.</p><p class="big">${e.pts > 0 ? '+' : ''}${e.pts} pkt rankingu · razem ${e.total}</p>`;
     else if (e.win) h = `<h2 class="win">Zwycięstwo!</h2><p class="big">+${e.xp} PD · +${e.gold} zł</p>${e.lvlUp ? `<p class="lvl">Awans na poziom ${e.lvlUp}!</p>` : ''}
       ${e.loot && e.loot.length ? `<h4>Łup</h4><div class="loot">${e.loot.map((it) => `<button type="button" class="lt" data-loot="${esc(it.u)}">${iconHtml(it, 40)}<span>${nameHtml(it)}<small style="color:${RAR[it.r].col}">${RAR[it.r].n}</small></span></button>`).join('')}</div>` : '<p class="muted">Tym razem bez przedmiotów.</p>'}`;
     else if (e.dead) h = '<h2 class="lose">Polegasz…</h2><p>Odrodzisz się w osadzie.</p>';
@@ -607,8 +633,16 @@
   }
   let lastZone = null;
   function onState() {
-    const z = myZone(); const n = z ? z.n : null;
-    if (n !== lastZone) { lastZone = n; const p = $('#uiZone'); p.hidden = !n; if (n) p.textContent = '⚔ Strefa PvP: ' + n; if (S.open === 'pvp') refreshPvp(); }
+    // zone badge (round 7): always visible – safe map / arena (friendly duels) / PvP map (lethal)
+    const z = myZone(); let area = ''; try { area = NET.api.P().area; } catch (e) {}
+    const key = area + '|' + (z ? z.n : '');
+    if (key !== lastZone) {
+      lastZone = key; const p = $('#uiZone'); p.hidden = !area;
+      p.className = 'ui-zone ' + (z ? (z.lethal ? 'pvp' : 'arena') : 'safe');
+      p.textContent = z ? (z.lethal ? `☠ Strefa PvP: ${z.n} – gracze mogą cię zaatakować` : `⚔ Pojedynki: ${z.n}`) : '🛡 Strefa bezpieczna';
+      p.title = z ? (z.lethal ? 'Mapa PvP: gracze od 10. poziomu mogą się atakować (różnica maks. 10 poziomów). Przegrany ginie: traci 10% złota i wytrzymałość ekwipunku.' : 'Arena: pojedynki o punkty rankingu, bez śmierci.') : 'Tu inni gracze nie mogą cię zaatakować.';
+      if (S.open === 'pvp') refreshPvp();
+    }
   }
 
   // ---------- input ----------
@@ -628,7 +662,7 @@
     if (detail) { if (lk === 'Escape') closeDetail(); return true; }
     if (EXT.key && EXT.key(lk, !!S.open)) return true;
     if (S.open) {
-      if (lk === 'Escape' || (lk === 'i' && S.open === 'eq') || (lk === 'r' && (S.open === 'mk' || S.open === 'hand' || S.open === 'skup')) || (lk === 'u' && S.open === 'gd') || (lk === 'p' && S.open === 'pvp')) { closePanels(); return true; }
+      if (lk === 'Escape' || (lk === 'i' && S.open === 'eq') || (lk === 'r' && (S.open === 'mk' || S.open === 'hand' || S.open === 'skup' || S.open === 'rep')) || (lk === 'u' && S.open === 'gd') || (lk === 'p' && S.open === 'pvp')) { closePanels(); return true; }
       if (lk === 'i') { openEq(); return true; } if (lk === 'r') { openMk(); return true; } if (lk === 'u') { openGd(); return true; } if (lk === 'p') { openPvp(); return true; }
       return true;
     }
@@ -649,6 +683,7 @@
     const bi = t.closest('[data-bag]'); if (bi && S.gear) { const it = S.gear.bag.find((x) => x.u === bi.dataset.bag); if (it) showDetail(it, { from: 'bag' }); return; }
     const us = t.closest('[data-use]'); if (us) { send({ t: 'in', mx: 0, my: 0, acts: [{ a: 'use', id: us.dataset.use }] }); setTimeout(() => send({ t: 'gear', a: 'get' }), 200); return; }
     const mt = t.closest('[data-mtab]'); if (mt) { mkTab = mt.dataset.mtab; refreshMk(); return; }
+    const rp = t.closest('[data-rep]'); if (rp && !rp.disabled && S.rep) { send(rp.dataset.rep === '*' ? { t: 'npc', a: 'repair' } : { t: 'npc', a: 'repair', u: rp.dataset.rep }); return; }
     const np = t.closest('[data-np]'); if (np && !np.disabled && S.npc) {
       if (np.dataset.np === 'junk') send({ t: 'npc', a: 'junk' });
       else { const us = ((S.gear && S.gear.bag) || []).filter((it) => it.r === 0 && it.s !== 'mat').map((it) => it.u); if (!np.dataset.sure) { np.dataset.sure = 1; np.textContent = `Na pewno sprzedać ${us.length} szt.?`; return; } send({ t: 'npc', a: 'sellmany', us }); }

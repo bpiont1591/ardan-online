@@ -2,15 +2,18 @@
 // Kupcy i aukcjonerzy: przedmioty sprzedaje się wyłącznie u NPC w miastach.
 //  - "skup"   (Handlarz)   – odkupuje ekwipunek za połowę wartości i łupy (trofea) z torby,
 //  - "aukcja" (Aukcjoner)  – dom aukcyjny: wystawianie, kupowanie i wycofywanie ofert graczy.
+//  - "naprawa" (Kowal / Płatnerz) – naprawa wytrzymałości ekwipunku za złoto (runda 7).
 // Serwer zawsze sprawdza, czy gracz stoi przy właściwym NPC (ta sama kraina, odległość ≤ RANGE pól).
 const RANGE = 2;
 const U_RE = /^[a-z0-9]{6,24}$/;
 const cheb = (ax, ay, bx, by) => Math.max(Math.abs(ax - bx), Math.abs(ay - by));
+const I = require('./items');
 
 function createMerchant(world) {
   const sys = (p, t) => world.chat.sys(p, t);
   let list = null;
-  const npcs = (api) => { if (!list) list = Object.keys(api.npcs).filter((k) => api.npcs[k].trade).map((k) => Object.assign({ id: k }, api.npcs[k])); return list; };
+  // every trade NPC with its kind: skup / aukcja (from the NPC data) or naprawa (blacksmiths with rep: 1)
+  const npcs = (api) => { if (!list) list = Object.keys(api.npcs).filter((k) => api.npcs[k].trade || api.npcs[k].rep).map((k) => Object.assign({ id: k }, api.npcs[k], { trade: api.npcs[k].trade || 'naprawa' })); return list; };
   // nearest trade NPC of the given type the player is standing next to (or null)
   function near(p, type) {
     const P = p.api.P();
@@ -28,11 +31,35 @@ function createMerchant(world) {
     const P = p.api.P(), j = junk(p);
     return { t: 'npcui', k: 'skup', npc: n.id, n: n.n, area: P.area, gold: P.gold, bag: P.gbag.map((it) => ({ u: it.u, pr: price(it) })), junk: j };
   }
+  // ---- repairs (Kowal / Płatnerz): every worn or carried item, cost = I.repairCost
+  function repList(p) {
+    const P = p.api.P(), out = [];
+    for (const sl of Object.keys(P.gear || {})) { const it = P.gear[sl]; if (it && it.s !== 'mat') out.push({ it, sl }); }
+    for (const it of P.gbag || []) if (it && it.s !== 'mat' && I.durOf(it) < I.durMax(it)) out.push({ it, sl: null });
+    return out;
+  }
+  function repView(p, n) {
+    const P = p.api.P();
+    const items = repList(p).map(({ it, sl }) => ({ u: it.u, sl, n: it.n, r: it.r, d: I.durOf(it), dm: I.durMax(it), c: I.repairCost(it) }));
+    return { t: 'npcui', k: 'naprawa', npc: n.id, n: n.n, area: P.area, gold: P.gold, items, all: items.reduce((s, x) => s + x.c, 0) };
+  }
+  function doRepair(p, n, u) {
+    const P = p.api.P();
+    const todo = repList(p).filter(({ it }) => I.repairCost(it) > 0 && (!u || it.u === u));
+    if (!todo.length) return sys(p, u ? 'Ten przedmiot nie wymaga naprawy.' : 'Nic nie wymaga naprawy.');
+    const cost = todo.reduce((s, x) => s + I.repairCost(x.it), 0);
+    if (P.gold < cost) return sys(p, `Naprawa kosztuje ${cost} zł – masz tylko ${P.gold} zł.`);
+    world.atomic([p], () => { P.gold -= cost; for (const { it } of todo) I.repair(it); });
+    p.srv.dirty = true; world.gear.changed(p);
+    sys(p, todo.length === 1 ? `⚒ ${n.n} naprawia: ${todo[0].it.n} (${cost} zł).` : `⚒ ${n.n} naprawia ${todo.length} przedmiotów za ${cost} zł.`);
+  }
+  const FAR = { aukcja: 'Dom aukcyjny prowadzą aukcjonerzy w miastach', skup: 'Przedmioty odkupują handlarze w miastach', naprawa: 'Ekwipunek naprawiają kowale i płatnerze w miastach' };
   function open(p, type, quiet) {
     const n = near(p, type);
-    if (!n) { if (!quiet) sys(p, type === 'aukcja' ? `Dom aukcyjny prowadzą aukcjonerzy w miastach: ${where(p.api, 'aukcja')}. Podejdź do jednego z nich.` : `Przedmioty odkupują handlarze w miastach: ${where(p.api, 'skup')}. Podejdź do jednego z nich.`); return false; }
+    if (!n) { if (!quiet) sys(p, `${FAR[type] || FAR.skup}: ${where(p.api, type || 'skup')}. Podejdź do jednego z nich.`); return false; }
     p.npcOpen = n.trade; p.npcId = n.id;
     if (n.trade === 'aukcja') { world.market.open(p, n); return true; }
+    if (n.trade === 'naprawa') { world.send(p, repView(p, n)); return true; }
     world.send(p, view(p, n)); return true;
   }
   function close(p, why) { if (!p.npcOpen) return; const k = p.npcOpen; p.npcOpen = null; p.npcId = null; world.send(p, { t: 'npcui', k, closed: true }); if (why) sys(p, why); }
@@ -51,7 +78,7 @@ function createMerchant(world) {
     if (cnt) { p.srv.dirty = true; sys(p, `${n.n} odkupuje łupy (${cnt} szt.) za ${sum} zł.`); } else sys(p, 'Nie masz łupów na sprzedaż.');
   }
   return {
-    name: 'merchant', RANGE, near, open, close, where, price,
+    name: 'merchant', RANGE, near, open, close, where, price, repView,
     list: (api) => npcs(api).map((n) => ({ id: n.id, n: n.n, k: n.trade, area: n.area, x: n.x, y: n.y })),
     onLeave(p) { p.npcOpen = null; },
     onTick() {
@@ -64,8 +91,17 @@ function createMerchant(world) {
     onMsg(p, msg) {
       if (msg.t !== 'npc') return false;
       if (p.battle) return true;
-      if (msg.a === 'open') { open(p, msg.k === 'aukcja' ? 'aukcja' : msg.k === 'skup' ? 'skup' : null); return true; }
+      if (msg.a === 'open') { open(p, ['aukcja', 'skup', 'naprawa'].indexOf(msg.k) >= 0 ? msg.k : null); return true; }
       if (msg.a === 'close') { close(p); return true; }
+      if (msg.a === 'repair') {
+        // repairs only while standing next to a blacksmith (server-checked)
+        const n = near(p, 'naprawa');
+        if (!n) { close(p); sys(p, `Naprawiać ekwipunek możesz tylko u kowala lub płatnerza (${where(p.api, 'naprawa')}). Podejdź do niego.`); world.send(p, { t: 'npcui', k: 'naprawa', closed: true, err: 'far' }); return true; }
+        p.npcOpen = 'naprawa'; p.npcId = n.id;
+        doRepair(p, n, typeof msg.u === 'string' && U_RE.test(msg.u) ? msg.u : null);
+        world.send(p, repView(p, n));
+        return true;
+      }
       const n = near(p, 'skup');
       if (!n) { close(p); sys(p, `Sprzedawać możesz tylko u handlarza (${where(p.api, 'skup')}). Podejdź do niego.`); world.send(p, { t: 'npcui', k: 'skup', closed: true, err: 'far' }); return true; }
       p.npcOpen = 'skup'; p.npcId = n.id;

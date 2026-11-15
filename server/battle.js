@@ -6,6 +6,8 @@ const START_RANGE = 3;          // tiles: attack key next to a monster
 const CLICK_RANGE = 7;          // tiles: clicking/tapping a visible monster starts the fight
 const PARTY_RANGE = 12;         // party members this close join the fight
 const DUEL_RANGE = 8;
+const PVP_MIN_LVL = 10, PVP_LVL_GAP = 10, PK_CD = 180000; // lethal PvP: newbie protection, level gap, same-victim cooldown
+const pkCd = new Map();
 const CHOOSE_MS = 20000;        // time to pick an action, then the round is played automatically
 const STEP_MS = { 1: 650, 2: 330, 3: 120 };
 const cheb = (ax, ay, bx, by) => Math.max(Math.abs(ax - bx), Math.abs(ay - by));
@@ -37,7 +39,7 @@ function createBattles(world) {
   // item passives (round 5): summed per kind from worn gear, capped
   function gearPx(P) {
     const out = {}, g = P.gear || {};
-    for (const sl of Object.keys(g)) { const it = g[sl]; if (it && Array.isArray(it.px)) for (const [k, v] of it.px) if (I.PXD.PX[k] && Number.isFinite(v)) out[k] = Math.min(I.PXD.PX[k].cap, (out[k] || 0) + v); }
+    for (const sl of Object.keys(g)) { const it = g[sl]; if (it && it.d !== 0 && Array.isArray(it.px)) for (const [k, v] of it.px) if (I.PXD.PX[k] && Number.isFinite(v)) out[k] = Math.min(I.PXD.PX[k].cap, (out[k] || 0) + v); }
     return out;
   }
   const pxEv = (ev, f, txt, extra) => ev.push(Object.assign({ a: f.id, k: 'px', txt: '✦ ' + txt }, extra || {}));
@@ -117,11 +119,21 @@ function createBattles(world) {
     const P = p.api.P(), Q = q.api.P();
     if (P.area !== Q.area || cheb(P.x, P.y, Q.x, Q.y) > DUEL_RANGE) return sys(p, 'Podejdź bliżej do przeciwnika.');
     const z1 = p.api.pvpAt(P.area, P.x, P.y), z2 = p.api.pvpAt(Q.area, Q.x, Q.y);
-    if (!z1 || !z2) return sys(p, 'Walczyć z graczami można tylko w strefie PvP (zaznaczonej na czerwono).');
+    if (!z1 || !z2) return sys(p, 'To bezpieczna strefa – walczyć z graczami można tylko na mapach PvP i na arenach.');
     if (p.partyId && p.partyId === q.partyId) return sys(p, 'Nie możesz walczyć z członkiem swojej drużyny.');
-    const b = { id: nextId++, kind: 'pvp', area: P.area, zone: z1.n, f: [fPlayer(p, 0), fPlayer(q, 1)], round: 0, phase: 'choose', speed: p.fightSpeed || 1, lead: p.pid };
+    // whole PvP maps: a real (lethal) fight; arenas: a friendly duel for ranking points
+    const lethal = !!(z1.lethal && z2.lethal);
+    if (lethal) {
+      if (Q.lvl < PVP_MIN_LVL) return sys(p, `Gracze poniżej ${PVP_MIN_LVL}. poziomu są chronieni przed atakami.`);
+      if (P.lvl < PVP_MIN_LVL) return sys(p, `Atakować innych graczy możesz od ${PVP_MIN_LVL}. poziomu.`);
+      if (P.lvl - Q.lvl > PVP_LVL_GAP) return sys(p, `Nie możesz atakować graczy słabszych od ciebie o więcej niż ${PVP_LVL_GAP} poziomów.`);
+      const k = ckey(p) + '>' + ckey(q), t = pkCd.get(k);
+      if (t && Date.now() < t) return sys(p, `Niedawno walczyłeś z ${q.nick}. Spróbuj ponownie za ${Math.ceil((t - Date.now()) / 1000)} s.`);
+    }
+    const b = { id: nextId++, kind: 'pvp', lethal, area: P.area, zone: z1.n, f: [fPlayer(p, 0), fPlayer(q, 1)], round: 0, phase: 'choose', speed: p.fightSpeed || 1, lead: p.pid };
     begin(b);
-    for (const o of world.inArea(P.area)) sys(o, `⚔ ${p.nick} wyzywa ${q.nick} na pojedynek! (${z1.n})`);
+    if (lethal) { pkCd.set(ckey(p) + '>' + ckey(q), Date.now() + PK_CD); sys(q, `⚔ ${p.nick} atakuje cię! To strefa PvP – walcz albo zginiesz.`); for (const o of world.inArea(P.area)) if (o !== q) sys(o, `⚔ ${p.nick} atakuje ${q.nick}! (${z1.n} – strefa PvP)`); }
+    else for (const o of world.inArea(P.area)) sys(o, `⚔ ${p.nick} wyzywa ${q.nick} na pojedynek! (${z1.n})`);
   }
   // fight against monsters that do not live on the world map (dungeon rooms); ps = players, foes = pseudo monsters
   function startCustom(ps, foes, opts) {
@@ -381,7 +393,14 @@ function createBattles(world) {
       const [a, c] = players(b);
       const winner = active(a) ? a : c, loser = winner === a ? c : a;
       for (const f of [a, c]) { if (f.left) continue; const P = f.p.api.P(); P.hp = Math.max(1, Math.round(f.hp)); P.mp = Math.max(0, Math.round(f.mp)); f.p.srv.dirty = true; }
-      if (why !== 'abort') {
+      if (why !== 'abort' && b.lethal) {
+        // lethal PvP: the loser dies (gold loss + durability loss like any death). No item stealing.
+        if (!loser.left) loser.p.api.die();
+        end[winner.id] = { win: true, pvp: true, lethal: true, vs: loser.n };
+        end[loser.id] = { win: false, pvp: true, lethal: true, dead: true, vs: winner.n };
+        world.emit('onEvent', winner.p, 'pvp', { win: true, lethal: true });
+        for (const o of world.inArea(b.area)) sys(o, `☠ ${winner.n} zabija ${loser.n} w strefie PvP (${b.zone}).`);
+      } else if (why !== 'abort') {
         const rk = rank();
         const ent = (f) => { const P = f.p.api.P(); const e = rk[ckey(f.p)] = rk[ckey(f.p)] || { n: f.n, cls: f.cls, pts: 1000, w: 0, l: 0 }; e.n = f.n; e.cls = f.cls; e.lvl = P.lvl; return e; };
         const ew = ent(winner), el = ent(loser);
@@ -444,7 +463,12 @@ function createBattles(world) {
       const f = b.f.find((x) => x.id === p.pid); if (f) { f.fled = true; f.left = true; }
       p.battle = null;
       if (!players(b).some((x) => active(x) && !x.left)) finish(b, 'abort');
-      else if (b.kind === 'pvp') { f.alive = false; f.fled = false; finish(b); }
+      else if (b.kind === 'pvp') {
+        f.alive = false; f.fled = false;
+        // logging out during a lethal fight counts as a death (no escaping by disconnecting)
+        if (b.lethal) { try { const P = p.api.P(); p.api.die(); const r = p.api.pl.resp; if (r) { P.area = r[0]; P.x = r[1]; P.y = r[2]; } P.hp = p.api.maxHp(); world.gear.deathWear(p); world.persist(p); } catch (e) { console.error('[ARDAN] pvp leave', e); } }
+        finish(b);
+      }
     },
     onMsg(p, msg) {
       if (msg.t === 'pvp') {

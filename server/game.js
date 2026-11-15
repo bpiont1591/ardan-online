@@ -45,7 +45,8 @@ function testHook(world, p, m) {
   if (Number.isInteger(m.lvl)) { P.lvl = Math.max(1, Math.min(80, m.lvl)); P.xp = 0; }
   if (Number.isInteger(m.gold)) P.gold = m.gold;
   if (m.mats) world.gear.give(p, Object.keys(m.mats).map((k) => require('./items').mat(k, m.mats[k])));
-  if (m.tp) { P.area = m.tp.area; P.x = m.tp.x; P.y = m.tp.y; }
+  if (m.tp) { P.area = m.tp.area; P.x = m.tp.x; P.y = m.tp.y;
+    for (let r = 1; r < 12 && p.api.solid(P.area, P.x, P.y); r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (p.api.solid(P.area, P.x, P.y) && !p.api.solid(P.area, m.tp.x + dx, m.tp.y + dy)) { P.x = m.tp.x + dx; P.y = m.tp.y + dy; } }
   if (m.near) { // stand on a free tile next to a gathering node / gate / NPC
     const area = m.near.area || P.area; let t = null;
     if (m.near.npc) { const n = p.api.npcs[m.near.npc]; if (n) t = { a: n.area, x: n.x, y: n.y }; }
@@ -57,6 +58,8 @@ function testHook(world, p, m) {
   if (Number.isInteger(m.loot) && m.loot > 0) { const I = require('./items'); world.gear.give(p, Array.from({ length: Math.min(12, m.loot) }, () => I.randomItem(P.lvl, 2))); }
   if (typeof m.leg === 'string') { const I = require('./items'); if (I.PXD.LEG.some((d) => d.id === m.leg)) world.gear.give(p, [I.makeLeg(m.leg)]); }
   if (m.heal) { P.hp = p.api.maxHp(); P.mp = 9999; }
+  if (Number.isInteger(m.wear) && m.wear > 0) { const I = require('./items'); for (const it of Object.values(P.gear || {}).concat(P.gbag || [])) if (it) I.wear(it, m.wear); }
+  if (m.dgLock && typeof m.dgLock === 'object') { P.dgLock = P.dgLock || {}; for (const k of Object.keys(m.dgLock)) P.dgLock[k] = Date.now() - m.dgLock[k]; }
   if (m.dqdone && P.daily) { const q = P.daily.q[0]; q.have = q.need; q.done = true; p.dqDirty = true; }
   p.srv.dirty = true; world.gear.changed(p);
 }
@@ -241,7 +244,7 @@ class World {
         const ms = JSON.stringify(meObj); if (ms !== p.lastMe) { p.lastMe = ms; this.send(p, { t: 'me', me: meObj }); }
         const dv = JSON.stringify(p.api.dlgView()); if (dv !== p.lastDlg) { p.lastDlg = dv; this.send(p, { t: 'dlg', d: JSON.parse(dv) }); }
         const sr = p.api.shopReq(); if (sr) this.send(p, { t: 'shop', shop: sr });
-        const ur = p.api.uiReq(); if (ur) this.merchant.open(p, ur.split(':')[0] === 'aukcja' ? 'aukcja' : 'skup');
+        const ur = p.api.uiReq(); if (ur) { const k = ur.split(':')[0]; this.merchant.open(p, k === 'aukcja' || k === 'naprawa' ? k : 'skup'); }
         if (p.srv.dirty && nowMs - p.saveT > 15000) this.persist(p);
       }
     }

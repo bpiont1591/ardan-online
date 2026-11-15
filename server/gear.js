@@ -66,18 +66,28 @@ function createGear(world) {
     if (space(p) <= 0) return sys(p, 'Torba jest pełna!');
     P.gbag.push(P.gear[slot]); delete P.gear[slot]; changed(p);
   }
+  // death penalty: every worn item loses durability (broken items give no stats until repaired)
+  function deathWear(p) {
+    const P = p.api.P(); if (p.api.pl) p.api.pl.wear = 0; if (!P.gear) return [];
+    const broke = [];
+    for (const sl of Object.keys(P.gear)) { const it = P.gear[sl]; if (!it) continue; const was = I.durOf(it); I.wear(it, I.DUR_LOSS); if (was > 0 && it.d === 0) broke.push(it.n); }
+    p.srv.dirty = true; changed(p);
+    sys(p, broke.length ? `⚒ Twój ekwipunek traci wytrzymałość. Zepsute (nie dają statystyk): ${broke.join(', ')}. Napraw je u kowala.` : `⚒ Założony ekwipunek traci ${I.DUR_LOSS} pkt wytrzymałości. Napraw go u kowala w mieście.`);
+    return broke;
+  }
   function view(p) {
     const P = p.api.P();
     return { t: 'gear', gear: P.gear, bag: P.gbag, max: BAG, st: p.api.stats(), gold: P.gold, lvl: P.lvl, cls: P.cls, inv: P.inv };
   }
   function push(p) { const v = view(p); const s = JSON.stringify(v); if (s !== p.lastGear) { p.lastGear = s; world.send(p, v); } }
   return {
-    name: 'gear', BAG, give, take, find, findAny, countMat, useMat, space, ensure, changed,
+    name: 'gear', BAG, deathWear, give, take, find, findAny, countMat, useMat, space, ensure, changed,
     onJoin(p) { ensure(p); p.gearDirty = true; },
     onTick() {
       for (const p of world.players.values()) {
         if (p.bot) continue;
         const P = p.api.P();
+        if (p.api.pl && p.api.pl.wear) deathWear(p); // set by the engine on every death
         // shop / quest weapons and armour land in the old item list – move them into the equipment bag
         for (let i = P.inv.length - 1; i >= 0; i--) {
           const s = P.inv[i], def = p.api.items[s.id];
