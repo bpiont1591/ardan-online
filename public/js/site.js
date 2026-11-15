@@ -24,7 +24,7 @@
       <button class="menu-btn" type="button" aria-label="Menu">Menu</button>
       <nav class="links">${L('#swiat', 'Świat')}${L('#ranking', 'Ranking')}${L('#nowosci', 'Nowości')}
       <span class="online-pill"><i></i><span data-online>…</span> online</span>
-      ${user ? `${user.role === 'admin' || user.role === 'moderator' ? '<a href="/admin">Panel</a>' : ''}<a href="/postacie">Moje postacie</a><a href="#" data-logout>Wyloguj (${A.esc(user.login)})</a><a class="btn primary small" href="/postacie">Graj teraz</a>`
+      ${user ? `${user.role === 'admin' || user.role === 'moderator' ? '<a href="/admin">Panel</a>' : ''}<a href="/postacie">Moje postacie</a><a href="/logowanie" role="button" data-logout>Wyloguj (${A.esc(user.login)})</a><a class="btn primary small" href="/postacie">Graj teraz</a>`
         : `<a href="/logowanie">Zaloguj się</a><a class="btn primary small" href="/rejestracja">Załóż konto</a>`}</nav></div>`;
     h.querySelector('.menu-btn').addEventListener('click', () => h.classList.toggle('open'));
     h.querySelectorAll('.links a').forEach((a) => a.addEventListener('click', () => h.classList.remove('open')));

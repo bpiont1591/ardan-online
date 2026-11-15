@@ -161,7 +161,8 @@ class World {
       if (Array.isArray(msg.acts)) for (const a of msg.acts.slice(0, 8)) {
         const s = sanitizeAct(a);
         if (!s || p.actBudget-- <= 0) continue;
-        if (p.dg) continue;
+        // in a dungeon only potions (between rooms – never during a battle) are allowed; no teleport scrolls
+        if (p.dg && !(!p.battle && (s.a === 'pot' || s.a === 'mpot' || (s.a === 'use' && s.id && p.api.items[s.id] && p.api.items[s.id].t !== 's')))) continue;
         if (s.a === 'talk' && !p.battle && (this.craft.interceptTalk(p) || this.gather.useNear(p))) continue;
         if (this.battle.intercept(p, s)) continue;
         if (p.acts.length < 12) p.acts.push(s);

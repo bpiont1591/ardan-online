@@ -375,3 +375,25 @@ em.bad, .bad { color: #ff9a8a; }
 .ui-zone.arena { background: rgba(150,90,16,.9); border-color: #ffc46a; color: #fff2d8; }
 .ui-zone.pvp { background: rgba(150,20,20,.92); border-color: #ff6a5a; color: #fff; }
 @media (max-width: 700px) { .ui-zone { max-width: calc(100vw - 200px); top: calc(4px + env(safe-area-inset-top)); font-size: 11px; } }
+/* round 9: bag slots, stat points, ground loot, healing after battle */
+.bagslots { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+.slot.bagslot { position: relative; }
+.slot.bagslot .cap { position: absolute; right: 3px; bottom: 1px; font: 700 10px Inter, sans-serif; color: #ffd84a; text-shadow: 0 1px 2px #000; }
+.attrs { display: grid; gap: 2px; margin-bottom: 6px; }
+.st.attr { align-items: center; }
+.st.attr span { display: flex; flex-direction: column; line-height: 1.15; }
+.st.attr span small { font-size: 11px; color: #8f846f; }
+.st.attr b { margin-left: auto; min-width: 28px; text-align: right; }
+.st.attr .plus { width: 30px; height: 30px; border-radius: 7px; border: 1px solid #c9a45c; background: rgba(0,0,0,.3); color: #ffd84a; font: 800 16px Inter, sans-serif; cursor: pointer; padding: 0; }
+.st.attr .plus:disabled { opacity: .35; cursor: default; }
+.attrs .small { justify-self: start; margin-top: 6px; font: 700 12px Inter, sans-serif; padding: 6px 12px; border-radius: 7px; border: 1px solid #5c5040; background: rgba(0,0,0,.3); color: #d9cdb4; cursor: pointer; }
+h4 small.pts { color: #ffd84a; font-weight: 700; }
+.warnm { color: #ffb08a; font-size: 13px; margin: 4px 0 8px; }
+.chk.ah { display: flex; gap: 8px; align-items: flex-start; margin-top: 12px; font-size: 13px; color: #b9ad97; }
+/* round 9 fixes: toasts no longer cover an open window (title + close button); portrait label inside its cell */
+#ui:has(.ui-back) .ui-toasts, #ui:has(#battle) .ui-toasts, body:has(.ui-detail) .ui-toasts { visibility: hidden; }
+#ui:has(.ui-back) .ui-toasts *, #ui:has(#battle) .ui-toasts * { visibility: hidden !important; pointer-events: none !important; }
+.portrait { overflow: hidden; align-content: center; gap: 0; }
+.portrait canvas { width: 44px; height: 44px; }
+.portrait canvas { width: 40px; height: 40px; }
+.portrait small { margin-top: 0; font-size: 9px; line-height: 1.05; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }

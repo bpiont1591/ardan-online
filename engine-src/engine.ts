@@ -975,6 +975,12 @@ function createArdan(canvas: HTMLCanvasElement, opts: any): () => void {
     srobe: { n: "Szata gwiazd", t: "a", cls: "mag", def: 15, mp: 75, price: 800, c: "#2a3a7a", ic: "robe" },
     drobe: { n: "Szata Pradawnych", t: "a", cls: "mag", def: 21, mp: 100, price: 1600, c: "#c8a03a", ic: "robe" },
     pot: { n: "Mała mikstura", t: "p", heal: 45, price: 12, c: "#e0413a", ic: "pot" },
+    tp_village: { n: "Zwój teleportacji: Osada Brzozowa", t: "s", tp: "village", price: 20, c: "#c8a46a", ic: "letter" },
+    tp_town: { n: "Zwój teleportacji: Srebrnogród", t: "s", tp: "town", price: 35, c: "#d8dde6", ic: "letter" },
+    tp_port: { n: "Zwój teleportacji: Mewia Przystań", t: "s", tp: "port", price: 60, c: "#8fd0ff", ic: "letter" },
+    tp_fort: { n: "Zwój teleportacji: Twierdza Żarogród", t: "s", tp: "fort", price: 90, c: "#ff9a5a", ic: "letter" },
+    tp_citadel: { n: "Zwój teleportacji: Cytadela Świtu", t: "s", tp: "citadel", price: 130, c: "#ffe9a8", ic: "letter" },
+    tp_star: { n: "Zwój teleportacji: Gwiezdna Strażnica", t: "s", tp: "star", price: 180, c: "#bfe8ff", ic: "letter" },
     bigpot: { n: "Duża mikstura", t: "p", heal: 120, price: 35, c: "#b03ad0", ic: "pot" },
     elix: { n: "Eliksir życia", t: "p", heal: 320, price: 90, c: "#ff4f7a", ic: "pot" },
     mpot: { n: "Mikstura many", t: "m", mana: 60, price: 15, c: "#3a7bff", ic: "pot" },
@@ -1185,7 +1191,7 @@ function createArdan(canvas: HTMLCanvasElement, opts: any): () => void {
   const pvpMap = (area: string): boolean => PVPZ.some((z: any) => z.area === area && z.lethal);
   const pvpAt = (area: string, x: number, y: number): any => { for (const z of PVPZ) if (z.area === area && x >= z.x0 && x <= z.x1 && y >= z.y0 && y <= z.y1) return z; return null; };
   const SHOPN: { [k: string]: string } = { smith: "Kuźnia Bogumiła", herbs: "Chata Zielarki", swamp: "Zapasy Rybaka", armory: "Zbrojownia Wojsława", alch: "Pracownia Alchemiczki", nomad: "Kram Nomady", portm: "Kram Mewiej Przystani", portsmith: "Kuźnia mistrzów", fortm: "Zaopatrzenie Żarogrodu", citm: "Skarbiec Świtu", starm: "Gwiezdny skarbiec" };
-  const SHOPS: { [k: string]: string[] } = { smith: ["$w2", "$w3", "$a2", "$a3", "$a4"], herbs: ["pot", "bigpot", "elix", "mpot"], swamp: ["pot", "bigpot", "mpot"], armory: ["$w4", "$w5", "$a4", "$a5"], alch: ["pot", "bigpot", "elix", "mpot"], nomad: ["bigpot", "elix", "mpot"], portm: ["pot", "bigpot", "elix", "gpot", "mpot"], portsmith: ["$w5", "$w6", "$a5", "$a6"], fortm: ["bigpot", "elix", "gpot", "selix", "mpot"], citm: ["elix", "gpot", "selix", "spot", "mpot", "gmpot"], starm: ["gpot", "selix", "spot", "dpot", "mpot", "gmpot"] };
+  const SHOPS: { [k: string]: string[] } = { smith: ["$w2", "$w3", "$a2", "$a3", "$a4"], herbs: ["pot", "bigpot", "elix", "mpot", "tp_village", "tp_town"], swamp: ["pot", "bigpot", "mpot"], armory: ["$w4", "$w5", "$a4", "$a5"], alch: ["pot", "bigpot", "elix", "mpot", "tp_village", "tp_town", "tp_port"], nomad: ["bigpot", "elix", "mpot"], portm: ["pot", "bigpot", "elix", "gpot", "mpot", "tp_town", "tp_port", "tp_fort"], portsmith: ["$w5", "$w6", "$a5", "$a6"], fortm: ["bigpot", "elix", "gpot", "selix", "mpot", "tp_port", "tp_fort", "tp_citadel"], citm: ["elix", "gpot", "selix", "spot", "mpot", "gmpot", "tp_fort", "tp_citadel", "tp_star"], starm: ["gpot", "selix", "spot", "dpot", "mpot", "gmpot", "tp_citadel", "tp_star", "tp_village"] };
   const QORDER = ["rats", "wolves", "tusks", "wraith", "letter", "drown", "wisps", "witchq", "swolves", "hearts", "dragonq", "stings", "mummies", "kingq", "crabs", "pirates", "pearls", "leviq", "imps", "embers", "golemsq", "ignarq", "shades", "voidq", "knights", "morgq", "bandits", "bwolves", "bearpaws", "kielq", "kobolds", "crawlers", "runes", "grimq", "frwraiths", "mtusks", "szroniaq", "hyenas", "nomads", "bscales", "burzanq", "delves", "bark", "wolfmen", "moranaq", "nagas", "drowned", "corals", "thalq", "cspiders", "starsh", "kolosq", "bmages", "souls", "bdrakes", "valgarq", "drakons", "dkins", "dscales", "valdrakq"];
   const QUESTS: { [k: string]: any } = {
     rats: { n: "Szczury w spiżarni", giver: "soltys", kill: "rat", need: 4, area: "village", desc: "Ubij 4 szczury w Osadzie Brzozowej.",
@@ -1373,6 +1379,7 @@ function createArdan(canvas: HTMLCanvasElement, opts: any): () => void {
   } catch (e) { /* no storage */ }
   if (!Array.isArray(P.inv)) P.inv = [];
   P.inv = P.inv.filter((s: any) => s && ITEMS[s.id] && s.n > 0);
+  { const m: any[] = []; for (const s0 of P.inv) { const t = ITEMS[s0.id].t; const st = t === "p" || t === "j" || t === "q" || t === "m" || t === "s"; const e = st ? m.find((x: any) => x.id === s0.id) : null; if (e) e.n += s0.n; else m.push({ id: s0.id, n: s0.n }); } P.inv = m; }
   if (!P.eq || typeof P.eq !== "object") P.eq = { w: null, a: null };
   if (P.eq.w && !ITEMS[P.eq.w]) P.eq.w = null;
   if (P.eq.a && !ITEMS[P.eq.a]) P.eq.a = null;
@@ -1396,12 +1403,14 @@ function createArdan(canvas: HTMLCanvasElement, opts: any): () => void {
   const xpNext = (l: number): number => Math.floor(40 * Math.pow(l, 1.65) * (1 + Math.min(0.35, Math.max(0, l - 4) * 0.025)) * (l > 30 ? 1 + (l - 30) * 0.05 : 1));
   const GEARON = (): boolean => !!(P.gear && typeof P.gear === "object");
   const gs = (k: string): number => { let s0 = 0; const g = P.gear; if (g) for (const sl of Object.keys(g)) { const it = g[sl]; if (it && it.st && it.d !== 0 && typeof it.st[k] === "number") s0 += it.st[k]; } return s0; };
-  const maxHp = (): number => Math.round(C().hp0 + (P.lvl - 1) * C().hpL + (GEARON() ? gs("hp") : (P.eq.a ? ITEMS[P.eq.a].def * 2 : 0)));
-  const maxMp = (): number => Math.round(C().mp0 + (P.lvl - 1) * C().mpL + (GEARON() ? gs("mp") : (P.eq.a && ITEMS[P.eq.a].mp ? ITEMS[P.eq.a].mp : 0)));
-  const atk = (): number => Math.round(C().atk0 + P.lvl * C().atkL + (GEARON() ? gs("atk") : (P.eq.w ? ITEMS[P.eq.w].atk : 0)));
+  const AT = (k: string): number => (P.attr && Number.isFinite(P.attr[k]) ? Math.max(0, P.attr[k]) : 0);
+  const atkFromAttr = (): number => AT("str") * (P.cls === "war" ? 1 : 0.4) + AT("agi") * (P.cls === "arc" ? 1 : 0) + AT("int") * (P.cls === "mag" ? 1 : 0);
+  const maxHp = (): number => Math.round(C().hp0 + (P.lvl - 1) * C().hpL + AT("str") * 3 + (GEARON() ? gs("hp") : (P.eq.a ? ITEMS[P.eq.a].def * 2 : 0)));
+  const maxMp = (): number => Math.round(C().mp0 + (P.lvl - 1) * C().mpL + AT("int") * 5 + (GEARON() ? gs("mp") : (P.eq.a && ITEMS[P.eq.a].mp ? ITEMS[P.eq.a].mp : 0)));
+  const atk = (): number => Math.round(C().atk0 + P.lvl * C().atkL + atkFromAttr() + (GEARON() ? gs("atk") : (P.eq.w ? ITEMS[P.eq.w].atk : 0)));
   const def = (): number => Math.round((P.lvl * C().defL + (GEARON() ? gs("def") : (P.eq.a ? ITEMS[P.eq.a].def : 0))) * (pl.buffDef > 0 ? 1.6 : 1));
-  const critC = (): number => C().crit + (GEARON() ? gs("crit") / 100 : 0);
-  const dodgeC = (): number => C().dodge + (GEARON() ? gs("dodge") / 100 : 0);
+  const critC = (): number => C().crit + AT("agi") * 0.002 + (GEARON() ? gs("crit") / 100 : 0);
+  const dodgeC = (): number => C().dodge + AT("agi") * 0.002 + (GEARON() ? gs("dodge") / 100 : 0);
   const statsAll = (): any => ({ atk: atk(), def: def(), hp: maxHp(), mp: maxMp(), crit: Math.round(critC() * 100), dodge: Math.round(dodgeC() * 100), res: C().res });
   const canUse = (id: string): boolean => { const it = ITEMS[id]; return !it.cls || !P.cls || it.cls.split(" ").indexOf(P.cls) >= 0; };
   const resolve = (id: string): string => { if (id.charAt(0) !== "$") return id; const g = GEAR[P.cls || "war"]; return g[id.charAt(1)][Number(id.charAt(2)) - 1]; };
@@ -1480,12 +1489,14 @@ function createArdan(canvas: HTMLCanvasElement, opts: any): () => void {
   }
 
   function countItem(id: string): number { let n = 0; for (const s of P.inv) if (s.id === id) n += s.n; return n; }
+  const isStack = (id: string): boolean => { const t = ITEMS[id] ? ITEMS[id].t : ""; return t === "p" || t === "j" || t === "q" || t === "m" || t === "s"; };
+  const used = (): number => P.inv.length + (Array.isArray(P.gbag) ? P.gbag.length : 0);
+  const invFull = (): boolean => (P.cap ? used() >= P.cap : P.inv.length >= 20);
   function addItem(id: string, n: number): boolean {
-    const it = ITEMS[id];
-    const stack = it.t === "p" || it.t === "j" || it.t === "q";
+    const stack = isStack(id);
     if (stack) { const s = P.inv.find((x: any) => x.id === id); if (s) { s.n += n; return true; } }
-    if (P.inv.length >= 20) { log("Torba jest pełna!", "#ff8a7a"); return false; }
-    if (stack) P.inv.push({ id, n }); else for (let i = 0; i < n; i++) { if (P.inv.length >= 20) return false; P.inv.push({ id, n: 1 }); }
+    if (invFull()) { log("Plecak pełny!", "#ff8a7a"); return false; }
+    if (stack) P.inv.push({ id, n }); else for (let i = 0; i < n; i++) { if (invFull()) return false; P.inv.push({ id, n: 1 }); }
     return true;
   }
   function removeItem(id: string, n: number): void {
@@ -1650,7 +1661,7 @@ function createArdan(canvas: HTMLCanvasElement, opts: any): () => void {
     ftext(p[0] + 16, p[1] - 6, "+" + n + " PD", "#9fd3ff", 13);
     while (P.lvl < MAXLVL && P.xp >= xpNext(P.lvl)) {
       P.xp -= xpNext(P.lvl); P.lvl++; P.hp = maxHp(); P.mp = maxMp();
-      log("AWANS! Osiągasz poziom " + P.lvl + ".", "#ffd25a");
+      log("AWANS! Osiągasz poziom " + P.lvl + ". Nowy punkt statystyk do rozdania (I – ekwipunek).", "#ffd25a");
       for (const s of (SK[P.cls] || []).concat(SKX[P.cls] || [])) if (s.lvl === P.lvl) log("Nowa umiejętność: " + s.n + "!", "#ffd25a");
       fx.push({ k: "ring", x: p[0] + 16, y: p[1] + 18, life: 1.2, max: 1.2 });
       fx.push({ k: "big", t: "AWANS! Poziom " + P.lvl, life: 2.4, max: 2.4 });
@@ -1725,9 +1736,10 @@ function createArdan(canvas: HTMLCanvasElement, opts: any): () => void {
   function die(): void {
     P.hp = 0; pl.dead = 2.2; pl.target = null; pl.auto = false; pl.path = []; pl.talk = null;
     const lost = Math.floor(P.gold * 0.1); P.gold -= lost;
+    const xl = P.lvl >= MAXLVL ? 0 : Math.min(P.xp, Math.floor(xpNext(P.lvl) * 0.05)); P.xp -= xl;
     const rp = respawnFor(P.area);
     pl.resp = rp; pl.wear = 1;
-    log("Poległeś! Tracisz " + lost + " zł, a założony ekwipunek traci wytrzymałość. Budzisz się: " + AREAS[rp[0]].name + ".", "#ff8a7a");
+    log("Poległeś! Tracisz " + lost + " zł" + (xl > 0 ? " i " + xl + " PD" : "") + ", a założony ekwipunek traci wytrzymałość. Budzisz się: " + AREAS[rp[0]].name + ".", "#ff8a7a");
   }
   // the nearest city on the world map; spawn next to its priest (or the city centre)
   const RESP0: { [k: string]: number[] } = { village: [18, 17], town: [19, 13], port: [26, 16], fort: [26, 16], citadel: [26, 16], star: [21, 17] };
@@ -1778,6 +1790,16 @@ function createArdan(canvas: HTMLCanvasElement, opts: any): () => void {
       const p = rpos(pl2()); ftext(p[0] + 16, p[1] - 4, "+" + Math.round(P.mp - b), "#7fb0ff", 15); burst(p[0] + 16, p[1] + 16, "#6f9bff", 12, 40);
       return;
     }
+    if (it.t === "s") {
+      if (pl.dead || trans) return;
+      if (!AREAS[it.tp] || !RESP0[it.tp]) return;
+      if (P.area === it.tp) { log("Już jesteś w tym mieście.", "#a89c86"); return; }
+      removeItem(id, 1); save();
+      log("Zwój teleportacji przenosi cię: " + AREAS[it.tp].name + ".", "#c8b6ff");
+      const p0 = rpos(pl2()); burst(p0[0] + 16, p0[1] + 16, "#c8b6ff", 30, 90);
+      changeArea(it.tp, RESP0[it.tp][0], RESP0[it.tp][1]);
+      return;
+    }
     if (it.t !== "p") return;
     if (P.hp >= maxHp()) { log("Masz pełne zdrowie.", "#a89c86"); return; }
     removeItem(id, 1);
@@ -1798,7 +1820,7 @@ function createArdan(canvas: HTMLCanvasElement, opts: any): () => void {
   }
   function unequip(slot: string): void {
     if (!P.eq[slot]) return;
-    if (P.inv.length >= 20) { log("Torba jest pełna!", "#ff8a7a"); return; }
+    if (invFull()) { log("Plecak pełny!", "#ff8a7a"); return; }
     P.inv.push({ id: P.eq[slot], n: 1 }); P.eq[slot] = null; P.hp = Math.min(P.hp, maxHp()); P.mp = Math.min(P.mp, maxMp()); invSel = -1; save();
   }
   function skillTarget(r: number): any {
@@ -1871,7 +1893,7 @@ function createArdan(canvas: HTMLCanvasElement, opts: any): () => void {
     if (!shopOk() || shopList(shopId).indexOf(id) < 0 || !ITEMS[id]) return;
     const it = ITEMS[id];
     if (P.gold < it.price) { log("Za mało złota.", "#ff8a7a"); return; }
-    if (addItem(id, 1)) { P.gold -= it.price; log("Kupiono: " + it.n + ".", "#c8e6a0"); save(); } else log("Torba jest pełna!", "#ff8a7a");
+    if (addItem(id, 1)) { P.gold -= it.price; log("Kupiono: " + it.n + ".", "#c8e6a0"); save(); } else log("Plecak pełny – zrób miejsce w torbach.", "#ff8a7a");
   }
   function sellItem(i: number): void {
     if (!shopOk()) return;
@@ -1941,10 +1963,17 @@ function createArdan(canvas: HTMLCanvasElement, opts: any): () => void {
   }
   function pickBag(b: any): void {
     b.taken = true;
-    const got: string[] = [];
-    if (b.gold) { P.gold += b.gold; got.push(b.gold + " zł"); }
-    for (const it of b.items) if (addItem(it[0], it[1])) got.push(ITEMS[it[0]].n);
+    const got: string[] = [], left: any[] = [];
+    if (b.gold) { P.gold += b.gold; got.push(b.gold + " zł"); b.gold = 0; }
+    for (const it of b.items) { if (addItem(it[0], it[1])) got.push(ITEMS[it[0]].n); else left.push(it); }
     if (got.length) log("Łup: " + got.join(", "), "#f5d98a");
+    if (left.length) {
+      b.items = left; b.taken = false;
+      if (b.over) return;
+      b.over = true; b.area = P.area; b.x = P.x; b.y = P.y; b.life = 120;
+      if (bags.indexOf(b) < 0) bags.push(b);
+      log("Plecak pełny! " + left.map((it: any[]) => ITEMS[it[0]].n).join(", ") + " – leży na ziemi przez 2 min. Zrób miejsce, a podniesiesz to automatycznie.", "#ff8a7a");
+    }
     ftext(b.x * TS + 16, b.y * TS, b.gold ? "+" + b.gold + " zł" : "łup", "#f5d98a", 13);
   }
   function nearestMob(r: number): any {
@@ -2207,7 +2236,7 @@ function createArdan(canvas: HTMLCanvasElement, opts: any): () => void {
       P.intro = true;
       dlg = { name: "ARDAN", text: touchMode
         ? "Mgła spowiła Ardan. Chodzisz strzałkami w lewym dolnym rogu (przytrzymaj; dwie naraz – po skosie). Złota strzałka i kropki wskazują drogę do celu zadania. Dotknij potwora, by go wybrać, i bij przyciskiem ataku (musisz być w zasięgu). Z postacią porozmawiasz, stojąc obok niej i dotykając jej. Mapka powiększa się po dotknięciu."
-        : "Mgła spowiła Ardan. Złota strzałka i kropki wskazują drogę do celu zadania. Sterowanie: WASD/strzałki – ruch, klik na potwora – wybór celu, Spacja/F – atak (w zasięgu), 1/2/3 – umiejętności, E – rozmowa (stojąc obok), I – torba, Q – zadania, T – zmiana zadania, M – mapa, H – mikstura, G – mana.",
+        : "Mgła spowiła Ardan. Złota strzałka i kropki wskazują drogę do celu zadania. Sterowanie: WASD/strzałki – ruch, klik na potwora – wybór celu, Spacja/F – atak (w zasięgu), 1/2/3 – umiejętności, E – rozmowa (stojąc obok), I – torba, Q – zadania, T – zmiana zadania, M – mapa, H – mikstura (tylko poza walką – w walce nie ma leczenia), G – mana. Zginiesz – budzisz się w mieście bez części złota i PD.",
         opts: [{ l: "Zaczynajmy!", fn: () => { dlg = null; save(); } }] };
     }
   }
@@ -2229,7 +2258,8 @@ function createArdan(canvas: HTMLCanvasElement, opts: any): () => void {
     }
     updatePlayer(dt, it);
     if (!trans) { updateMobs(dt); updateShots(dt); }
-    for (let i = bags.length - 1; i >= 0; i--) { bags[i].life -= dt; if (bags[i].life <= 0 || bags[i].taken) bags.splice(i, 1); }
+    for (const b of bags) if (b.over && !b.taken && !pl.dead && !invFull()) pickBag(b);
+    for (let i = bags.length - 1; i >= 0; i--) { bags[i].life -= dt; if (bags[i].life <= 0 && bags[i].over && !bags[i].taken) log("Przepadło z ziemi: " + bags[i].items.map((it: any[]) => ITEMS[it[0]].n).join(", ") + ".", "#a89c86"); if (bags[i].life <= 0 || bags[i].taken) bags.splice(i, 1); }
   }
   // ---------- MULTIPLAYER: ONLINE CLIENT ----------
   const others: { [id: string]: any } = {};
@@ -3186,7 +3216,8 @@ function createArdan(canvas: HTMLCanvasElement, opts: any): () => void {
     const who = it.cls ? " · " + it.cls.split(" ").map((c: string) => CLS[c].n).join("/") : "";
     if (it.t === "w") return "Atak +" + it.atk + who;
     if (it.t === "a") return "Obrona +" + it.def + ", HP +" + it.def * 2 + (it.mp ? ", mana +" + it.mp : "") + who;
-    if (it.t === "p") return "Leczy " + it.heal + " HP (także w walce)";
+    if (it.t === "p") return "Leczy " + it.heal + " HP (tylko poza walką)";
+    if (it.t === "s") return "Teleport do miasta (poza walką)";
     if (it.t === "m") return "Przywraca " + it.mana + " " + (P.cls === "mag" ? "many" : "energii");
     if (it.t === "q") return "Przedmiot do zadania";
     return "Łup na sprzedaż";
@@ -3320,7 +3351,7 @@ function createArdan(canvas: HTMLCanvasElement, opts: any): () => void {
         if (it.t === "a" && P.eq.a) { const d = it.def - ITEMS[P.eq.a].def; sub += d > 0 ? " (+" + d + ")" : " (" + d + ")"; }
         row(id, sub, it.price, "Kup", () => act({ a: "buy", id }), P.gold < it.price);
       }
-      text(shopId === "smith" || shopId === "armory" ? "Sprzęt dla klasy: " + C().n + ". Załóż go w torbie." : "Życie nie odnawia się samo – tylko mikstury (H, także w walce) i odpoczynek w mieście.", x + 14, y + h - 22, 11, COL.mute);
+      text(shopId === "smith" || shopId === "armory" ? "Sprzęt dla klasy: " + C().n + ". Załóż go w torbie." : "Lecz się PRZED walką: mikstury (H), odpoczynek w mieście, kapłan. W walce nie ma leczenia.", x + 14, y + h - 22, 11, COL.mute);
     } else {
       const inv = P.inv.map((s: any, i: number) => ({ s, i }));
       const pages = Math.max(1, Math.ceil(inv.length / rowsFit));
@@ -3662,7 +3693,7 @@ function createArdan(canvas: HTMLCanvasElement, opts: any): () => void {
     dlgView: (): any => dlg ? { name: dlg.name, text: dlg.text, opts: dlg.opts.map((o: any) => o.l) } : null,
     shopReq: (): string | null => { if (panel === "shop") { panel = ""; return shopId; } return null; },
     uiReq: (): string | null => { const u = uiReq; uiReq = ""; return u || null; },
-    quests: QUESTS, qorder: QORDER, maxLvl: MAXLVL, shops: SHOPS,
+    quests: QUESTS, qorder: QORDER, maxLvl: MAXLVL, shops: SHOPS, xpNext, used, invFull,
     mobIdx: (m: any): number => mobs[P.area].indexOf(m),
     partyKill: (mk: string, mlvl: number, baseXp: number, from: string): void => {
       if (pl.dead > 0 || !P.cls) return;

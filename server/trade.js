@@ -38,7 +38,7 @@ function createTrade(world) {
     const A = p.api.P(), B = q.api.P();
     const ia = p.trade.items.map((u) => world.gear.find(p, u)), ib = q.trade.items.map((u) => world.gear.find(q, u));
     if (ia.some((x) => !x) || ib.some((x) => !x) || A.gold < p.trade.gold || B.gold < q.trade.gold) return close(p, 'Wymiana przerwana – oferta się zmieniła.');
-    if (A.gbag.length - ia.length + ib.length > world.gear.BAG || B.gbag.length - ib.length + ia.length > world.gear.BAG) return close(p, 'Wymiana przerwana – brak miejsca w torbie.');
+    if (ib.length - ia.length > world.gear.space(p) || ia.length - ib.length > world.gear.space(q)) return close(p, 'Wymiana przerwana – brak miejsca w torbie.');
     const ga = p.trade.gold, gb = q.trade.gold;
     if (!(ga >= 0 && gb >= 0)) return close(p, 'Wymiana przerwana.');
     world.atomic([p, q], () => {

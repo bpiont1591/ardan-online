@@ -210,6 +210,7 @@ function rollDrops(mk, d, cls, R) {
   const n = rank === 2 ? 2 + (R() < 0.5 ? 1 : 0) : rank === 1 ? (R() < 0.85 ? 1 : 0) + (R() < 0.2 ? 1 : 0) : (R() < 0.08 + d.lvl * 0.008 ? 1 : 0);
   const out = [];
   for (let i = 0; i < n; i++) out.push((rank === 2 && rollBossLeg(mk, cls, R)) || rollLeg(rank, d.lvl, cls, R) || make(pickBase(cls, R), tierFor(d.lvl, R), rollRar(rank, d.lvl, R), R));
+  const bg = rollBag(rank, R); if (bg) out.push(bg);
   return out;
 }
 // dungeon loot: rank 3 (elite) or 4 (boss); bosses always drop 2-3 items, elites often one, plus materials
@@ -218,6 +219,7 @@ function rollDungeon(lvl, rank, cls, R) {
   const n = rank === 4 ? 2 + (R() < 0.5 ? 1 : 0) : (R() < 0.6 ? 1 : 0);
   const out = [];
   for (let i = 0; i < n; i++) { const t = tierFor(lvl, () => 1); out.push(rollLeg(rank, lvl, cls, R) || make(pickBase(cls, R), t, rollRar(rank, lvl, R), R)); }
+  { const bg = rollBag(rank >= 4 ? 2 : 1, R); if (bg) out.push(bg); }
   if (rank === 4) out.push(mat('crystal', 1 + (R() < 0.4 ? 1 : 0)));
   else if (R() < 0.35) out.push(mat(['ore', 'herb', 'wood'][Math.floor(R() * 3)], 1 + Math.floor(R() * 3)));
   return out;
@@ -231,6 +233,24 @@ const MATS = {
 };
 const MAX_STACK = 999;
 function mat(k, q) { const M = MATS[k]; q = Math.max(1, Math.min(MAX_STACK, q | 0)); return { u: uid(), b: 'mat_' + k, m: k, n: M.n, s: 'mat', c: null, l: 1, r: M.r, t: 0, ic: M.ic, st: {}, q, v: M.v * q }; }
+// ---------- bags (round 9, like Margonem): worn in bag slots, capacity = sum of the worn bags ----------
+const BAGS = {
+  s: { n: 'Mała sakwa', cap: 6, r: 0, v: 40, l: 1 },
+  m: { n: 'Średnia torba', cap: 12, r: 1, v: 160, l: 1 },
+  l: { n: 'Duży plecak', cap: 25, r: 2, v: 600, l: 1 },
+};
+const BAG_SLOTS = 4;
+function bag(k) { const B = BAGS[k] || BAGS.s; return { u: uid(), b: 'bag_' + (BAGS[k] ? k : 's'), bk: BAGS[k] ? k : 's', n: B.n, s: 'bag', c: null, l: B.l, r: B.r, t: 0, ic: 'bag', st: {}, cap: B.cap, v: B.v }; }
+const isBag = (it) => !!(it && it.s === 'bag' && BAGS[it.bk]);
+const bagCap = (it) => (isBag(it) ? BAGS[it.bk].cap : 0);
+// monsters sometimes drop a bag: normal 0.6%, elite 4%, boss 12% (bigger bags from stronger enemies)
+function rollBag(rank, R) {
+  R = R || Math.random;
+  const ch = rank >= 2 ? 0.12 : rank === 1 ? 0.04 : 0.006;
+  if (R() >= ch) return null;
+  const v = R();
+  return bag(rank >= 2 ? (v < 0.5 ? 'l' : 'm') : rank === 1 ? (v < 0.15 ? 'l' : v < 0.6 ? 'm' : 's') : (v < 0.03 ? 'l' : v < 0.25 ? 'm' : 's'));
+}
 // ---------- item upgrade +1..+5 ----------
 const UP_MAX = 5;
 const UP_CHANCE = [1, 0.9, 0.75, 0.55, 0.35];   // chance for +1 .. +5
@@ -282,4 +302,4 @@ function wear(it, n) { if (!it || it.s === 'mat') return 0; const before = durOf
 function repairCost(it) { if (!it || it.s === 'mat') return 0; const dm = durMax(it), miss = dm - durOf(it); if (miss <= 0) return 0; return Math.max(1, Math.ceil((miss / dm) * Math.max(10, it.v || 0) * REP_K)); }
 function repair(it) { it.dm = durMax(it); it.d = it.dm; }
 const validItem = (it) => !!(it && typeof it === 'object' && typeof it.u === 'string' && it.st && typeof it.n === 'string' && typeof it.s === 'string');
-module.exports = { DUR_MAX, DUR_LOSS, REP_K, durMax, durOf, wear, repairCost, repair, BOSS_LEG, BOSS_LEG_CH, rollBossLeg, makeLeg, rollLeg, LEG_CH, PXD, SLOTS, SLOT_N, CLS_N, CLASSES, RAR, TIERS, STAT_N, BASES, SPR, ELITE, MATS, MAX_STACK, UP_MAX, UP_CHANCE, make, rollDrops, rollDungeon, randomItem, fromLegacy, canEquip, value, rankOf, validItem, mat, upCost, applyUp, forge, forgeCost, tierFor };
+module.exports = { BAGS, BAG_SLOTS, bag, isBag, bagCap, rollBag, DUR_MAX, DUR_LOSS, REP_K, durMax, durOf, wear, repairCost, repair, BOSS_LEG, BOSS_LEG_CH, rollBossLeg, makeLeg, rollLeg, LEG_CH, PXD, SLOTS, SLOT_N, CLS_N, CLASSES, RAR, TIERS, STAT_N, BASES, SPR, ELITE, MATS, MAX_STACK, UP_MAX, UP_CHANCE, make, rollDrops, rollDungeon, randomItem, fromLegacy, canEquip, value, rankOf, validItem, mat, upCost, applyUp, forge, forgeCost, tierFor };

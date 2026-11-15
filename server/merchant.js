@@ -5,6 +5,7 @@
 //  - "naprawa" (Kowal / Płatnerz) – naprawa wytrzymałości ekwipunku za złoto (runda 7).
 // Serwer zawsze sprawdza, czy gracz stoi przy właściwym NPC (ta sama kraina, odległość ≤ RANGE pól).
 const RANGE = 2;
+const BAG_PRICE = { s: 80, m: 320, l: 1200 };
 const U_RE = /^[a-z0-9]{6,24}$/;
 const cheb = (ax, ay, bx, by) => Math.max(Math.abs(ax - bx), Math.abs(ay - by));
 const I = require('./items');
@@ -29,7 +30,8 @@ function createMerchant(world) {
   function junk(p) { const api = p.api, P = api.P(); let n = 0, sum = 0; for (const s of P.inv) { const d = api.items[s.id]; if (d && d.t === 'j') { n += s.n; sum += Math.max(1, Math.floor(d.price / 2)) * s.n; } } return { n, sum }; }
   function view(p, n) {
     const P = p.api.P(), j = junk(p);
-    return { t: 'npcui', k: 'skup', npc: n.id, n: n.n, area: P.area, gold: P.gold, bag: P.gbag.map((it) => ({ u: it.u, pr: price(it) })), junk: j };
+    return { t: 'npcui', k: 'skup', npc: n.id, n: n.n, area: P.area, gold: P.gold, bag: P.gbag.map((it) => ({ u: it.u, pr: price(it) })), junk: j,
+      bags: Object.keys(BAG_PRICE).map((k) => ({ k, n: I.BAGS[k].n, cap: I.BAGS[k].cap, pr: BAG_PRICE[k], r: I.BAGS[k].r })), free: world.gear.space(p), slots: (P.bags || []).filter((b) => !b).length };
   }
   // ---- repairs (Kowal / Płatnerz): every worn or carried item, cost = I.repairCost
   function repList(p) {
@@ -72,6 +74,18 @@ function createMerchant(world) {
     if (cnt) { p.srv.dirty = true; world.gear.changed(p); }
     return cnt;
   }
+  // round 9: handlarze sprzedają torby (Margonem-like bags)
+  function buyBag(p, n, k) {
+    const P = p.api.P(); if (!BAG_PRICE[k]) return;
+    const pr = BAG_PRICE[k];
+    if (P.gold < pr) return sys(p, `${I.BAGS[k].n} kosztuje ${pr} zł – masz ${P.gold} zł.`);
+    const slot = (P.bags || []).findIndex((b) => !b);
+    if (slot < 0 && world.gear.space(p) <= 0) return sys(p, 'Nie masz wolnego miejsca na torbę ani w plecaku.');
+    const it = I.bag(k);
+    world.atomic([p], () => { P.gold -= pr; if (slot >= 0) P.bags[slot] = it; else P.gbag.push(it); });
+    p.srv.dirty = true; world.gear.changed(p);
+    sys(p, slot >= 0 ? `🎒 Kupujesz i zakładasz: ${it.n} (+${it.cap} miejsc) za ${pr} zł.` : `🎒 Kupujesz: ${it.n} za ${pr} zł – leży w plecaku (wszystkie miejsca na torby są zajęte).`);
+  }
   function sellJunk(p, n) {
     const api = p.api, P = api.P(); let sum = 0, cnt = 0;
     world.atomic([p], () => { for (let i = P.inv.length - 1; i >= 0; i--) { const s = P.inv[i], d = api.items[s.id]; if (d && d.t === 'j') { sum += Math.max(1, Math.floor(d.price / 2)) * s.n; cnt += s.n; P.inv.splice(i, 1); } } P.gold += sum; });
@@ -108,10 +122,11 @@ function createMerchant(world) {
       if (msg.a === 'sell' && typeof msg.u === 'string' && U_RE.test(msg.u)) sellGear(p, n, [msg.u]);
       else if (msg.a === 'sellmany' && Array.isArray(msg.us)) sellGear(p, n, msg.us.slice(0, 40).filter((u) => typeof u === 'string' && U_RE.test(u)));
       else if (msg.a === 'junk') sellJunk(p, n);
+      else if (msg.a === 'buybag' && typeof msg.k === 'string') buyBag(p, n, msg.k);
       world.send(p, view(p, n));
       return true;
     },
   };
 }
 const AREA_N = { village: 'Osada Brzozowa', town: 'Srebrnogród', port: 'Mewia Przystań', fort: 'Twierdza Żarogród', citadel: 'Cytadela Świtu', star: 'Gwiezdna Strażnica' };
-module.exports = { createMerchant, RANGE };
+module.exports = { createMerchant, RANGE, BAG_PRICE };

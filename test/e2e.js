@@ -235,7 +235,7 @@ async function main() {
     ok((await pb.$$eval('#battle .bf.en', (e) => e.length)) >= 1 && (await pb.$$eval('#battle .bf.al', (e) => e.length)) >= 1, 'ekran walki: przeciwnicy i sojusznicy z paskami HP');
     ok(((await snap(pa)).m[tgt.i][3] & 32) === 32, 'A widzi, że potwór jest w walce (stan z serwera)');
     const aJoined = await pa.$('#battle').then((e) => !!e);
-    ok((await pb.$$eval('#battle [data-ba]', (e) => e.map((x) => x.dataset.ba))).join(',').match(/atk.*sk.*pot.*flee/), 'akcje: atak, umiejętności, mikstura, ucieczka');
+    { const ba = (await pb.$$eval('#battle [data-ba]', (e) => e.map((x) => x.dataset.ba))).join(','); ok(/atk.*sk.*flee/.test(ba) && !/pot(,|$)/.test(ba.replace(/mpot/g, '')), `akcje: atak, umiejętności, ucieczka – bez mikstury leczącej (runda 9): ${ba}`); }
     await pb.screenshot({ path: `${SHOTS}/10_combat_phone.png` });
     await pb.tap('#battle [data-ba="atk"]');
     if (aJoined) { await pa.waitForSelector('#battle [data-ba="atk"]:not([disabled])', { timeout: 5000 }).catch(() => {}); await pa.click('#battle [data-ba="atk"]').catch(() => {}); }
@@ -577,6 +577,7 @@ async function main() {
     const pbi = await pb.$(await gearSel(pb));
     let lp = null;
     if (pbi) {
+      await pbi.evaluate((e) => e.scrollIntoView({ block: 'center' })); await W(300);
       const bb = await pbi.boundingBox();
       await pb.touchscreen.touchStart(bb.x + bb.width / 2, bb.y + bb.height / 2); await W(750);
       lp = await pb.evaluate(() => { const t = document.getElementById('uiTip'); if (!t || t.hidden) return null; const r = (t.querySelector('.dcard') || t).getBoundingClientRect(); return { in: r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight }; });

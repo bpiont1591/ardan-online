@@ -70,6 +70,7 @@
       case 'mask': p(3, 4, 10, 7, metal); p(4, 11, 8, 2, metal); p(4, 6, 3, 2, dark); p(9, 6, 3, 2, dark); p(7, 8, 2, 3, gem); p(3, 4, 10, 1, lite); break;
       case 'circlet': p(2, 7, 12, 2, gold); p(3, 6, 2, 1, gold); p(11, 6, 2, 1, gold); p(7, 3, 2, 4, gold); p(7, 4, 2, 2, gem); p(3, 7, 1, 1, gem); p(12, 7, 1, 1, gem); break;
       case 'talisman': p(7, 1, 2, 4, gold); p(4, 5, 8, 8, metal); p(5, 4, 6, 10, metal); p(6, 6, 4, 4, gem); p(7, 7, 1, 1, '#fff'); p(5, 13, 6, 1, gold); break;
+      case 'bag': p(5, 1, 6, 2, '#5a3a1e'); p(4, 3, 8, 2, '#7a4f2a'); p(2, 5, 12, 9, '#9a6436'); p(2, 13, 12, 2, '#6a4222'); p(2, 5, 12, 1, '#b8804a'); p(3, 7, 10, 3, '#7a4f2a'); p(7, 8, 2, 3, gem); p(7, 8, 1, 1, '#fff'); p(1, 6, 1, 6, '#5a3a1e'); p(14, 6, 1, 6, '#5a3a1e'); break;
       default: p(4, 4, 8, 8, metal);
     }
   }
@@ -90,6 +91,7 @@
     return (iconCache[key] = c.toDataURL());
   }
   const slotOf = (it) => (it.s === 'ring' ? 'ring' : it.s);
+  const wornAt = (G, sl) => { const m = /^bag([0-3])$/.exec(sl); return m ? (G.bags || [])[+m[1]] || null : (G.gear || {})[sl] || null; };
   const slotName = (s, cls) => (s === 'offhand' && cls && OFF_N[cls] ? OFF_N[cls] : SLOT_N[s] || s);
   function statLines(st, cmp) {
     return Object.keys(STAT_N).filter((k) => st[k] || (cmp && cmp[k])).map((k) => {
@@ -133,7 +135,8 @@
   function itemFromEl(t) {
     if (!t || !t.closest) return null;
     const G = S.gear;
-    const sl = t.closest('[data-slot]'); if (sl) { const it = G && G.gear[sl.dataset.slot]; return it ? [it, { from: 'worn' }, sl] : null; }
+    const sl = t.closest('[data-slot]'); if (sl) { const it = G && wornAt(G, sl.dataset.slot); return it ? [it, { from: 'worn' }, sl] : null; }
+    const gi = t.closest('[data-ground]'); if (gi) { const g = G && (G.ground || []).find((x) => x.it.u === gi.dataset.ground); return g ? [g.it, { from: 'loot' }, gi] : null; }
     const bi = t.closest('[data-bag],[data-tradd]'); if (bi) { const u = bi.dataset.bag || bi.dataset.tradd; const it = G && (G.bag || []).find((x) => x.u === u); return it ? [it, { from: 'bag' }, bi] : null; }
     const mr = t.closest('[data-mk]'); if (mr && S.mk) { const mine = !!mr.dataset.mine; const x = (mine ? S.mk.mine : S.mk.list).find((y) => String(y.id) === mr.dataset.mk); return x ? [x.it, { from: 'market', seller: mine ? '' : x.sn, pr: x.pr }, mr] : null; }
     const tri = t.closest('[data-tri]'); if (tri && S.tr) { const side = tri.dataset.mine ? S.tr.me : S.tr.them; const it = side && side.items.find((x) => x.u === tri.dataset.tri); return it ? [it, { from: 'trade' }, tri] : null; }
@@ -182,6 +185,7 @@
   function cardBody(it, ctx) {
     const G = S.gear || {}, cls = G.cls;
     let worn = null;
+    if (it.s === 'bag') return `<div class="dh">${iconHtml(it, 48)}<div>${nameHtml(it)}<small style="color:${RAR[it.r].col}">${RAR[it.r].n}</small></div></div><div class="dm">Torba · pojemność: <b>${it.cap || 0} miejsc</b></div><div class="dm">Załóż ją w wolnym miejscu na torbę (do 4), aby powiększyć plecak. Pojemność plecaka to suma założonych toreb.</div>${ctx.pr ? `<div class="dm">Cena: <b class="gold">${ctx.pr} zł</b></div>` : ''}<div class="dm">Wartość: ${it.v} zł</div>`;
     if (ctx.from !== 'worn' && G.gear && it.s !== 'mat') { const s = slotOf(it); worn = s === 'ring' ? (G.gear.ring1 || G.gear.ring2) : G.gear[s]; }
     const okCls = !it.c || it.c === cls, okLvl = (G.lvl || 1) >= it.l;
     return `<div class="dh">${iconHtml(it, 48)}<div>${nameHtml(it)}<small style="color:${RAR[it.r].col}">${RAR[it.r].n}</small></div></div>
@@ -247,7 +251,7 @@
     let doll = '';
     for (const row of DOLL) for (const s of row) {
       if (s === null) { doll += '<i></i>'; continue; }
-      if (s === '@') { doll += `<div class="portrait"><canvas id="eqPortrait" width="96" height="96"></canvas><small>${esc(CLS_N[G.cls] || '')} · poz. ${G.lvl}</small></div>`; continue; }
+      if (s === '@') { doll += `<div class="portrait"><canvas id="eqPortrait" width="96" height="96"></canvas><small title="${esc(CLS_N[G.cls] || '')} · poziom ${G.lvl}">${esc(CLS_N[G.cls] || '')}<br>poz. ${G.lvl}</small></div>`; continue; }
       const it = G.gear && G.gear[s];
       doll += `<button type="button" class="slot ${it ? 'r' + it.r : 'empty'}${it && durOf(it).d === 0 ? ' broken' : ''}" data-slot="${s}" title="${esc(slotName(s, G.cls))}">${it ? `<img src="${itemIcon(it, 40)}" alt="${esc(it.n)}" width="40" height="40">` : `<span>${esc(slotName(s, G.cls))}</span>`}</button>`;
     }
@@ -255,12 +259,24 @@
     const stats = [['Atak', st.atk], ['Obrona', st.def], ['Życie', st.hp], [st.res || 'Mana', st.mp], ['Cios krytyczny', (st.crit || 0) + '%'], ['Unik', (st.dodge || 0) + '%']]
       .map(([k, v]) => `<div class="st"><span>${k}</span><b>${v}</b></div>`).join('');
     const bag = (G.bag || []).map((it) => `<button type="button" class="bi r${it.r}" data-bag="${esc(it.u)}"><img src="${itemIcon(it, 40)}" alt="${esc(it.n)}" width="40" height="40">${qty(it)}</button>`).join('');
-    const nb = (G.bag || []).length, pad = nb === 0 ? 8 : (8 - nb % 8) % 8;
-    const inv = (G.inv || []).map((x) => { const d = NET.api.items[x.id]; if (!d) return ''; const usable = d.heal || d.mana || d.buff; return `<div class="li"><img src="${legacyIcon(x.id, 28)}" alt="" width="28" height="28"><span>${esc(d.n)}${x.n > 1 ? ` <small>×${x.n}</small>` : ''}</span>${usable ? `<button type="button" data-use="${esc(x.id)}">Użyj</button>` : ''}</div>`; }).join('');
+    const used = G.used != null ? G.used : (G.bag || []).length + (G.inv || []).length, max = G.max || 25, over = used > max;
+    const free = Math.max(0, max - used), pad = Math.min(free, 60);
+    const bagSlots = (G.bags || [null, null, null, null]).map((b, i) => `<button type="button" class="slot bagslot ${b ? 'r' + b.r : 'empty'}" data-slot="bag${i}" title="${b ? esc(b.n) + ' · ' + b.cap + ' miejsc' : 'Wolne miejsce na torbę'}">${b ? `<img src="${itemIcon(b, 36)}" alt="${esc(b.n)}" width="36" height="36"><small class="cap">${b.cap}</small>` : '<span>Torba</span>'}</button>`).join('');
+    const inv = (G.inv || []).map((x) => { const d = NET.api.items[x.id]; if (!d) return ''; const usable = d.heal || d.mana || d.buff || d.tp; return `<div class="li"><img src="${legacyIcon(x.id, 28)}" alt="" width="28" height="28"><span>${esc(d.n)}${x.n > 1 ? ` <small>×${x.n}</small>` : ''}${d.heal ? ` <small class="muted">+${d.heal} pż</small>` : ''}</span>${usable ? `<button type="button" data-use="${esc(x.id)}">Użyj</button>` : ''}</div>`; }).join('');
+    const A = G.attr || {}, pts = G.pts | 0;
+    const attrRow = (k, n, d) => `<div class="st attr"><span title="${esc(d)}">${n}<small>${esc(d)}</small></span><b>${A[k] | 0}</b><button type="button" class="plus" data-attr="${k}" ${pts > 0 ? '' : 'disabled'} aria-label="${n} +1">+</button></div>`;
+    const ground = (G.ground || []).map((g) => `<button type="button" class="bi r${g.it.r}" data-ground="${esc(g.it.u)}" title="${esc(g.it.n)} – zniknie za ${g.s} s"><img src="${itemIcon(g.it, 40)}" alt="${esc(g.it.n)}" width="40" height="40"><small class="pr">${g.s}s</small></button>`).join('');
     return `<div class="eq-top"><div class="doll">${doll}</div><div class="eq-st"><h4>Statystyki</h4>${stats}<div class="st gold"><span>Złoto</span><b>${G.gold} zł</b></div></div></div>
-      <h4>Torba <small>${(G.bag || []).length}/${G.max || 40}</small></h4><div class="bag">${bag}${'<span class="bi none"></span>'.repeat(pad)}</div>
-      ${(G.bag || []).length ? '' : '<p class="muted">Torba jest pusta – pokonuj potwory, by zdobywać przedmioty.</p>'}
-      <h4>Przedmioty i mikstury</h4><div class="legacy">${inv || '<p class="muted">Brak.</p>'}</div>`;
+      <h4>Punkty statystyk ${pts > 0 ? `<small class="pts">do rozdania: ${pts}</small>` : '<small>(1 punkt za każdy poziom)</small>'}</h4>
+      <div class="attrs">${attrRow('str', 'Siła', G.cls === 'war' ? '+1 atak, +3 życia' : '+0,4 ataku, +3 życia')}${attrRow('agi', 'Zręczność', (G.cls === 'arc' ? '+1 atak, ' : '') + '+0,2% krytyk i unik')}${attrRow('int', 'Intelekt', (G.cls === 'mag' ? '+1 atak, ' : '') + '+5 ' + (G.cls === 'mag' ? 'many' : 'energii'))}
+        ${(A.str | 0) + (A.agi | 0) + (A.int | 0) > 0 ? `<button type="button" class="sec small" data-attrreset>Resetuj u kapłana · ${G.rc || 0} zł</button>` : ''}</div>
+      <h4>Torby <small>plecak ${used}/${max}${over ? ' – przepełniony!' : ''}</small></h4><div class="bagslots">${bagSlots}</div>
+      ${over ? '<p class="warnm">Plecak jest przepełniony – nic nie przepada, ale nowych przedmiotów nie podniesiesz, dopóki nie zrobisz miejsca (sprzedaj, wyrzuć albo załóż większą torbę).</p>' : ''}
+      ${ground ? `<h4>Na ziemi <small>podniesiesz automatycznie, gdy zrobisz miejsce</small></h4><div class="bag sm">${ground}</div>` : ''}
+      <h4>Plecak <small>${(G.bag || []).length} przedm. + ${(G.inv || []).length} mikst./przedm.</small></h4><div class="bag">${bag}${'<span class="bi none"></span>'.repeat(pad)}</div>
+      ${(G.bag || []).length ? '' : '<p class="muted">Pokonuj potwory, by zdobywać przedmioty.</p>'}
+      <h4>Mikstury i przedmioty <small>zajmują miejsce w plecaku</small></h4><div class="legacy">${inv || '<p class="muted">Brak.</p>'}</div>
+      <label class="chk ah"><input type="checkbox" data-ah ${G.ah ? 'checked' : ''}> Lecz się po wygranej walce (wypija mikstury – w walce leczenie jest niemożliwe)</label>`;
   }
   function paintPortrait() {
     const c = $('#eqPortrait'); if (!c || !S.gear) return;
@@ -317,7 +333,9 @@
       ${bag.length ? `<div class="bag">${bag.map((it) => `<button type="button" class="bi r${it.r}" data-bag="${esc(it.u)}"><img src="${itemIcon(it, 40)}" alt="${esc(it.n)}" width="40" height="40">${qty(it)}<small class="pr">${pr(it)}</small></button>`).join('')}</div>` : '<p class="muted">Torba jest pusta.</p>'}
       <div class="da" style="margin-top:12px">
         ${commons.length ? `<button type="button" data-np="common">Sprzedaj zwykłe przedmioty (${commons.length}) · ${sum} zł</button>` : ''}
-        ${N.junk && N.junk.n ? `<button type="button" class="sec" data-np="junk">Sprzedaj łupy (${N.junk.n}) · ${N.junk.sum} zł</button>` : ''}</div>`;
+        ${N.junk && N.junk.n ? `<button type="button" class="sec" data-np="junk">Sprzedaj łupy (${N.junk.n}) · ${N.junk.sum} zł</button>` : ''}</div>
+      ${N.bags ? `<h4 style="margin-top:14px">Torby na sprzedaż <small>${N.slots ? `wolne miejsca na torby: ${N.slots}` : 'brak wolnych miejsc na torby – kupiona trafi do plecaka'}</small></h4>
+      <div class="legacy">${N.bags.map((b) => `<div class="li"><img src="${itemIcon({ ic: 'bag', t: 0, r: b.r }, 28)}" alt="" width="28" height="28"><span><b style="color:${RAR[b.r].col}">${esc(b.n)}</b> <small>+${b.cap} miejsc</small></span><button type="button" data-buybag="${b.k}" ${(G.gold != null ? G.gold : N.gold) >= b.pr && (N.slots || N.free > 0) ? '' : 'disabled'}>Kup · ${b.pr} zł</button></div>`).join('')}</div>` : ''}`;
   }
   // ---- blacksmith repairs (Kowal / Płatnerz) ----
   function repHtml() {
@@ -403,7 +421,7 @@
     const near = z ? nearPlayers().filter((x) => NET.api.pvpAt(x.area, x.x, x.y) && !(NET.party && NET.party[x.i]) && !x.fb) : [];
     const R = S.pvp;
     const rows = R ? R.rank.map((x) => `<tr class="${x.me ? 'me' : ''}"><td>${x.i}</td><td>${esc(x.n)}</td><td>${esc(CLS_N[x.cls] || '')}</td><td>${x.lvl || ''}</td><td><b>${x.pts}</b></td><td>${x.w}/${x.l}</td></tr>`).join('') : '';
-    return `<div class="card ${z ? 'zone-on' : ''}">${z ? (z.lethal ? `⚔ Jesteś na mapie PvP: <b>${esc(z.n)}</b>. Możesz zaatakować innych graczy – przegrany ginie (traci 10% złota i wytrzymałość ekwipunku, przedmiotów nikt nie zabiera).` : `⚔ Jesteś na arenie: <b>${esc(z.n)}</b>. Możesz wyzwać innych graczy na pojedynek o punkty rankingu (bez śmierci).`) : 'Jesteś w strefie bezpiecznej – tu nikt cię nie zaatakuje. Walki z graczami są możliwe tylko tutaj:'}<ul class="zl">${z ? '' : zones}</ul></div>
+    return `<div class="card ${z ? 'zone-on' : ''}">${z ? (z.lethal ? `⚔ Jesteś na mapie PvP: <b>${esc(z.n)}</b>. Możesz zaatakować innych graczy – przegrany ginie (traci 10% złota, 5% PD do poziomu i wytrzymałość ekwipunku, przedmiotów nikt nie zabiera).` : `⚔ Jesteś na arenie: <b>${esc(z.n)}</b>. Możesz wyzwać innych graczy na pojedynek o punkty rankingu (bez śmierci).`) : 'Jesteś w strefie bezpiecznej – tu nikt cię nie zaatakuje. Walki z graczami są możliwe tylko tutaj:'}<ul class="zl">${z ? '' : zones}</ul></div>
       ${z ? `<h4>Gracze w pobliżu</h4>${near.length ? near.map((x) => `<div class="gm"><span><b>${x.gt ? '[' + esc(x.gt) + '] ' : ''}${esc(x.n)}</b><small>${esc(CLS_N[x.c] || '')} · poz. ${x.l}</small></span><span class="ga"><button type="button" data-duel="${esc(x.i)}">${z.lethal ? '⚔ Zaatakuj' : '⚔ Wyzwij'}</button></span></div>`).join('') : '<p class="muted">Nikogo nie ma w pobliżu na arenie.</p>'}` : ''}
       <h4>Ranking PvP</h4>${R ? `<table class="rank"><thead><tr><th>#</th><th>Gracz</th><th>Klasa</th><th>Poz.</th><th>Pkt</th><th>W/P</th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="muted">Brak pojedynków.</td></tr>'}</tbody></table>${R.mine && !R.rank.some((x) => x.me) ? `<p class="muted">Twoje miejsce: ${R.mine.i} (${R.mine.pts} pkt)</p>` : ''}` : '<p class="muted">Wczytywanie rankingu…</p>'}
       <p class="muted">Areny: każdy zaczyna z 1000 punktami, wygrana z silniejszym daje więcej punktów, przegrany zostaje z 1 pż. Mapy PvP: walka na śmierć; gracze poniżej 10. poziomu są chronieni, nie można atakować graczy słabszych o więcej niż 10 poziomów, a tego samego gracza można zaatakować ponownie dopiero po 3 minutach.</p>`;
@@ -504,9 +522,8 @@
     else if (st.phase === 'choose' && me.auto) acts.innerHTML = '<div class="wait">Walka automatyczna – postać sama wybiera ruchy.</div>';
     else if (st.phase !== 'choose') acts.innerHTML = '<div class="wait">Trwa runda…</div>';
     else {
-      const hp = potCount(['pot', 'bigpot', 'elix', 'gpot', 'selix', 'spot', 'dpot']), mp = potCount(['mpot', 'gmpot']);
+      const mp = potCount(['mpot', 'gmpot']);
       acts.innerHTML = `<button type="button" class="ba atk" data-ba="atk" ${canAct ? '' : 'disabled'}><b>⚔</b>Atak<small>Spacja</small></button>${skillBtns(me)}
-        <button type="button" class="ba" data-ba="pot" ${canAct && hp ? '' : 'disabled'}><b>❤</b>Mikstura<small>×${hp} (H)</small></button>
         ${me.cls === 'mag' ? `<button type="button" class="ba" data-ba="mpot" ${canAct && mp ? '' : 'disabled'}><b>✦</b>Mana<small>×${mp} (G)</small></button>` : ''}
         <button type="button" class="ba fl" data-ba="flee" ${canAct && st.kind !== 'pvp' ? '' : 'disabled'}><b>🏃</b>Ucieczka<small>${st.kind === 'pvp' ? 'niemożliwa' : 'X'}</small></button>`;
     }
@@ -515,11 +532,11 @@
   function showEnd(st) {
     const e = st.end, box = $('#btEnd', bt.el);
     let h;
-    if (e.pvp && e.lethal) h = `<h2 class="${e.win ? 'win' : 'lose'}">${e.win ? 'Zwycięstwo!' : 'Zginąłeś'}</h2><p>${e.win ? `Zabijasz gracza ${esc(e.vs)} w strefie PvP.` : `Zabija cię ${esc(e.vs)}. Tracisz 10% złota, a założony ekwipunek traci wytrzymałość. Budzisz się w najbliższym mieście.`}</p>`;
+    if (e.pvp && e.lethal) h = `<h2 class="${e.win ? 'win' : 'lose'}">${e.win ? 'Zwycięstwo!' : 'Zginąłeś'}</h2><p>${e.win ? `Zabijasz gracza ${esc(e.vs)} w strefie PvP.` : `Zabija cię ${esc(e.vs)}. Tracisz 10% złota i 5% PD do poziomu, a założony ekwipunek traci wytrzymałość. Budzisz się w najbliższym mieście.`}</p>`;
     else if (e.pvp) h = `<h2 class="${e.win ? 'win' : 'lose'}">${e.win ? 'Zwycięstwo!' : 'Porażka'}</h2><p>${e.win ? 'Pokonujesz' : 'Przegrywasz z'} ${esc(e.vs)}.</p><p class="big">${e.pts > 0 ? '+' : ''}${e.pts} pkt rankingu · razem ${e.total}</p>`;
     else if (e.win) h = `<h2 class="win">Zwycięstwo!</h2><p class="big">+${e.xp} PD · +${e.gold} zł</p>${e.lvlUp ? `<p class="lvl">Awans na poziom ${e.lvlUp}!</p>` : ''}
       ${e.loot && e.loot.length ? `<h4>Łup</h4><div class="loot">${e.loot.map((it) => `<button type="button" class="lt" data-loot="${esc(it.u)}">${iconHtml(it, 40)}<span>${nameHtml(it)}<small style="color:${RAR[it.r].col}">${RAR[it.r].n}</small></span></button>`).join('')}</div>` : '<p class="muted">Tym razem bez przedmiotów.</p>'}`;
-    else if (e.dead) h = '<h2 class="lose">Polegasz…</h2><p>Odrodzisz się w osadzie.</p>';
+    else if (e.dead) h = '<h2 class="lose">Polegasz…</h2><p>Budzisz się przy kapłanie w najbliższym mieście. Tracisz 10% złota i 5% PD do poziomu, a założony ekwipunek traci wytrzymałość. W walce nie ma leczenia – lecz się przed nią.</p>';
     else if (e.fled) h = '<h2>Ucieczka</h2><p>Udało ci się uciec z walki.</p>';
     else h = '<h2>Koniec walki</h2>';
     box.innerHTML = `<div class="endc">${h}<button type="button" class="btn" data-ba="close">Zamknij</button></div>`;
@@ -640,7 +657,7 @@
       lastZone = key; const p = $('#uiZone'); p.hidden = !area;
       p.className = 'ui-zone ' + (z ? (z.lethal ? 'pvp' : 'arena') : 'safe');
       p.textContent = z ? (z.lethal ? `☠ Strefa PvP: ${z.n} – gracze mogą cię zaatakować` : `⚔ Pojedynki: ${z.n}`) : '🛡 Strefa bezpieczna';
-      p.title = z ? (z.lethal ? 'Mapa PvP: gracze od 10. poziomu mogą się atakować (różnica maks. 10 poziomów). Przegrany ginie: traci 10% złota i wytrzymałość ekwipunku.' : 'Arena: pojedynki o punkty rankingu, bez śmierci.') : 'Tu inni gracze nie mogą cię zaatakować.';
+      p.title = z ? (z.lethal ? 'Mapa PvP: gracze od 10. poziomu mogą się atakować (różnica maks. 10 poziomów). Przegrany ginie: traci 10% złota, 5% PD do poziomu i wytrzymałość ekwipunku.' : 'Arena: pojedynki o punkty rankingu, bez śmierci.') : 'Tu inni gracze nie mogą cię zaatakować.';
       if (S.open === 'pvp') refreshPvp();
     }
   }
@@ -653,7 +670,7 @@
       else if (lk === 'Enter' && bt.st && bt.st.phase === 'end') closeBattle();
       else if (lk === ' ' || lk === 'f') choose({ a: 'atk' });
       else if (lk >= '1' && lk <= '6' && lk.length === 1) { const b = bt.el.querySelector(`[data-ba="sk"][data-i="${+lk - 1}"]`); if (b && !b.disabled) choose({ a: 'sk', i: +lk - 1 }); }
-      else if (lk === 'h') { const b = bt.el.querySelector('[data-ba="pot"]'); if (b && !b.disabled) choose({ a: 'pot' }); }
+      else if (lk === 'h') logLine('W walce nie można się leczyć – mikstury lecznicze pij przed walką.', 'sys');
       else if (lk === 'g') { const b = bt.el.querySelector('[data-ba="mpot"]'); if (b && !b.disabled) choose({ a: 'mpot' }); }
       else if (lk === 'x') { const b = bt.el.querySelector('[data-ba="flee"]'); if (b && !b.disabled) choose({ a: 'flee' }); }
       else if (lk === 'a') { const c = $('#btAuto', bt.el); c.checked = !c.checked; c.dispatchEvent(new Event('change')); }
@@ -679,7 +696,10 @@
     if (!back) return;
     const op = t.closest('[data-open]'); if (op) { const k = op.dataset.open; if (k === 'chat') { closePanels(); openChat(''); return; } const fn = ({ eq: openEq, mk: openMk, gd: openGd, pvp: openPvp, tr: openTr })[k] || EXT.open[k]; if (fn) fn(); return; }
     if (EXT.click && EXT.click(t, back)) return;
-    const sl = t.closest('[data-slot]'); if (sl && S.gear) { const it = S.gear.gear[sl.dataset.slot]; if (it) showDetail(it, { from: 'worn', slot: sl.dataset.slot }); return; }
+    const sl = t.closest('[data-slot]'); if (sl && S.gear) { const it = wornAt(S.gear, sl.dataset.slot); if (it) showDetail(it, { from: 'worn', slot: sl.dataset.slot }); return; }
+    const at = t.closest('[data-attr]'); if (at && !at.disabled) { send({ t: 'gear', a: 'attr', k: at.dataset.attr, n: 1 }); return; }
+    const ar = t.closest('[data-attrreset]'); if (ar) { if (!ar.dataset.sure) { ar.dataset.sure = 1; ar.textContent = 'Na pewno? (u kapłana)'; return; } send({ t: 'gear', a: 'attrReset' }); return; }
+    const bb = t.closest('[data-buybag]'); if (bb && !bb.disabled) { send({ t: 'npc', a: 'buybag', k: bb.dataset.buybag }); return; }
     const bi = t.closest('[data-bag]'); if (bi && S.gear) { const it = S.gear.bag.find((x) => x.u === bi.dataset.bag); if (it) showDetail(it, { from: 'bag' }); return; }
     const us = t.closest('[data-use]'); if (us) { send({ t: 'in', mx: 0, my: 0, acts: [{ a: 'use', id: us.dataset.use }] }); setTimeout(() => send({ t: 'gear', a: 'get' }), 200); return; }
     const mt = t.closest('[data-mtab]'); if (mt) { mkTab = mt.dataset.mtab; refreshMk(); return; }
@@ -713,6 +733,7 @@
   function onLayerChange(e) {
     const f = e.target.dataset && e.target.dataset.f;
     if (f) { mkF[f] = f === 'lvl' ? (e.target.checked ? 1 : 0) : e.target.value; send({ t: 'mk', a: 'browse', f: mkF }); return; }
+    if (e.target.dataset && e.target.dataset.ah !== undefined) { send({ t: 'gear', a: 'ah', on: e.target.checked }); return; }
     if (e.target.id === 'trGold') send({ t: 'tr', a: 'gold', v: Math.max(0, Math.floor(+e.target.value || 0)) });
   }
   let qT = 0;

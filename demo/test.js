@@ -279,6 +279,7 @@ async function flow(browser, label, vp, shots) {
   const bi4 = await pg.$(sel4);
   let tip4 = null;
   if (bi4) {
+    await bi4.evaluate((e) => e.scrollIntoView({ block: 'center' })); await W(300);
     const bb = await bi4.boundingBox();
     if (vp.isMobile) { await pg.touchscreen.touchStart(bb.x + bb.width / 2, bb.y + bb.height / 2); await W(750); }
     else { await pg.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2); await W(300); }

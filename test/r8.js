@@ -95,18 +95,18 @@ const send = (p, acts) => { p.msgT = 0; world.onMessage(p, JSON.stringify({ t: '
       world.battle.onTick();
       absorbSeen = Math.max(absorbSeen, f.absorb || 0);
       const nowPots = B.api.countItem('pot');
-      if (f.hp > prev) { if (nowPots < pots) potGains++; else gains.push(`${prev}→${f.hp}`); }
+      if (f.hp > prev) { if (nowPots < pots) potGains++; else gains.push(`${prev}→${f.hp}`); } else if (nowPots < pots) potGains++;
       pots = nowPots; prev = f.hp;
       if (turn > 30) break;
     }
     if (B.battle) { B.ws.readyState = 3; world.leave(B); }
-    return { ok: true, gains, potGains, absorbSeen, turn, mhp: f.mhp };
+    return { ok: true, gains, potGains, absorbSeen, turn, mhp: f.mhp, potsLeft: B.api.countItem('pot') };
   }
   const w = fight('war', [2, 5, 0], { ls: 50, hregen: 10, soul: 30 });
   ok(w.ok && w.turn > 10, `walka wojownika trwała ${w.turn} tur`);
   ok(w.ok && w.gains.length === 0, `wojownik (Okrzyk, Gniew bogów, Rozdarcie, Runiczny pancerz) nie zyskuje życia bez mikstur ${w.gains.join(' ')}`);
   ok(w.ok && w.absorbSeen > 0 && w.absorbSeen <= w.mhp * 0.6 * 4 + 1, `zamiast leczenia – bariera (maks. ${Math.round(w.absorbSeen)} przy ${w.mhp} pż)`);
-  ok(w.ok && w.potGains >= 1, 'mikstura w walce leczy (akcja tury)');
+  ok(w.ok && w.potGains === 0 && w.potsLeft === 3, 'runda 9: mikstura w walce NIE leczy i nie znika (leczenie tylko przed walką)');
   const g = fight('mag', [2, 5, 1], { ls: 40, hregen: 8 });
   ok(g.ok && g.gains.length === 0, `mag (Lodowa bariera, Zatrzymanie czasu) nie zyskuje życia bez mikstur ${g.gains.join(' ')}`);
 

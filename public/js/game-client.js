@@ -73,6 +73,8 @@
   input.addEventListener('keyup', (e) => e.stopPropagation());
   // engine listens on window: keep typing out of the game
   ['keydown', 'keyup'].forEach((t) => chat.addEventListener(t, (e) => e.stopPropagation()));
+  // Escape closes the chat even when its input is not focused (e.g. opened with C or the button)
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && chat.classList.contains('open') && !e.defaultPrevented) { setOpen(false); e.stopImmediatePropagation(); } }, true);
 
   // ---------- network ----------
   function connect() {

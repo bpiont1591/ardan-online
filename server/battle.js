@@ -158,13 +158,24 @@ function createBattles(world) {
     for (const f of b.f) { f.choice = null; if (f.kind === 'p' && active(f) && (f.auto || f.stun > 0 || f.frz > 0)) f.choice = ai(b, f); }
     pushAll(b);
   }
+  // Round 9 (Margonem-like): optional "leczenie po walce" – after a fight (never during it) drink healing potions to top up HP
+  function autoHeal(p) {
+    const P = p.api.P(); if (!P.ah || !p.api.maxHp) return;
+    const max = p.api.maxHp(); let hp = P.hp, used = {}, got = 0;
+    for (let i = 0; i < 30 && hp < max; i++) {
+      const miss = max - hp, have = HEAL_POTS.filter((id) => p.api.countItem(id) > 0); if (!have.length) break;
+      let id = have[0]; for (const h of have) if (p.api.items[h].heal <= miss + 20) id = h;
+      if (p.api.items[id].heal > miss * 2.5 && miss < max * 0.15) break; // don't waste a big potion on a scratch
+      p.api.removeItem(id, 1); const add = Math.min(miss, p.api.items[id].heal); hp += add; got += add; used[id] = (used[id] || 0) + 1;
+    }
+    if (got > 0) { P.hp = Math.round(hp); p.srv.dirty = true; sys(p, `❤ Leczenie po walce: ${Object.keys(used).map((id) => `${used[id]}× ${p.api.items[id].n}`).join(', ')} (+${Math.round(got)} pż).`); }
+  }
   function potHave(f) { if (!f.p) return null; for (const id of HEAL_POTS.slice().reverse()) if (f.p.api.countItem(id) > 0) return id; return null; }
   function ai(b, f) {
     const en = enemiesOf(b, f); if (!en.length) return { a: 'atk' };
     const tgt = en.slice().sort((x, y) => x.hp - y.hp)[0].id;
     const hpk = f.hp / f.mhp, sk = TSK[f.cls] || TSK.war, lvl = f.lvl;
     const ok = (i) => !!sk[i] && lvl >= SK_LV[i] && (f.cds[i] | 0) <= 0 && f.mp >= sk[i].cost;
-    if (hpk < 0.35 && !f.bot && potHave(f)) return { a: 'pot', t: tgt };
     if (hpk < 0.5 && f.cls !== 'arc' && ok(5)) return { a: 'sk', i: 5, t: tgt };
     if (f.cls === 'arc' && ok(5)) return { a: 'sk', i: 5, t: tgt };
     if (en.length >= 2 && ok(4)) return { a: 'sk', i: 4, t: tgt };
@@ -251,9 +262,11 @@ function createBattles(world) {
         ev.push({ a: f.id, k: 'info', txt: `${f.n} próbuje uciec, ale się nie udaje!` }); return;
       }
     }
-    if (ch.a === 'pot' || ch.a === 'mpot') {
-      const ids = ch.a === 'pot' ? HEAL_POTS : MANA_POTS;
-      const id = ch.a === 'pot' ? potHave(f) : (f.p ? MANA_POTS.slice().reverse().find((m) => f.p.api.countItem(m) > 0) || null : null);
+    // Round 9: no healing in battle at all – healing potions are drunk only before / after a fight
+    if (ch.a === 'pot') { ev.push({ a: f.id, k: 'info', txt: `${f.n}: w walce nie można się leczyć – mikstury lecznicze pije się przed walką.` }); ch = { a: 'atk' }; }
+    if (ch.a === 'mpot') {
+      const ids = MANA_POTS;
+      const id = f.p ? MANA_POTS.slice().reverse().find((m) => f.p.api.countItem(m) > 0) || null : null;
       if (!id || ids.indexOf(id) < 0) { ev.push({ a: f.id, k: 'info', txt: `${f.n} szuka mikstury, ale torba jest pusta!` }); return; }
       f.p.api.removeItem(id, 1); f.p.srv.dirty = true;
       const def = f.p.api.items[id];
@@ -380,6 +393,7 @@ function createBattles(world) {
       const before = {};
       for (const f of players(b)) { const P = f.p.api.P(); before[f.id] = { xp: xpTotal(P.lvl, P.xp), gold: P.gold, lvl: P.lvl }; }
       for (const f of players(b)) { if (f.left) continue; const P = f.p.api.P(); P.mp = Math.max(0, Math.round(f.mp)); if (!f.alive) { P.hp = 0; } else P.hp = Math.max(1, Math.round(f.hp)); }
+      for (const f of players(b)) if (!f.left && f.alive && !f.bot) autoHeal(f.p);
       if (won0 && winners.length) {
         const killer = winners.find((f) => f.id === b.lead) || winners[0];
         for (const mf of mobsF) { mf.m.inB = 0; killer.p.api.kill(mf.m); }
@@ -500,7 +514,7 @@ function createBattles(world) {
       if (msg.a === 'auto') { f.auto = !!msg.on; if (f.auto && b.phase === 'choose' && !f.choice && active(f)) f.choice = ai(b, f); pushAll(b); }
       else if (msg.a === 'speed') pushAll(b);
       else if (msg.a === 'act' && b.phase === 'choose' && active(f) && msg.c && typeof msg.c === 'object') {
-        const c = msg.c, a = ['atk', 'sk', 'pot', 'mpot', 'flee'].indexOf(c.a) >= 0 ? c.a : 'atk';
+        const c = msg.c, a = ['atk', 'sk', 'mpot', 'flee'].indexOf(c.a) >= 0 ? c.a : 'atk';
         f.choice = { a, i: Number.isInteger(c.i) && c.i >= 0 && c.i < 6 ? c.i : 0, t: typeof c.t === 'string' && c.t.length < 30 ? c.t : null };
         pushAll(b);
       } else if (msg.a === 'get') world.send(p, view(b, f));
