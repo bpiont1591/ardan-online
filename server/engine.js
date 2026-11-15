@@ -4848,7 +4848,8 @@ function createArdan(canvas, opts) {
         }
         const dl = m.d.lvl - P.lvl;
         const lc = m.d.boss ? "#e0a8ff" : dl >= 6 ? "#ff5a4a" : dl >= 3 ? "#ffa04a" : dl >= -2 ? "#ffe9a8" : dl >= -5 ? "#8fe08a" : "#a8a8a8";
-        label(x + 16, top - (m.d.boss ? 22 : 10), (tgt || hv || m.d.boss ? m.d.n + " · " : "") + "Lv " + m.d.lvl + (m.d.boss ? " ☠" : ""), lc);
+        if (!m.portrait)
+            label(x + 16, top - (m.d.boss ? 22 : 10), (tgt || hv || m.d.boss ? m.d.n + " · " : "") + "Lv " + m.d.lvl + (m.d.boss ? " ☠" : ""), lc);
         if (tgt) {
             g.strokeStyle = "rgba(255,80,60,0.85)";
             g.lineWidth = 1.5;
@@ -7270,7 +7271,7 @@ function createArdan(canvas, opts) {
         NET.api = { recv: netRecv, clearKeys: onBlur, log,
             P: () => P, stats: statsAll, items: ITEMS, mon: MON, sk: SK, skx: SKX, cls: CLS, zones: PVPZ, pvpAt, pvpMap, city: CITY, others: () => others, gearIds: GEAR, npcs: NPCS, ainfo: AINFO,
             drawMob: (g, k) => { if (MON[k])
-                withCtx(g, () => drawMob({ k, d: MON[k], x: 0, y: 0, fx: 0, fy: 0, mt: 1, hit: 0, anim: 0, dir: 0, hp: MON[k].hp, cd: 0, frz: 0 })); },
+                withCtx(g, () => drawMob({ k, d: MON[k], x: 0, y: 0, fx: 0, fy: 0, hx: 0, hy: 0, portrait: true, mt: 1, hit: 0, anim: 0, dir: 0, hp: MON[k].hp, cd: 0, frz: 0 })); },
             drawChar: (g, cls, w, a, dir) => { const c = CLS[cls] || CLS.war; withCtx(g, () => drawHuman(0, 0, dir || 0, 0, c.look, w && ITEMS[w] ? ITEMS[w].c : null, a && a !== "shirt" && ITEMS[a] ? ITEMS[a].c : null, false, 0, c.wk)); },
             drawIcon: (g, id, x, y, sz) => { if (ITEMS[id])
                 withCtx(g, () => drawIcon(id, x, y, sz)); },

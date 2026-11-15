@@ -96,6 +96,10 @@ ed('    if (it.t === "p") return "Leczy " + it.heal + " HP";', '    if (it.t ===
 ed('text(shopId === "smith" || shopId === "armory" ? "Sprzęt dla klasy: " + C().n + ". Załóż go w torbie." : "Mikstury: H – leczenie, G – mana/energia.",',
    'text(shopId === "smith" || shopId === "armory" ? "Sprzęt dla klasy: " + C().n + ". Załóż go w torbie." : "Życie nie odnawia się samo – tylko mikstury (H, także w walce) i odpoczynek w mieście.",')
 ed('    quests: QUESTS, qorder: QORDER, maxLvl: MAXLVL,\n', '    quests: QUESTS, qorder: QORDER, maxLvl: MAXLVL, shops: SHOPS,\n')
+# battle-view portraits: the synthetic mob had no home tile (hx/hy) -> NaN in the animated sprites -> invisible
+ed('drawMob({ k, d: MON[k], x: 0, y: 0, fx: 0, fy: 0, mt: 1,', 'drawMob({ k, d: MON[k], x: 0, y: 0, fx: 0, fy: 0, hx: 0, hy: 0, mt: 1,')
+ed('fx: 0, fy: 0, hx: 0, hy: 0, mt: 1,', 'fx: 0, fy: 0, hx: 0, hy: 0, portrait: true, mt: 1,')
+ed('    label(x + 16, top - (m.d.boss ? 22 : 10), (tgt || hv || m.d.boss ? m.d.n + " · " : "") + "Lv "', '    if (!m.portrait) label(x + 16, top - (m.d.boss ? 22 : 10), (tgt || hv || m.d.boss ? m.d.n + " · " : "") + "Lv "')
 
 open('engine.ts', 'w').write(s)
 print('r8 ok')

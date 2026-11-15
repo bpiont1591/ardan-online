@@ -40,8 +40,12 @@ const W = (ms) => new Promise((r) => setTimeout(r, ms));
       await TH({ heal: true, tp: { area, x, y } }); await W(2500);
       await TH({ heal: true, near: { mob } }); await W(6500); await shot(`r8_${name}_world.png`);
       await inAct({ a: 'atk' }); await W(2600); await shot(`r8_${name}_battle.png`);
-      await send({ t: 'bt', a: 'act', c: { a: 'flee' } }); await W(5000);
-      for (let i = 0; i < 3; i++) { await pg.keyboard.press('Escape'); await W(200); }
+      for (let i = 0; i < 12; i++) {
+        const inBt = await pg.evaluate(() => { const r = document.getElementById('btRound'); return !!(r && r.offsetParent && !/Koniec/.test(r.textContent)); });
+        if (!inBt) break;
+        await send({ t: 'bt', a: 'act', c: { a: 'flee' } }); await W(3500);
+      }
+      for (let i = 0; i < 3; i++) { await pg.keyboard.press('Escape'); await W(300); }
     };
     await monster(14, 'swamp', 20, 18, 'wisp', 'wisp_swamp');
     await monster(24, 'mount', 20, 14, 'ielem', 'ielem_mount');
