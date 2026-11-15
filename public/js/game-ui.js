@@ -328,7 +328,7 @@
         ${x.c > 0 ? `<button type="button" data-rep="${esc(x.u)}" ${gold >= x.c ? '' : 'disabled'}>Napraw · ${x.c} zł</button>` : '<small class="okm">✓ sprawny</small>'}</div>`; }).join('');
     return `<p class="muted">${esc(N.n)} naprawi twój ekwipunek. Po każdej śmierci założone przedmioty tracą 10 pkt wytrzymałości, a zepsute (0) nie dają statystyk. Masz <b class="gold">${gold} zł</b>.</p>
       <div class="legacy">${rows || '<p class="muted">Nie masz ekwipunku do naprawy.</p>'}</div>
-      <div class="da" style="margin-top:12px">${N.all > 0 ? `<button type="button" data-rep="*" ${gold >= N.all ? '' : 'disabled'}>⚒ Napraw wszystko · ${N.all} zł</button>` : '<span class="okm">✓ Cały ekwipunek jest sprawny.</span>'}</div>`;
+      <div class="da" style="margin-top:12px">${N.all > 0 ? `<button type="button" class="btn" data-rep="*" ${gold >= N.all ? '' : 'disabled'}>⚒ Napraw wszystko · ${N.all} zł</button>` : '<span class="okm">✓ Cały ekwipunek jest sprawny.</span>'}</div>`;
   }
   function refreshRep() { if (S.open !== 'rep') return; const b = curBody(); if (!b) return; const top = b.scrollTop; b.innerHTML = repHtml(); b.scrollTop = top; }
   function refreshSkup() { if (S.open !== 'skup') return; const b = curBody(); if (!b) return; const top = b.scrollTop; b.innerHTML = skupHtml(); b.scrollTop = top; }

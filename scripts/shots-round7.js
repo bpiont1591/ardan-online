@@ -35,14 +35,14 @@ const W = (ms) => new Promise((r) => setTimeout(r, ms));
     // claim the login reward / close dialogs so the view is clean
     await W(800); await clean();
     // 1) maps drawn properly + monster level labels (colour by difficulty)
-    await TH({ lvl: 7, heal: true, tp: { area: 'wolfhills', x: 24, y: 20 } }); await W(7000); await shot('r7_map_levels_wolfhills.png');
-    await TH({ lvl: 40, heal: true, tp: { area: 'elfwood', x: 24, y: 20 } }); await W(7000); await shot('r7_map_levels_elfwood.png');
-    await TH({ lvl: 70, heal: true, tp: { area: 'necro', x: 25, y: 12 } }); await W(7000); await shot('r7_map_necro_pvp_badge.png');
+    await TH({ lvl: 7, heal: true }); await W(4500); await TH({ heal: true, tp: { area: 'wolfhills', x: 24, y: 20 } }); await W(6500); await shot('r7_map_levels_wolfhills.png');
+    await TH({ lvl: 40, heal: true }); await W(4500); await TH({ heal: true, tp: { area: 'elfwood', x: 24, y: 20 } }); await W(6500); await shot('r7_map_levels_elfwood.png');
+    await TH({ lvl: 70, heal: true }); await W(4500); await TH({ heal: true, tp: { area: 'necro', x: 25, y: 12 } }); await W(6500); await shot('r7_map_necro_pvp_badge.png');
     // high-level map warning on entry (level 12 entering the dragon nest)
-    await TH({ lvl: 12, heal: true, tp: { area: 'dragon', x: 24, y: 20 } }); await W(1500); await shot('r7_warning_high_level_pvp.png');
-    await TH({ lvl: 30, heal: true, tp: { area: 'steppe', x: 24, y: 20 } }); await W(7000); await shot('r7_pvp_zone_badge.png');
+    await TH({ lvl: 12, heal: true }); await W(4500); await TH({ heal: true, tp: { area: 'dragon', x: 24, y: 20 } }); await W(3200); await shot('r7_warning_high_level_pvp.png');
+    await TH({ lvl: 30, heal: true }); await W(4500); await TH({ heal: true, tp: { area: 'steppe', x: 24, y: 20 } }); await W(6500); await shot('r7_pvp_zone_badge.png');
     await TH({ lvl: 30, heal: true, near: { npc: 'handtown' } }); await W(2500); await shot('r7_safe_zone_badge.png');
-    await pg.keyboard.press('m'); await W(900); await shot('r7_world_map.png'); await pg.keyboard.press('m'); await W(300);
+    await pg.keyboard.press('m'); await W(900); await pg.mouse.click(447, 120); await W(900); await shot('r7_world_map.png'); await pg.keyboard.press('m'); await W(300);
     // 2) durability: worn gear after a few deaths, tooltip + blacksmith repair window
     await TH({ lvl: 30, gold: 5000, loot: 6 }); await W(1200);
     const bag = await pg.evaluate(() => (window.ARDAN_UI_STATE.gear || {}).bag || []);

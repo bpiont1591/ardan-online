@@ -2975,7 +2975,7 @@ function createArdan(canvas, opts) {
     for (const k of ["kowal", "platnerz", "portsmith", "fortsmith", "citsmith", "starsmith"])
         if (NPCS[k])
             NPCS[k].rep = 1;
-    let areaWarnT = "";
+    let areaWarnT = "", warnPend = 0;
     const lvRange = (a) => { const m = /Potwory poz\. (\d+)\D+(\d+)/.exec((AINFO[a] && AINFO[a].lv) || ""); return m ? [+m[1], +m[2]] : null; };
     function areaWarn() {
         areaWarnT = "";
@@ -3998,7 +3998,7 @@ function createArdan(canvas, opts) {
         trans = { t: 0.25, done: true, to: a };
         if (first)
             log("Odkryto nową krainę: " + A().name + "!", "#f5d98a");
-        areaWarn();
+        warnPend = 2;
     }
     function netEvent(e) {
         if (e.k === "burst")
@@ -4168,6 +4168,8 @@ function createArdan(canvas, opts) {
         }
     }
     function netUpdate(dt) {
+        if (warnPend > 0 && --warnPend === 0)
+            areaWarn(); // after the state update that came with the area change
         banner = Math.max(0, banner - dt);
         if (trans) {
             trans.t += dt;
@@ -5553,7 +5555,7 @@ function createArdan(canvas, opts) {
                 ctx.setLineDash([8, 6]);
                 ctx.strokeRect(zx + 1, zy + 1, zw - 2, zh - 2);
                 ctx.setLineDash([]);
-                label(zx + zw / 2, zy + 14, "⚔ " + z.n + " – strefa PvP", "#ffb0a0");
+                label(zx + zw / 2, zy + 14, "⚔ " + z.n + " – pojedynki (bez śmierci)", "#ffd0a0");
             }
         for (const b of bags)
             if (b.area === P.area)

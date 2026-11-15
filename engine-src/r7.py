@@ -84,7 +84,7 @@ ed('    if (n.heal) extra.push({ l: n.heal,', '''    if (n.rep) extra.push({ l: 
     if (n.heal) extra.push({ l: n.heal,''')
 
 # --- entering a map: warn about PvP maps and maps far above the player's level
-ed('  function heal(n: number): void {', """  let areaWarnT = "";
+ed('  function heal(n: number): void {', """  let areaWarnT = "", warnPend = 0;
   const lvRange = (a: string): number[] | null => { const m = /Potwory poz\\. (\\d+)\\D+(\\d+)/.exec((AINFO[a] && AINFO[a].lv) || ""); return m ? [+m[1], +m[2]] : null; };
   function areaWarn(): void {
     areaWarnT = "";
@@ -97,7 +97,9 @@ ed('  function heal(n: number): void {', """  let areaWarnT = "";
 ed('''    banner = first ? 4.5 : 3; trans = { t: 0.25, done: true, to: a };
     if (first) log("Odkryto nową krainę: " + A().name + "!", "#f5d98a");''', '''    banner = first ? 4.5 : 3; trans = { t: 0.25, done: true, to: a };
     if (first) log("Odkryto nową krainę: " + A().name + "!", "#f5d98a");
-    areaWarn();''')
+    warnPend = 2;''')
+ed('  function netUpdate(dt: number): void {', '''  function netUpdate(dt: number): void {
+    if (warnPend > 0 && --warnPend === 0) areaWarn(); // after the state update that came with the area change''')
 ed('''        banner = first ? 4.5 : 3; clickMark = null; panel = ""; dlg = null; guideT = 0; save();
         if (first) log("Odkryto nową krainę: " + A().name + "!", "#f5d98a");''', '''        banner = first ? 4.5 : 3; clickMark = null; panel = ""; dlg = null; guideT = 0; save();
         if (first) log("Odkryto nową krainę: " + A().name + "!", "#f5d98a");
@@ -108,6 +110,9 @@ ed('''      text(AINFO[a.id].lv, W / 2, H * 0.3 + 26, 12, COL.text, "center", tr
       if (areaWarnT) text(fitText(areaWarnT, W - 30, 14, true), W / 2, H * 0.3 + 48, 14, "#ff8a6a", "center", true);
       ctx.globalAlpha = 1;
     }''')
+
+# --- arenas are friendly duels now (lethal PvP = whole PvP maps)
+ed('label(zx + zw / 2, zy + 14, "⚔ " + z.n + " – strefa PvP", "#ffb0a0");', 'label(zx + zw / 2, zy + 14, "⚔ " + z.n + " – pojedynki (bez śmierci)", "#ffd0a0");')
 
 ed('zones: PVPZ, pvpAt, npcs: NPCS, areas: AREAS, ainfo: AINFO,', 'zones: PVPZ, pvpAt, pvpMap, city: CITY, npcs: NPCS, areas: AREAS, ainfo: AINFO,')
 ed('zones: PVPZ, pvpAt, others:', 'zones: PVPZ, pvpAt, pvpMap, city: CITY, others:')

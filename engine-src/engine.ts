@@ -1739,7 +1739,7 @@ function createArdan(canvas: HTMLCanvasElement, opts: any): () => void {
     return [best, x, y];
   }
   for (const k of ["kowal", "platnerz", "portsmith", "fortsmith", "citsmith", "starsmith"]) if (NPCS[k]) NPCS[k].rep = 1;
-  let areaWarnT = "";
+  let areaWarnT = "", warnPend = 0;
   const lvRange = (a: string): number[] | null => { const m = /Potwory poz\. (\d+)\D+(\d+)/.exec((AINFO[a] && AINFO[a].lv) || ""); return m ? [+m[1], +m[2]] : null; };
   function areaWarn(): void {
     areaWarnT = "";
@@ -2249,7 +2249,7 @@ function createArdan(canvas: HTMLCanvasElement, opts: any): () => void {
     shots.length = 0; warns.length = 0; bags.length = 0; panel = ""; guide = null; guideT = 0;
     banner = first ? 4.5 : 3; trans = { t: 0.25, done: true, to: a };
     if (first) log("Odkryto nową krainę: " + A().name + "!", "#f5d98a");
-    areaWarn();
+    warnPend = 2;
   }
   function netEvent(e: any): void {
     if (e.k === "burst") burst(e.x, e.y, e.c, Math.min(60, e.n || 8), e.sp);
@@ -2321,6 +2321,7 @@ function createArdan(canvas: HTMLCanvasElement, opts: any): () => void {
     for (let i = warns.length - 1; i >= 0; i--) { warns[i].t -= dt; if (warns[i].t <= 0) { warns.splice(i, 1); } }
   }
   function netUpdate(dt: number): void {
+    if (warnPend > 0 && --warnPend === 0) areaWarn(); // after the state update that came with the area change
     banner = Math.max(0, banner - dt);
     if (trans) { trans.t += dt; if (trans.t >= 0.6) trans = null; }
     const it = readIntent();
@@ -2793,7 +2794,7 @@ function createArdan(canvas: HTMLCanvasElement, opts: any): () => void {
       const zx = z.x0 * TS, zy = z.y0 * TS, zw = (z.x1 - z.x0 + 1) * TS, zh = (z.y1 - z.y0 + 1) * TS;
       ctx.fillStyle = "rgba(190,40,40,0.13)"; ctx.fillRect(zx, zy, zw, zh);
       ctx.strokeStyle = "rgba(255,90,70,0.75)"; ctx.lineWidth = 2; ctx.setLineDash([8, 6]); ctx.strokeRect(zx + 1, zy + 1, zw - 2, zh - 2); ctx.setLineDash([]);
-      label(zx + zw / 2, zy + 14, "⚔ " + z.n + " – strefa PvP", "#ffb0a0");
+      label(zx + zw / 2, zy + 14, "⚔ " + z.n + " – pojedynki (bez śmierci)", "#ffd0a0");
     }
     for (const b of bags) if (b.area === P.area) drawBag(b);
     const ents: any[] = [];
