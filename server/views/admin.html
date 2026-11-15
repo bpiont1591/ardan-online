@@ -21,6 +21,7 @@
     <button type="button" data-tab="players" class="on">Gracze</button>
     <button type="button" data-tab="chat">Czat</button>
     <button type="button" data-tab="active">Kary</button>
+    <button type="button" data-tab="logs" data-admin hidden>Logi</button>
     <button type="button" data-tab="audit" data-admin hidden>Dziennik</button>
   </nav>
   <div class="adm-msg" id="msg" role="status" hidden></div>
@@ -33,6 +34,20 @@
     <div id="chat" class="adm-chat"></div>
   </section>
   <section data-pane="active" hidden><div id="active"></div></section>
+  <section data-pane="logs" hidden>
+    <form class="adm-search adm-logf" id="logF">
+      <select name="type" aria-label="Typ"><option value="">Wszystkie typy</option><option value="trade">Handel</option><option value="battle">Walki</option><option value="login">Logowania</option><option value="sus">Podejrzane</option></select>
+      <select name="sub" aria-label="Rodzaj"><option value="">Każdy rodzaj</option></select>
+      <input name="nick" maxlength="40" placeholder="Gracz (nick lub login)" autocomplete="off">
+      <input name="q" maxlength="60" placeholder="Szukaj w treści, IP…" autocomplete="off">
+      <label class="dt">od <input type="date" name="from"></label><label class="dt">do <input type="date" name="to"></label>
+      <button class="btn primary small" type="submit">Filtruj</button><button class="btn small" type="button" data-logclear>Wyczyść</button>
+    </form>
+    <div id="logUser" class="lg-user" hidden></div>
+    <div id="logStats" class="muted small lg-stats"></div>
+    <div id="logs" class="lg-list"></div>
+    <div class="lg-pg" id="logPg"></div>
+  </section>
   <section data-pane="audit" hidden><div id="audit"></div></section>
 </main>
 <div class="adm-modal" id="modal" hidden>

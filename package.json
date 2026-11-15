@@ -7,7 +7,7 @@
     "start": "node server/start.js",
     "dev": "NODE_ENV=development node server/start.js",
     "build:engine": "cd engine-src && bash build.sh",
-    "test": "node test/world-check.js && node test/ranking-cache.js && node test/r7.js && node test/r8.js && node test/r9.js && node test/security.js && node test/admin.js && node test/e2e.js",
+    "test": "node test/world-check.js && node test/ranking-cache.js && node test/r7.js && node test/r8.js && node test/r9.js && node test/r10.js && node test/security.js && node test/admin.js && node test/e2e.js",
     "test:security": "node test/security.js",
     "test:passives": "node test/passives-stress.js",
     "make-admin": "node scripts/make-admin.js",

@@ -449,7 +449,7 @@
         <button type="button" data-pa="trade" data-i="${esc(o.i)}">🤝 Handel</button>
         <button type="button" data-pa="party" data-n="${esc(o.n)}">◆ Zaproś do drużyny</button>
         ${inGd && S.gd.g.my >= 1 ? `<button type="button" data-pa="guild" data-n="${esc(o.n)}">🛡 Zaproś do gildii</button>` : ''}
-        <button type="button" data-pa="whisper" data-n="${esc(o.n)}">✉ Szepnij</button></div>`, 'menu');
+        <button type="button" data-pa="whisper" data-n="${esc(o.n)}">✉ Szepnij</button>${EXT.plExtra ? EXT.plExtra(o) : ''}</div>`, 'menu');
   }
 
   // ---------- battle ----------
@@ -471,7 +471,7 @@
       if (f.kind === 'm') {
         const sc = (NET.api.mon[f.k] && NET.api.mon[f.k].sc) || 1, k = f.boss ? 2.5 : 2 / Math.max(1, sc * 0.8);
         g.translate(48 - 16 * k, 88 - 30 * k); g.scale(k, k); try { NET.api.drawMob(g, f.k); } catch (e) {}
-      } else { g.translate(16, 20); g.scale(2, 2); try { NET.api.drawChar(g, f.cls, f.w, f.a, f.side ? 1 : 0); } catch (e) {} }
+      } else { g.translate(16, 20); g.scale(2, 2); try { NET.api.drawChar(g, f.cls, f.w, f.a, f.side ? 1 : 0, f.sk | 0); } catch (e) {} }
       g.restore();
     }
   }

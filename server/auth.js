@@ -105,9 +105,10 @@ function passwordProblem(p, login, email) {
   return null;
 }
 
+const logs = require('./logs');
 const limiter = (windowMin, max, msg) => rateLimit({
   windowMs: windowMin * 60e3, max, standardHeaders: true, legacyHeaders: false,
-  handler: (req, res) => res.status(429).json({ error: msg }),
+  handler: (req, res) => { logs.write('sus', 'rate', { ip: req.ip, userId: req.user ? req.user.id : null, nick: req.user ? req.user.login : null }, { detail: `limit żądań: ${req.method} ${String(req.originalUrl || req.path).slice(0, 80)} (${max}/${windowMin} min)`, throttle: 'http' + windowMin + max }); res.status(429).json({ error: msg }); },
 });
 const loginLimiter = limiter(15, 10, 'Zbyt wiele prób logowania. Spróbuj ponownie za kilkanaście minut.');
 const registerLimiter = limiter(60, 8, 'Zbyt wiele rejestracji z tego adresu. Spróbuj później.');
@@ -170,15 +171,16 @@ function router() {
     const key = id.toLowerCase();
     if (!id || !pass) return res.status(400).json({ error: 'Podaj login i hasło.' });
     if (pass.length > 128) return res.status(400).json({ error: 'Nieprawidłowy login lub hasło.' });
-    if (loginThrottled(key)) return res.status(429).json({ error: 'Zbyt wiele nieudanych prób dla tego konta. Spróbuj za 15 minut lub zresetuj hasło.' });
+    if (loginThrottled(key)) { logs.write('sus', 'throttle', { ip: req.ip, nick: id.slice(0, 40) }, { detail: 'logowanie zablokowane po wielu nieudanych próbach', throttle: 'thr' }); return res.status(429).json({ error: 'Zbyt wiele nieudanych prób dla tego konta. Spróbuj za 15 minut lub zresetuj hasło.' }); }
     const u = qUserByLogin.get(id, id.toLowerCase());
     const ok = await bcrypt.compare(pass.slice(0, 128), u ? u.pass : DUMMY_HASH);
-    if (!u || !ok) { loginFailed(key); return res.status(401).json({ error: 'Nieprawidłowy login lub hasło.' }); }
+    if (!u || !ok) { loginFailed(key); logs.write('login', 'fail', { ip: req.ip, userId: u ? u.id : null, nick: u ? u.login : id.slice(0, 40) }, { detail: u ? 'błędne hasło' : 'nieznany login / e-mail' }); return res.status(401).json({ error: 'Nieprawidłowy login lub hasło.' }); }
     failByLogin.delete(key);
     const ban = mod.banOf(u.id); if (ban) return res.status(403).json({ error: mod.banMessage(ban), banned: true });
     const old = parseCookies(req.headers.cookie)[SID]; if (old && old.length <= 100) qSessDel.run(sidHash(old)); // session fixation: always a fresh session id
     qUserLast.run(now(), u.id);
     startSession(res, u.id);
+    logs.write('login', 'ok', { ip: req.ip, userId: u.id, nick: u.login }, { detail: String(req.headers['user-agent'] || '').slice(0, 160) });
     res.json({ ok: true });
   });
 

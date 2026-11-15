@@ -1347,6 +1347,18 @@ function createArdan(canvas: HTMLCanvasElement, opts: any): () => void {
       { n: "Lodowa bariera", lvl: 5, cost: 35, cd: 16, ic: "frost", d: "Bariera 45% maks. życia – pochłania obrażenia (nie leczy)." }],
   };
   const MAXLVL = 80;
+  const SKIN_LV = [1, 5, 15, 30, 45, 60, 70, 80];
+  function skinTier(lvl: number, choice: any): number {
+    let top = 0; for (let i = 0; i < SKIN_LV.length; i++) if (lvl >= SKIN_LV[i]) top = i;
+    return Number.isInteger(choice) && choice >= 0 && choice <= top ? choice : top;
+  }
+  const SKINS = (): any => (typeof window !== "undefined" ? (window as any).ARDAN_SKINS : null);
+  // a player figure: the skin art for tiers 1+ (when loaded), the classic drawHuman otherwise
+  function drawHero(x: number, y: number, dir: number, walk: number, cls: string, tier: number, w: string | null, ar: string | null, flash: boolean, lunge: number): void {
+    const SK2 = SKINS(), c = CLS[cls] || CLS.war;
+    if (SK2 && tier > 0) { SK2.hero(ctx, x, y, { cls: CLS[cls] ? cls : "war", tier, dir, walk, flash, lunge, t: time, wcol: w, weapon: drawWeapon }); return; }
+    drawHuman(x, y, dir, walk, c.look, w, ar, flash, lunge, c.wk);
+  }
   const SKX: { [k: string]: any[] } = {
     war: [
       { n: "Szarża tytana", lvl: 15, cost: 45, cd: 3, ic: "smash", d: "Cios za 300% obrażeń, ogłusza (bossa rzadziej)." },
@@ -2316,7 +2328,7 @@ function createArdan(canvas: HTMLCanvasElement, opts: any): () => void {
         let e = others[o.i];
         if (!e) { e = others[o.i] = { x: o.x, y: o.y, fx: o.x, fy: o.y, mt: 1, phase: 0, an: 0, hit: 0, area: msg.a }; }
         netPos(e, e, o.x, o.y);
-        e.i = o.i; e.n = o.n; e.c = o.c; e.l = o.l; e.dir = o.d; e.hp = o.hp; e.mh = o.mh; e.w = o.w; e.a = o.a; e.dead = o.dd; e.area = msg.a; e.bd = o.bd; e.gt = o.gt; e.fb = o.fb; e.i = o.i; e.ti = o.ti; e.dg = o.dg;
+        e.i = o.i; e.n = o.n; e.c = o.c; e.l = o.l; e.dir = o.d; e.hp = o.hp; e.mh = o.mh; e.w = o.w; e.a = o.a; e.dead = o.dd; e.area = msg.a; e.bd = o.bd; e.gt = o.gt; e.fb = o.fb; e.i = o.i; e.ti = o.ti; e.dg = o.dg; e.sk = o.sk | 0;
         if (o.an > e.an + 0.05) e.an = o.an;
         if (o.ht > e.hit + 0.05) e.hit = o.ht;
       }
@@ -2381,7 +2393,7 @@ function createArdan(canvas: HTMLCanvasElement, opts: any): () => void {
     const c = CLS[o.c] || CLS.war;
     const w = o.w && ITEMS[o.w] ? ITEMS[o.w].c : null, ar = o.a && o.a !== "shirt" && ITEMS[o.a] ? ITEMS[o.a].c : null;
     if (o.bd) { ctx.strokeStyle = "rgba(255,150,60,0.6)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(op[0] + 16, op[1] + 28, 14, 5, 0, 0, Math.PI * 2); ctx.stroke(); }
-    drawHuman(op[0], op[1], o.dir || 0, o.mt < 1 ? o.phase : 0, c.look, w, ar, o.hit > 0, o.an, c.wk);
+    drawHero(op[0], op[1], o.dir || 0, o.mt < 1 ? o.phase : 0, o.c, o.sk | 0, w, ar, o.hit > 0, o.an); void c;
     const inParty = !!(NET && NET.party && NET.party[o.i]);
     const inZ = !!pvpAt(P.area, o.x, o.y) && !!pvpAt(P.area, P.x, P.y);
     if (o.ti) label(op[0] + 16, op[1] - 21, "«" + o.ti + "»", "#e8c96a");
@@ -2791,7 +2803,7 @@ function createArdan(canvas: HTMLCanvasElement, opts: any): () => void {
   // ---------- DRAW: MAIN ----------
   function drawPlayerAt(x: number, y: number, dir: number, walk: number, flash: boolean, lunge: number): void {
     const w = P.eq.w ? ITEMS[P.eq.w].c : null, ar = P.eq.a && P.eq.a !== "shirt" ? ITEMS[P.eq.a].c : null;
-    drawHuman(x, y, dir, walk, C().look, w, ar, flash, lunge, C().wk);
+    drawHero(x, y, dir, walk, P.cls, skinTier(P.lvl, P.skin), w, ar, flash, lunge);
   }
   function arrowTri(cx: number, cy: number, ang: number, sz: number, col: string): void {
     ctx.save(); ctx.translate(cx, cy); ctx.rotate(ang);
@@ -3012,6 +3024,9 @@ function createArdan(canvas: HTMLCanvasElement, opts: any): () => void {
       g.fillStyle = "#e8dcc0"; rr(cx - r * 0.55, cy - r * 0.45, r * 1.1, r * 0.75, 4); g.fill();
       g.beginPath(); g.moveTo(cx - r * 0.25, cy + r * 0.28); g.lineTo(cx - r * 0.4, cy + r * 0.6); g.lineTo(cx + r * 0.05, cy + r * 0.28); g.fill();
       g.fillStyle = "#6a5430"; for (let i = 0; i < 3; i++) g.fillRect(cx - r * 0.32 + i * r * 0.26, cy - r * 0.1, 3, 3);
+    } else if (kind === "friends") {
+      g.fillStyle = "#9fc2ff"; g.beginPath(); g.arc(cx - r * 0.22, cy - r * 0.2, r * 0.22, 0, 7); g.fill(); g.fillRect(cx - r * 0.52, cy + r * 0.08, r * 0.6, r * 0.38);
+      g.fillStyle = "#ffd25a"; g.beginPath(); g.arc(cx + r * 0.25, cy - r * 0.12, r * 0.22, 0, 7); g.fill(); g.fillRect(cx - r * 0.05, cy + r * 0.16, r * 0.6, r * 0.34);
     } else if (kind === "menu") {
       g.fillStyle = "#ffd25a"; for (let i = 0; i < 3; i++) g.fillRect(cx - r * 0.45, cy - r * 0.38 + i * r * 0.32, r * 0.9, Math.max(2, r * 0.14));
     } else if (kind === "quest") {
@@ -3136,6 +3151,7 @@ function createArdan(canvas: HTMLCanvasElement, opts: any): () => void {
     circleBtn(W - 10 - ur * 3 - 8, uy, ur, "quest", () => { panel = panel === "quest" ? "" : "quest"; }, hintOn ? "Q" : "");
     circleBtn(W - 10 - ur * 5 - 16, uy, ur, "bag", () => { if (NET && NET.onPanel) { panel = ""; NET.onPanel("inv"); } else { panel = panel === "inv" ? "" : "inv"; invSel = -1; } }, hintOn ? "I" : "");
     if (NET && NET.onPanel) circleBtn(W - 10 - ur, uy + ur * 2 + 8, ur, "menu", () => { panel = ""; NET.onPanel("menu"); }, hintOn ? "R/U/P" : "");
+    if (NET && NET.onPanel) circleBtn(W - 10 - ur * 3 - 8, uy + ur * 2 + 8, ur, "friends", () => { panel = ""; NET.onPanel("fr"); }, hintOn ? "L" : "", NET.frBadge ? String(Math.min(9, NET.frBadge)) : undefined);
     if (NET && NET.onChat) circleBtn(W - 10 - ur * 7 - 24, uy, ur, "chat", () => { NET.onChat(); }, hintOn ? "C" : "", NET.unread ? String(Math.min(9, NET.unread)) : undefined);
     if (banner > 0) {
       ctx.globalAlpha = clamp(banner, 0, 1);
@@ -3694,6 +3710,7 @@ function createArdan(canvas: HTMLCanvasElement, opts: any): () => void {
     shopReq: (): string | null => { if (panel === "shop") { panel = ""; return shopId; } return null; },
     uiReq: (): string | null => { const u = uiReq; uiReq = ""; return u || null; },
     quests: QUESTS, qorder: QORDER, maxLvl: MAXLVL, shops: SHOPS, xpNext, used, invFull,
+    skinLv: SKIN_LV, skinTier: (): number => skinTier(P.lvl, P.skin),
     mobIdx: (m: any): number => mobs[P.area].indexOf(m),
     partyKill: (mk: string, mlvl: number, baseXp: number, from: string): void => {
       if (pl.dead > 0 || !P.cls) return;
@@ -3708,7 +3725,8 @@ function createArdan(canvas: HTMLCanvasElement, opts: any): () => void {
   if (NET) NET.api = { recv: netRecv, clearKeys: onBlur, log,
     P: (): any => P, stats: statsAll, items: ITEMS, mon: MON, sk: SK, skx: SKX, cls: CLS, zones: PVPZ, pvpAt, pvpMap, city: CITY, others: (): any => others, gearIds: GEAR, npcs: NPCS, ainfo: AINFO,
     drawMob: (g: CanvasRenderingContext2D, k: string): void => { if (MON[k]) withCtx(g, () => drawMob({ k, d: MON[k], x: 0, y: 0, fx: 0, fy: 0, hx: 0, hy: 0, portrait: true, mt: 1, hit: 0, anim: 0, dir: 0, hp: MON[k].hp, cd: 0, frz: 0 })); },
-    drawChar: (g: CanvasRenderingContext2D, cls: string, w: string, a: string, dir: number): void => { const c = CLS[cls] || CLS.war; withCtx(g, () => drawHuman(0, 0, dir || 0, 0, c.look, w && ITEMS[w] ? ITEMS[w].c : null, a && a !== "shirt" && ITEMS[a] ? ITEMS[a].c : null, false, 0, c.wk)); },
+    drawChar: (g: CanvasRenderingContext2D, cls: string, w: string, a: string, dir: number, sk?: number): void => { withCtx(g, () => drawHero(0, 0, dir || 0, 0, cls, sk === undefined ? skinTier(P.lvl, P.skin) : sk | 0, w && ITEMS[w] ? ITEMS[w].c : null, a && a !== "shirt" && ITEMS[a] ? ITEMS[a].c : null, false, 0)); },
+    skinLv: SKIN_LV, skinTier: (lvl?: number, ch?: any): number => skinTier(lvl === undefined ? P.lvl : lvl, ch === undefined ? P.skin : ch),
     drawIcon: (g: CanvasRenderingContext2D, id: string, x: number, y: number, sz: number): void => { if (ITEMS[id]) withCtx(g, () => drawIcon(id, x, y, sz)); },
   };
   return () => {

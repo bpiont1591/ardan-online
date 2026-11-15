@@ -15,12 +15,16 @@ const db = require('./db');
 const { createMod } = require('./mod');
 const admin = require('./admin');
 const backup = require('./backup');
+const logs = require('./logs');
 const qTop = db.prepare('SELECT nick, cls, lvl FROM characters ORDER BY lvl DESC, updated ASC LIMIT 20');
 
 const app = express();
 const wsOrigin = (() => { try { const u = new URL(cfg.baseUrl); return (u.protocol === 'https:' ? 'wss://' : 'ws://') + u.host; } catch (e) { return null; } })();
 const world = new World();
 world.mod = createMod(world);
+world.log = logs.player;
+const qFindChar = db.prepare('SELECT id, nick FROM characters WHERE nick = ?');
+world.findChar = (nick) => qFindChar.get(String(nick)) || null;
 app.disable('x-powered-by');
 if (cfg.trustProxy) app.set('trust proxy', cfg.trustProxy);
 app.use(helmet({
@@ -49,7 +53,7 @@ api.use((req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next()
 api.use(auth.csrfGuard);
 api.use('/', auth.router());
 api.use('/characters', characters.router((id) => world.isOnline(id)));
-api.use('/admin', admin.router(() => world.mod));
+api.use('/admin', admin.router(() => world.mod, logs));
 api.get('/stats', (req, res) => { res.setHeader('Cache-Control', 'no-store'); res.json({ online: world.online() }); });
 api.get('/news', (req, res) => res.json(news));
 // public ranking: recomputed at most every 12 h (RANKING_REFRESH_MS only shortens it for tests/dev)
@@ -91,22 +95,25 @@ server.on('upgrade', (req, socket, head) => {
   const user = auth.userFromCookieHeader(req.headers.cookie);
   const charId = Number(url.searchParams.get('postac'));
   const ip = ipOf(req), hits = (wsHits.get(ip) || 0) + 1; wsHits.set(ip, hits);
-  if (hits > cfg.wsPerMin || (wsConn.get(ip) || 0) >= cfg.wsPerIp) { socket.write('HTTP/1.1 429 Too Many Requests\r\n\r\n'); return socket.destroy(); }
+  if (hits > cfg.wsPerMin || (wsConn.get(ip) || 0) >= cfg.wsPerIp) { logs.write('sus', 'rate', { ip, userId: user ? user.id : null, nick: user ? user.login : null }, { detail: `WebSocket: limit połączeń z IP (${hits}/min, otwarte ${wsConn.get(ip) || 0})`, throttle: 'ws' }); socket.write('HTTP/1.1 429 Too Many Requests\r\n\r\n'); return socket.destroy(); }
   if (!ok || !user || !Number.isInteger(charId) || charId <= 0) { socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n'); return socket.destroy(); }
   wss.handleUpgrade(req, socket, head, (ws) => {
     const p = world.join(ws, user, charId);
     if (!p) return;
-    p.role = user.role; world.mod.onJoin(p);
+    p.role = user.role; p.ip = ip; world.mod.onJoin(p);
+    logs.player('login', 'game', p, { detail: `wejście do gry (${p.api.P().area}, poz. ${p.api.P().lvl})` });
+    const t0 = Date.now();
     p.sid = user.sid; wsConn.set(ip, (wsConn.get(ip) || 0) + 1);
     let gone = false; const bye = () => { if (gone) return; gone = true; const n = (wsConn.get(ip) || 1) - 1; if (n > 0) wsConn.set(ip, n); else wsConn.delete(ip); };
     ws.on('message', (data, isBinary) => { if (!isBinary) world.onMessage(p, data.toString()); });
-    ws.on('close', () => { bye(); world.leave(p); });
+    ws.on('close', (code) => { bye(); if (world.players.get(p.pid) === p) logs.player('login', 'out', p, { amount: Math.round((Date.now() - t0) / 60e3), detail: `wyjście z gry po ${Math.round((Date.now() - t0) / 60e3)} min (kod ${code})` }); world.leave(p); });
     ws.on('error', () => world.leave(p));
   });
 });
 
 world.start();
 backup.start(db);
+logs.start();
 setInterval(() => { try { auth.cleanup(); } catch (e) { console.error(e); } }, 3600e3).unref();
 // sessions are re-validated for live game connections (logout elsewhere / password reset kicks the socket)
 setInterval(() => { for (const p of world.players.values()) if (p.sid && !auth.sessionValid(p.sid)) try { p.ws.close(4001, 'session'); } catch (e) { /* ignore */ } }, 30e3).unref();
@@ -120,7 +127,7 @@ server.listen(cfg.port, cfg.host, () => {
 let closing = false;
 async function shutdown() {
   if (closing) return; closing = true;
-  console.log('[ARDAN] Zamykanie – zapisywanie postaci...'); world.stop(); server.close();
+  console.log('[ARDAN] Zamykanie – zapisywanie postaci...'); world.stop(); server.close(); try { logs.flush(); } catch (e) { /* */ }
   try { await backup.finalSnapshot(db); } catch (e) { console.error('[ARDAN] snapshot przy zamykaniu', e.message); }
   setTimeout(() => process.exit(0), 300);
 }

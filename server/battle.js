@@ -46,7 +46,7 @@ function createBattles(world) {
   function fPlayer(p, side) {
     const P = p.api.P(), st = p.api.stats(), px = gearPx(P);
     return { id: p.pid, kind: 'p', side, p, n: p.nick, cls: P.cls, lvl: P.lvl, hp: Math.max(1, Math.round(P.hp)), mhp: st.hp, mp: Math.round(P.mp), mmp: st.mp,
-      atk: st.atk, def: st.def, crit: st.crit / 100, dodge: st.dodge / 100, res: st.res, w: P.eq.w, a: P.eq.a, gt: p.guildTag || null,
+      atk: st.atk, def: st.def, crit: st.crit / 100, dodge: st.dodge / 100, res: st.res, w: P.eq.w, a: P.eq.a, sk: p.api.skinTier ? p.api.skinTier() : 0, gt: p.guildTag || null,
       cds: [0, 0, 0, 0, 0, 0], buf: {}, stun: 0, frz: 0, burn: 0, burnD: 0, alive: true, fled: false, choice: null, auto: !!p.autoFight || !!p.bot, bot: !!p.bot, px, absorb: px.shield || 0, phx: false, poison: 0, poisonD: 0 };
   }
   function fMob(m, idx) {
@@ -63,7 +63,7 @@ function createBattles(world) {
     return {
       t: 'bt', id: b.id, kind: b.kind, round: b.round, phase: b.phase, dl: b.phase === 'choose' ? Math.max(0, b.deadline - Date.now()) : 0, speed: b.speed, me: f.id, title: b.title || undefined, mech: b.mech || undefined,
       f: b.f.map((x) => ({ id: x.id, side: x.side, kind: x.kind, n: x.n, lvl: x.lvl, cls: x.cls, k: x.k, hp: Math.max(0, Math.round(x.hp)), mhp: x.mhp, mp: Math.round(x.mp), mmp: x.mmp,
-        alive: x.alive, fled: x.fled, stun: x.stun, frz: x.frz, burn: x.burn, buf: x.buf, boss: x.boss, elite: x.elite, w: x.w, a: x.a, gt: x.gt, ready: !!x.choice, auto: !!x.auto, cds: x.cds, res: x.res })),
+        alive: x.alive, fled: x.fled, stun: x.stun, frz: x.frz, burn: x.burn, buf: x.buf, boss: x.boss, elite: x.elite, w: x.w, a: x.a, sk: x.sk, gt: x.gt, ready: !!x.choice, auto: !!x.auto, cds: x.cds, res: x.res })),
     };
   }
   function pushAll(b, extra) {
@@ -121,6 +121,8 @@ function createBattles(world) {
     const z1 = p.api.pvpAt(P.area, P.x, P.y), z2 = p.api.pvpAt(Q.area, Q.x, Q.y);
     if (!z1 || !z2) return sys(p, 'To bezpieczna strefa – walczyć z graczami można tylko na mapach PvP i na arenach.');
     if (p.partyId && p.partyId === q.partyId) return sys(p, 'Nie możesz walczyć z członkiem swojej drużyny.');
+    // a block stops arena duel challenges both ways; attacks on lethal PvP maps follow the zone rules only
+    if (!(z1.lethal && z2.lethal) && world.friends && world.friends.either(p, q)) return sys(p, world.friends.blocks(q, p) ? `${q.nick} nie przyjmuje od ciebie wyzwań.` : `Zablokowałeś gracza ${q.nick} – odblokuj go, aby wyzwać go na pojedynek.`);
     // whole PvP maps: a real (lethal) fight; arenas: a friendly duel for ranking points
     const lethal = !!(z1.lethal && z2.lethal);
     if (lethal) {
@@ -383,6 +385,22 @@ function createBattles(world) {
   }
 
   // ---------- end ----------
+  // admin logs: elites, bosses and dungeon fights one by one; ordinary kills summed per player every 10 minutes
+  function logKills(p, mobsF, e, b) {
+    if (!world.log || p.bot) return;
+    const big = mobsF.filter((m) => m.elite || m.boss);
+    if (big.length || b.dg) world.log('battle', b.dg ? 'dungeon' : 'kill', p, { amount: e ? e.gold : null, detail: `pokonuje: ${mobsF.map((m) => `${m.n} (poz. ${m.lvl}${m.boss ? ', boss' : m.elite ? ', elita' : ''})`).join(', ')}${b.dg ? ' – loch ' + (b.dg.n || b.dg.id) : ''}; +${e ? e.xp : 0} PD, +${e ? e.gold : 0} zł${e && e.loot && e.loot.length ? ', łup: ' + e.loot.map((x) => x.n).join(', ') : ''}` });
+    else {
+      const a = p.killAgg = p.killAgg || { n: 0, m: {}, xp: 0, gold: 0, t: Date.now() };
+      for (const m of mobsF) { a.n++; a.m[m.n] = (a.m[m.n] || 0) + 1; }
+      a.xp += e ? e.xp : 0; a.gold += e ? e.gold : 0;
+      if (Date.now() - a.t >= 600e3) flushKills(p);
+    }
+  }
+  function flushKills(p) {
+    const a = p.killAgg; if (!a || !a.n || !world.log) return; p.killAgg = null;
+    world.log('battle', 'kills', p, { amount: a.gold, detail: `${a.n} potworów w ${Math.max(1, Math.round((Date.now() - a.t) / 60e3))} min: ${Object.keys(a.m).map((k) => `${a.m[k]}× ${k}`).join(', ')}; +${a.xp} PD, +${a.gold} zł` });
+  }
   function finish(b, why) {
     battles.delete(b.id);
     const won0 = !sideDone(b, 0) && sideDone(b, 1);
@@ -406,6 +424,7 @@ function createBattles(world) {
           const P = f.p.api.P(), bf = before[f.id];
           end[f.id] = { win: true, xp: Math.max(0, xpTotal(P.lvl, P.xp) - bf.xp), gold: P.gold - bf.gold, lvlUp: P.lvl > bf.lvl ? P.lvl : 0, loot: got };
           if (got.length) sys(f.p, 'Łup z walki: ' + got.map((x) => `${x.n} (${I.RAR[x.r].n})`).join(', ') + '.');
+          logKills(f.p, mobsF, end[f.id], b);
         }
       } else {
         for (const mf of mobsF) { mf.m.inB = 0; if (mf.alive) { mf.m.hp = sideDone(b, 0) && !players(b).some((f) => f.fled) ? mf.m.d.hp : Math.max(1, mf.hp); } else if (!mf.m.dead) { const k = players(b).find((f) => !f.left); if (k) k.p.api.kill(mf.m); else mf.m.inB = 0; } }
@@ -413,7 +432,7 @@ function createBattles(world) {
       if (b.onEnd) { try { b.onEnd(b, won0 && winners.length > 0, winners.map((f) => f.p), end); } catch (e) { console.error('[ARDAN] battle onEnd', e); } }
       for (const f of players(b)) {
         if (f.left) continue;
-        if (!f.alive) { f.p.api.die(); end[f.id] = { win: false, dead: true }; }
+        if (!f.alive) { f.p.api.die(); end[f.id] = { win: false, dead: true }; if (world.log && !f.bot) world.log('battle', 'death', f.p, { detail: `ginie w walce z: ${mobsF.map((m) => `${m.n} (poz. ${m.lvl})`).join(', ')}${b.dg ? ' – loch ' + (b.dg.n || b.dg.id) : ''} (${b.area})` }); }
         else if (!end[f.id]) end[f.id] = { win: false, fled: f.fled };
       }
     } else {
@@ -427,6 +446,7 @@ function createBattles(world) {
         end[loser.id] = { win: false, pvp: true, lethal: true, dead: true, vs: winner.n };
         world.emit('onEvent', winner.p, 'pvp', { win: true, lethal: true });
         for (const o of world.inArea(b.area)) sys(o, `☠ ${winner.n} zabija ${loser.n} w strefie PvP (${b.zone}).`);
+        if (world.log) world.log('battle', 'pvp', winner.p, { other: loser.n, detail: `zabija ${loser.n} (poz. ${loser.lvl}) – mapa PvP ${b.zone}` });
       } else if (why !== 'abort') {
         const rk = rank();
         const ent = (f) => { const P = f.p.api.P(); const e = rk[ckey(f.p)] = rk[ckey(f.p)] || { n: f.n, cls: f.cls, pts: 1000, w: 0, l: 0 }; e.n = f.n; e.cls = f.cls; e.lvl = P.lvl; return e; };
@@ -439,6 +459,7 @@ function createBattles(world) {
         world.emit('onEvent', winner.p, 'pvp', { win: true }); world.emit('onEvent', loser.p, 'pvp', { win: false });
         end[loser.id] = { win: false, pvp: true, pts: -gain, total: el.pts, vs: winner.n };
         for (const o of world.inArea(b.area)) sys(o, `⚔ ${winner.n} pokonuje ${loser.n} w pojedynku! (+${gain} pkt rankingu)`);
+        if (world.log) world.log('battle', 'pvp', winner.p, { other: loser.n, amount: gain, detail: `wygrywa pojedynek z ${loser.n} na arenie ${b.zone} (+${gain} pkt, ${ew.pts} : ${el.pts})` });
       }
     }
     for (const f of players(b)) if (f.p && f.p.battle === b) f.p.battle = null;
@@ -486,6 +507,7 @@ function createBattles(world) {
       }
     },
     onLeave(p) {
+      flushKills(p);
       const b = p.battle; if (!b) return;
       const f = b.f.find((x) => x.id === p.pid); if (f) { f.fled = true; f.left = true; }
       p.battle = null;

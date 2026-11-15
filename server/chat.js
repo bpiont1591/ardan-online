@@ -18,6 +18,8 @@ function createChat(world) {
       const to = world.byNick(m[1]);
       if (!to) return sys(p, `Gracz „${m[1]}” nie jest teraz w grze.`);
       if (to === p) return sys(p, 'Nie możesz pisać sam do siebie.');
+      if (world.friends && world.friends.blocks(p, to)) return sys(p, `Zablokowałeś gracza ${to.nick}. Odblokuj go (/odblokuj ${to.nick} lub lista znajomych – L), aby pisać.`);
+      if (world.friends && world.friends.blocks(to, p)) return sys(p, `${to.nick} nie przyjmuje od ciebie wiadomości.`);
       const text = esc(filter(m[2].slice(0, MAX_LEN)));
       const msg = { t: 'chat', ch: 'w', from: p.nick, to: to.nick, text, ts: Date.now(), role: badge(p) };
       world.send(to, msg); world.send(p, msg); to.lastWhisper = p.nick;
@@ -65,7 +67,9 @@ function createChat(world) {
     if (msg.ch === 'gu' && commands.gi) return commands.gi(p, text);
     const ch = msg.ch === 'r' ? 'r' : 'g';
     const out = { t: 'chat', ch, from: p.nick, cls: p.cls, text: esc(filter(text)), ts: now, area: ch === 'r' ? p.area : undefined, role: badge(p) };
-    if (ch === 'g') world.broadcast(out); else for (const o of world.inArea(p.area)) world.send(o, out);
+    // players who blocked the sender never receive the message (server-side)
+    const hide = (o) => world.friends && world.friends.blocks(o, p);
+    if (ch === 'g') { for (const o of world.players.values()) if (!hide(o)) world.send(o, out); } else for (const o of world.inArea(p.area)) if (!hide(o)) world.send(o, out);
   }
   return { name: 'chat', handle, commands, sys, esc, filter, MAX_LEN };
 }

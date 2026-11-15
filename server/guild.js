@@ -44,6 +44,7 @@ function createGuilds(world) {
     if ((g.m[p.ckey] || {}).r < 1) return sys(p, 'Tylko Mistrz i Oficerowie mogą zapraszać.');
     const q = world.byNick(String(nick || '').trim()); if (!q || q === p) return sys(p, `Gracz „${nick}” nie jest teraz w grze.`);
     if (guildOf(q)) return sys(p, `${q.nick} należy już do gildii.`);
+    if (world.friends && world.friends.either(p, q)) return sys(p, world.friends.blocks(q, p) ? `${q.nick} nie przyjmuje od ciebie zaproszeń.` : `Zablokowałeś gracza ${q.nick} – odblokuj go, aby zaprosić.`);
     q.guildInv = { id: g.id, name: g.name, tag: g.tag, from: p.ckey, fromN: p.nick, exp: Date.now() + 120e3 }; q.gdDirty = true;
     sys(p, `Zaproszono ${q.nick} do gildii.`);
     if (q.bot && q.bot.onGuildInvite) return q.bot.onGuildInvite(p, g);
@@ -89,7 +90,7 @@ function createGuilds(world) {
     const g = guildOf(p); if (!g) return sys(p, 'Nie należysz do gildii.');
     text = String(text || '').trim(); if (!text) return;
     const msg = { t: 'chat', ch: 'gu', from: p.nick, text: chat.esc(chat.filter(text.slice(0, chat.MAX_LEN))), ts: Date.now(), role: p.role === 'admin' || p.role === 'moderator' ? p.role : undefined };
-    for (const o of online(g)) world.send(o, msg);
+    for (const o of online(g)) if (!(world.friends && world.friends.blocks(o, p))) world.send(o, msg);
   }
   Object.assign(chat.commands, { gi: gchat, gzapros: (p, r) => invite(p, r.trim().split(/\s+/)[0]), 'gzaproś': (p, r) => invite(p, r.trim().split(/\s+/)[0]) });
   return {

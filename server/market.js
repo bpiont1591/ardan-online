@@ -21,6 +21,7 @@ function createMarket(world) {
     const L = { id: d.next++, s: p.ckey, sn: p.nick, it, pr: price, t: Date.now() };
     d.list.push(L); save(d);
     world.emit('onEvent', p, 'list', { it });
+    if (world.log) world.log('trade', 'list', p, { amount: price, detail: `wystawia ${it.n} (poz. ${it.l}) za ${price} zł – oferta #${L.id}` });
     return L;
   }
   function browse(p, f, o) {
@@ -49,6 +50,7 @@ function createMarket(world) {
       P.gold -= L.pr; world.gear.give(p, [L.it]);
       pay(L.s, p.nick, L.pr - Math.floor(L.pr * TAX), L.it.n);
     });
+    if (world.log) world.log('trade', 'buy', p, { other: L.sn, amount: L.pr, detail: `kupuje ${L.it.n} od ${L.sn} za ${L.pr} zł (oferta #${L.id}, podatek ${Math.floor(L.pr * TAX)} zł)` });
     sys(p, `Kupiono na rynku: ${L.it.n} za ${L.pr} zł.`);
     return true;
   }
@@ -57,12 +59,13 @@ function createMarket(world) {
     open(p) { browse(p, {}, true); },
     onJoin(p) {
       const m = mail(); const e = m[p.ckey];
-      if (e && e.gold) { world.atomic([p], () => { p.api.P().gold += e.gold; p.srv.dirty = true; delete m[p.ckey]; store.set('mail', m); }); sys(p, `Rynek: podczas twojej nieobecności sprzedano przedmioty (${e.n}). Otrzymujesz ${e.gold} zł.`); }
+      if (e && e.gold) { world.atomic([p], () => { p.api.P().gold += e.gold; p.srv.dirty = true; delete m[p.ckey]; store.set('mail', m); }); if (world.log) world.log('trade', 'mail', p, { amount: e.gold, detail: `złoto za ${e.n} sprzedanych przedmiotów (offline)` }); sys(p, `Rynek: podczas twojej nieobecności sprzedano przedmioty (${e.n}). Otrzymujesz ${e.gold} zł.`); }
     },
     onMsg(p, msg) {
       if (msg.t !== 'mk') return false;
       if (p.battle) return true;
       if (!world.merchant.near(p, 'aukcja')) {
+        if (msg.a === 'sell' || msg.a === 'buy' || msg.a === 'cancel') { if (world.log) world.log('sus', 'range', p, { detail: `rynek (${String(msg.a)}) bez aukcjonera w pobliżu`, throttle: 'mk' }); }
         world.send(p, { t: 'mk', closed: true, err: 'far' });
         sys(p, `Dom aukcyjny jest dostępny tylko u aukcjonera (${world.merchant.where(p.api, 'aukcja')}). Podejdź do niego.`);
         return true;
@@ -77,7 +80,7 @@ function createMarket(world) {
         }
       } else if (msg.a === 'cancel' && Number.isInteger(msg.id)) {
         const d = data(), i = d.list.findIndex((x) => x.id === msg.id && x.s === p.ckey);
-        if (i >= 0) { if (world.gear.space(p) <= 0) sys(p, 'Torba jest pełna!'); else { const L = world.atomic([p], () => { const L = d.list.splice(i, 1)[0]; save(d); world.gear.give(p, [L.it]); return L; }); sys(p, `Wycofano z rynku: ${L.it.n}.`); } }
+        if (i >= 0) { if (world.gear.space(p) <= 0) sys(p, 'Torba jest pełna!'); else { const L = world.atomic([p], () => { const L = d.list.splice(i, 1)[0]; save(d); world.gear.give(p, [L.it]); return L; }); sys(p, `Wycofano z rynku: ${L.it.n}.`); if (world.log) world.log('trade', 'cancel', p, { amount: L.pr, detail: `wycofuje ${L.it.n} (oferta #${L.id})` }); } }
       } else if (msg.a === 'buy' && Number.isInteger(msg.id)) buy(p, msg.id);
       browse(p, msg.f);
       return true;

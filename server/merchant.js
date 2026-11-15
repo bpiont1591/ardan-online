@@ -52,6 +52,7 @@ function createMerchant(world) {
     const cost = todo.reduce((s, x) => s + I.repairCost(x.it), 0);
     if (P.gold < cost) return sys(p, `Naprawa kosztuje ${cost} zł – masz tylko ${P.gold} zł.`);
     world.atomic([p], () => { P.gold -= cost; for (const { it } of todo) I.repair(it); });
+    if (world.log) world.log('trade', 'npc_repair', p, { amount: -cost, detail: `naprawa ${todo.length} przedm.` });
     p.srv.dirty = true; world.gear.changed(p);
     sys(p, todo.length === 1 ? `⚒ ${n.n} naprawia: ${todo[0].it.n} (${cost} zł).` : `⚒ ${n.n} naprawia ${todo.length} przedmiotów za ${cost} zł.`);
   }
@@ -70,6 +71,7 @@ function createMerchant(world) {
     world.atomic([p], () => {
       for (const u of us) { const it = world.gear.take(p, u); if (!it) continue; const pr = price(it); p.api.P().gold += pr; cnt++; sum += pr; }
     });
+    if (cnt && world.log) world.log('trade', 'npc_sell', p, { amount: sum, detail: `${n.n} odkupuje ${cnt} przedm.` });
     if (cnt === 1) sys(p, `${n.n} odkupuje przedmiot za ${sum} zł.`); else if (cnt) sys(p, `${n.n} odkupuje ${cnt} przedmiotów za ${sum} zł.`);
     if (cnt) { p.srv.dirty = true; world.gear.changed(p); }
     return cnt;
@@ -84,12 +86,13 @@ function createMerchant(world) {
     const it = I.bag(k);
     world.atomic([p], () => { P.gold -= pr; if (slot >= 0) P.bags[slot] = it; else P.gbag.push(it); });
     p.srv.dirty = true; world.gear.changed(p);
+    if (world.log) world.log('trade', 'npc_buy', p, { amount: -pr, detail: `${n.n}: ${it.n}` });
     sys(p, slot >= 0 ? `🎒 Kupujesz i zakładasz: ${it.n} (+${it.cap} miejsc) za ${pr} zł.` : `🎒 Kupujesz: ${it.n} za ${pr} zł – leży w plecaku (wszystkie miejsca na torby są zajęte).`);
   }
   function sellJunk(p, n) {
     const api = p.api, P = api.P(); let sum = 0, cnt = 0;
     world.atomic([p], () => { for (let i = P.inv.length - 1; i >= 0; i--) { const s = P.inv[i], d = api.items[s.id]; if (d && d.t === 'j') { sum += Math.max(1, Math.floor(d.price / 2)) * s.n; cnt += s.n; P.inv.splice(i, 1); } } P.gold += sum; });
-    if (cnt) { p.srv.dirty = true; sys(p, `${n.n} odkupuje łupy (${cnt} szt.) za ${sum} zł.`); } else sys(p, 'Nie masz łupów na sprzedaż.');
+    if (cnt) { p.srv.dirty = true; sys(p, `${n.n} odkupuje łupy (${cnt} szt.) za ${sum} zł.`); if (world.log) world.log('trade', 'npc_sell', p, { amount: sum, detail: `${n.n}: łupy ×${cnt}` }); } else sys(p, 'Nie masz łupów na sprzedaż.');
   }
   return {
     name: 'merchant', RANGE, near, open, close, where, price, repView,
@@ -110,14 +113,14 @@ function createMerchant(world) {
       if (msg.a === 'repair') {
         // repairs only while standing next to a blacksmith (server-checked)
         const n = near(p, 'naprawa');
-        if (!n) { close(p); sys(p, `Naprawiać ekwipunek możesz tylko u kowala lub płatnerza (${where(p.api, 'naprawa')}). Podejdź do niego.`); world.send(p, { t: 'npcui', k: 'naprawa', closed: true, err: 'far' }); return true; }
+        if (!n) { if (world.log) world.log('sus', 'range', p, { detail: `naprawa bez kowala w pobliżu (${p.api.P().area})`, throttle: 'rep' }); close(p); sys(p, `Naprawiać ekwipunek możesz tylko u kowala lub płatnerza (${where(p.api, 'naprawa')}). Podejdź do niego.`); world.send(p, { t: 'npcui', k: 'naprawa', closed: true, err: 'far' }); return true; }
         p.npcOpen = 'naprawa'; p.npcId = n.id;
         doRepair(p, n, typeof msg.u === 'string' && U_RE.test(msg.u) ? msg.u : null);
         world.send(p, repView(p, n));
         return true;
       }
       const n = near(p, 'skup');
-      if (!n) { close(p); sys(p, `Sprzedawać możesz tylko u handlarza (${where(p.api, 'skup')}). Podejdź do niego.`); world.send(p, { t: 'npcui', k: 'skup', closed: true, err: 'far' }); return true; }
+      if (!n) { if (world.log) world.log('sus', 'range', p, { detail: `${String(msg.a).slice(0, 12)} u handlarza spoza zasięgu (${p.api.P().area} ${p.api.P().x},${p.api.P().y})`, throttle: 'skup' }); close(p); sys(p, `Sprzedawać możesz tylko u handlarza (${where(p.api, 'skup')}). Podejdź do niego.`); world.send(p, { t: 'npcui', k: 'skup', closed: true, err: 'far' }); return true; }
       p.npcOpen = 'skup'; p.npcId = n.id;
       if (msg.a === 'sell' && typeof msg.u === 'string' && U_RE.test(msg.u)) sellGear(p, n, [msg.u]);
       else if (msg.a === 'sellmany' && Array.isArray(msg.us)) sellGear(p, n, msg.us.slice(0, 40).filter((u) => typeof u === 'string' && U_RE.test(u)));

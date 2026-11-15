@@ -65,6 +65,11 @@
       });
     });
   }
+  if (page === 'skins' && window.ARDAN_SKINS) {
+    const SK = window.ARDAN_SKINS, box = document.getElementById('skg'), CN = { war: 'Wojownik', arc: 'Łucznik', mag: 'Mag' };
+    box.innerHTML = ['war', 'arc', 'mag'].map((cls) => `<div class="skrow"><h2>${CN[cls]}</h2><div class="skline">${SK.LV.map((lv, i) => `<figure class="skf${i >= 5 ? ' top' : ''}"><canvas width="96" height="108" data-cls="${cls}" data-t="${i}"></canvas><figcaption><b>${A.esc(SK.names(cls)[i])}</b><small>${i ? 'poziom ' + lv : 'od początku'}</small></figcaption></figure>`).join('')}</div></div>`).join('');
+    SK.animate([...box.querySelectorAll('canvas')].map((c) => ({ c, cls: c.dataset.cls, tier: +c.dataset.t, o: { scale: 3 } })));
+  }
   if (page === 'chars') {
     const list = document.getElementById('list');
     const IMG = { war: 'hero_war', arc: 'hero_arc', mag: 'hero_mag' };
@@ -72,8 +77,9 @@
       const r = await A.api('/characters');
       if (r.status === 401) { location.href = '/logowanie?next=/postacie'; return; }
       const cs = r.data.characters || [];
-      list.innerHTML = cs.length ? cs.map((c) => `<div class="card char"><img src="/img/${IMG[c.cls]}.png" alt=""><div class="info"><div class="nick">${A.esc(c.nick)}</div><div class="muted">${A.esc(c.clsName)} · poziom ${c.lvl} · ${A.esc(c.areaName)}${c.online ? ' · <b style="color:#7be07b">w grze</b>' : ''}</div></div><a class="btn primary" href="/graj?postac=${c.id}">Graj</a></div>`).join('')
+      list.innerHTML = cs.length ? cs.map((c) => `<div class="card char">${window.ARDAN_SKINS ? `<canvas class="charspr" width="64" height="72" data-cls="${A.esc(c.cls)}" data-sk="${c.sk | 0}" role="img" aria-label="${A.esc(c.skinName || c.clsName)}"></canvas>` : `<img src="/img/${IMG[c.cls]}.png" alt="">`}<div class="info"><div class="nick">${A.esc(c.nick)}</div><div class="muted">${A.esc(c.clsName)} · poziom ${c.lvl} · ${A.esc(c.areaName)}${c.skinName ? ` · <span class="skn">${A.esc(c.skinName)}</span>` : ''}${c.online ? ' · <b style="color:#7be07b">w grze</b>' : ''}</div></div><a class="btn primary" href="/graj?postac=${c.id}">Graj</a></div>`).join('')
         : '<p class="muted" style="text-align:center">Nie masz jeszcze postaci. Stwórz pierwszą poniżej!</p>';
+      if (window.ARDAN_SKINS) window.ARDAN_SKINS.animate([...list.querySelectorAll('canvas.charspr')].map((c) => ({ c, cls: c.dataset.cls, tier: +c.dataset.sk, o: { scale: 2 } })));
       f.style.display = cs.length >= r.data.max ? 'none' : '';
       if (cs.length >= r.data.max) list.insertAdjacentHTML('beforeend', `<p class="muted" style="text-align:center">Osiągnięto limit ${r.data.max} postaci na konto.</p>`);
     }

@@ -79,6 +79,17 @@ const MIGRATIONS = [
     ts INTEGER NOT NULL, user_id INTEGER, nick TEXT NOT NULL, ch TEXT NOT NULL, area TEXT, target TEXT, text TEXT NOT NULL
   );
   CREATE INDEX chatlog_ts ON chatlog(ts);`,
+  // 3: admin logs (trades, battles, logins, suspicious behaviour) – pruned by age and per-type row caps (server/logs.js)
+  `CREATE TABLE logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts INTEGER NOT NULL, type TEXT NOT NULL, sub TEXT NOT NULL,
+    user_id INTEGER, char_id INTEGER, nick TEXT, ip TEXT, other TEXT, amount INTEGER, detail TEXT NOT NULL DEFAULT ''
+  );
+  CREATE INDEX logs_ts ON logs(ts);
+  CREATE INDEX logs_type ON logs(type, id);
+  CREATE INDEX logs_user ON logs(user_id, id);
+  CREATE INDEX logs_nick ON logs(nick COLLATE NOCASE, id);
+  CREATE INDEX logs_other ON logs(other COLLATE NOCASE, id);`,
 ];
 function migrate() {
   const v = db.pragma('user_version', { simple: true });

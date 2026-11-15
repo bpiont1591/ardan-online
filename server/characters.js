@@ -9,7 +9,8 @@ const START_WEAPON = { war: 'club', arc: 'sbow', mag: 'wand' };
 const AREA_NAMES = { village: 'Osada Brzozowa', forest: 'Mroczny Bór', cave: 'Jaskinia Cieni', swamp: 'Bagna Żałoby', town: 'Srebrnogród', mount: 'Szczyty Szronu', desert: 'Ruiny Piasków', port: 'Mewia Przystań', coast: 'Wybrzeże Wraków', fort: 'Twierdza Żarogród', volcano: 'Wulkan Ignara', citadel: 'Cytadela Świtu', abyss: 'Otchłań Zmierzchu', wolfhills: 'Wilcze Wzgórza', mine: 'Kopalnia Krasnoludów', glacier: 'Lodowiec Wichrów', steppe: 'Spalone Stepy', elfwood: 'Szmaragdowa Puszcza', sunken: 'Zatopione Miasto', star: 'Gwiezdna Strażnica', crystal: 'Kryształowe Pustkowia', necro: 'Nekropolia Valgaru', dragon: 'Smocze Gniazdo' };
 const RESERVED = /^(admin|administrator|moderator|mod|gm|system|ardan|serwer|support)$/i;
 
-const qList = db.prepare('SELECT id, nick, cls, lvl, area, updated FROM characters WHERE user_id = ? ORDER BY id');
+const qList = db.prepare("SELECT id, nick, cls, lvl, area, updated, json_extract(data, '$.skin') AS skin FROM characters WHERE user_id = ? ORDER BY id");
+const SKINS = require('../public/js/skins.js');
 const qCount = db.prepare('SELECT COUNT(*) AS n FROM characters WHERE user_id = ?');
 const qNick = db.prepare('SELECT id FROM characters WHERE nick = ?');
 const qIns = db.prepare('INSERT INTO characters (user_id, nick, cls, lvl, area, data, created, updated) VALUES (?, ?, ?, 1, ?, ?, ?, ?)');
@@ -24,7 +25,7 @@ function router(isOnline) {
   const r = express.Router();
   r.get('/', needUser, (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
-    res.json({ max: cfg.maxCharacters, characters: qList.all(req.user.id).map((c) => ({ ...c, clsName: CLASSES[c.cls] || c.cls, areaName: AREA_NAMES[c.area] || c.area, online: isOnline(c.id) })) });
+    res.json({ max: cfg.maxCharacters, characters: qList.all(req.user.id).map(({ skin, ...c }) => ({ ...c, sk: SKINS.tierFor(c.lvl, Number.isInteger(skin) ? skin : -1), skinName: SKINS.names(c.cls)[SKINS.tierFor(c.lvl, Number.isInteger(skin) ? skin : -1)], clsName: CLASSES[c.cls] || c.cls, areaName: AREA_NAMES[c.area] || c.area, online: isOnline(c.id) })) });
   });
   r.post('/', needUser, (req, res) => {
     const b = req.body || {};

@@ -38,6 +38,8 @@ function createParties(world) {
       if (!to) return sys(p, `Gracz „${nick}” nie jest teraz w grze.`);
       if (to === p) return sys(p, 'Nie możesz zaprosić samego siebie.');
       if (to.partyId) return sys(p, `${to.nick} jest już w drużynie.`);
+      if (world.friends && world.friends.blocks(p, to)) return sys(p, `Zablokowałeś gracza ${to.nick} – odblokuj go, aby zaprosić.`);
+      if (world.friends && world.friends.blocks(to, p)) return sys(p, `${to.nick} nie przyjmuje od ciebie zaproszeń.`);
       const party = partyOf(p);
       if (party && party.leader !== p.pid) return sys(p, 'Tylko lider może zapraszać do drużyny.');
       if (party && party.members.length >= MAX_SIZE) return sys(p, `Drużyna jest pełna (maks. ${MAX_SIZE}).`);
@@ -81,7 +83,7 @@ function createParties(world) {
       const party = partyOf(p); if (!party) return sys(p, 'Nie jesteś w drużynie.');
       const text = String(rest || '').trim(); if (!text) return;
       const msg = { t: 'chat', ch: 'p', from: p.nick, text: chat.esc(chat.filter(text.slice(0, chat.MAX_LEN))), ts: Date.now(), role: p.role === 'admin' || p.role === 'moderator' ? p.role : undefined };
-      for (const m of members(party)) world.send(m, msg);
+      for (const m of members(party)) if (!(world.friends && world.friends.blocks(m, p))) world.send(m, msg);
     },
   };
   // Polish-diacritic and English aliases

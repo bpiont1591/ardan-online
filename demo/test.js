@@ -145,7 +145,9 @@ async function flow(browser, label, vp, shots) {
   await pg.evaluate(() => window.ARDAN_UI.h.send({ t: 'mk', a: 'browse', f: {} })); await W(900);
   let M = (await ui()).mk;
   ok(M && M.list.length >= 4, `${label}: rynek – oferty botów: ${M && M.list.length}`);
-  ok(M && M.mine.some((x) => x.it.u === wp.u), `${label}: moja oferta na rynku`);
+  // demo bots buy the player's cheap listings at random moments – a sale right after listing counts too
+  const soldNow = await pg.evaluate(() => /Wystawiono na rynku[\s\S]*kupił\(a\)/.test(document.getElementById('chat').textContent));
+  ok(M && (M.mine.some((x) => x.it.u === wp.u) || soldNow), `${label}: moja oferta na rynku${soldNow ? ' (od razu kupiona przez bota)' : ''}`);
   if (shots) await pg.screenshot({ path: `shots/${shots}_9_market.png` });
   const cheap = M.list.filter((x) => x.pr <= M.gold).sort((a, b) => a.pr - b.pr)[0];
   if (cheap) { await tap(`[data-mk="${cheap.id}"]`); await W(300); await tap('.ui-detail [data-ia="buy"]'); await W(1500); }
@@ -231,7 +233,7 @@ async function flow(browser, label, vp, shots) {
   await pg.evaluate(() => { const c = document.getElementById('chatIn'); c.value = '/zapros Jagienka'; document.getElementById('chatForm').requestSubmit(); });
   await pg.waitForFunction(() => document.querySelectorAll('#party .pm').length >= 2, { timeout: 8000 }).catch(() => {});
   ok((await pg.$$('#party .pm')).length >= 2, `${label}: Jagienka przyjmuje zaproszenie do drużyny`);
-  await TH({ near: { area: 'forest', k: 'gate' }, heal: true }); await W(3500);
+  await TH({ lvl: 18, near: { area: 'forest', k: 'gate' }, heal: true }); await W(3500);
   await pg.waitForSelector('#uiCtx:not([hidden])', { timeout: 5000 }).catch(() => {});
   await tap('#uiCtx').catch(() => {}); await W(900);
   ok((await ui()).open === 'dgg', `${label}: brama lochu – okno wejścia`);
@@ -241,11 +243,12 @@ async function flow(browser, label, vp, shots) {
   let D = (await X3()).dg;
   ok(D && D.party.some((m) => m.n === 'Jagienka'), `${label}: Jagienka wchodzi z graczem do lochu`);
   let bossShot = false, fin = false;
-  for (let guard = 0; guard < 14 && !fin; guard++) {
+  for (let guard = 0; guard < 22 && !fin; guard++) {
     D = (await X3()).dg; if (!D) break;
     if (D.fin) { fin = true; break; }
     const g = D.groups.find((x) => !x.done && !x.busy);
     if (!g) { if (D.cleared) { await tap('[data-dg="next"]').catch(() => {}); await W(900); continue; } await W(800); continue; }
+    await TH({ heal: true }); await W(400); // no healing in battle since round 9: top up between groups (as a player would with potions)
     await tap(`[data-dgf="${g.i}"]`).catch(() => {}); await W(900);
     await pg.waitForSelector('#battle', { timeout: 4000 }).catch(() => {});
     if (await pg.$('#btAuto:not(:checked)')) await tap('#btAuto').catch(() => {});

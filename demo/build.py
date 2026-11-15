@@ -68,13 +68,14 @@ for a, b in reps:
 client, n = re.subn(r'new WebSocket\(`[^`]*`\)', 'new DemoSocket(charId)', client); assert n == 1
 client = "window.DEMO_GAME_CLIENT = function () {\n" + client + "\n};"
 
-engine = rd(os.path.join(PUB, 'js/engine.js'))
+engine = rd(os.path.join(PUB, 'js/skins.js')) + '\n' + rd(os.path.join(PUB, 'js/engine.js'))
 gameui = rd(os.path.join(PUB, 'js/game-ui.js'))
 gameui += '\n' + rd(os.path.join(PUB, 'js/game-ui2.js'))
+gameui += '\n' + rd(os.path.join(PUB, 'js/game-ui3.js'))
 import subprocess
 NEWS_JSON = subprocess.check_output(['node', '-e', "process.stdout.write(JSON.stringify(require(process.argv[1])))", os.path.join(SRV, 'news.js')]).decode()
 mods = {}
-for m in ['chat', 'party', 'passives', 'items', 'gear', 'battle', 'market', 'merchant', 'trade', 'guild', 'gather', 'dungeon', 'craft', 'daily', 'ach', 'ranking', 'game']:
+for m in ['chat', 'party', 'passives', 'items', 'gear', 'battle', 'market', 'merchant', 'trade', 'guild', 'gather', 'dungeon', 'craft', 'daily', 'ach', 'friends', 'looks', 'ranking', 'game']:
     mods[m] = rd(os.path.join(SRV, m + '.js'))
 require_js = """(function(){
 const defs = {}, cache = {};

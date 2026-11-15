@@ -36,7 +36,7 @@
     f.innerHTML = `<div class="wrap"><div class="cols">
       <div><a class="brand" href="/">${EMBLEM}ARDAN</a><p style="margin-top:12px">Przeglądarkowa gra MMORPG w klimacie dark fantasy. Mgła powróciła – Ardan potrzebuje bohaterów.</p></div>
       <div><h4>Gra</h4><ul><li><a href="/postacie">Graj teraz</a></li><li><a href="/rejestracja">Załóż konto</a></li><li><a href="/logowanie">Zaloguj się</a></li><li><a href="/nie-pamietam-hasla">Nie pamiętam hasła</a></li></ul></div>
-      <div><h4>Informacje</h4><ul><li><a href="/#swiat">Historia świata</a></li><li><a href="/#nowosci">Nowości</a></li><li><a href="/regulamin">Regulamin</a></li><li><a href="/prywatnosc">Polityka prywatności</a></li></ul></div>
+      <div><h4>Informacje</h4><ul><li><a href="/#swiat">Historia świata</a></li><li><a href="/#nowosci">Nowości</a></li><li><a href="/wyglady">Wyglądy postaci</a></li><li><a href="/regulamin">Regulamin</a></li><li><a href="/prywatnosc">Polityka prywatności</a></li></ul></div>
       </div><div class="copy">© ${new Date().getFullYear()} ARDAN. Wszelkie prawa zastrzeżone.</div></div>`;
   }
   async function online() {

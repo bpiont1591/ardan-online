@@ -17,6 +17,8 @@ const { createDungeons } = require('./dungeon');
 const { createCraft } = require('./craft');
 const { createDaily } = require('./daily');
 const { createAch } = require('./ach');
+const { createFriends } = require('./friends');
+const { createLooks } = require('./looks');
 const cfg = require('./config');
 
 const stub = new Proxy(function () {}, { get: (t, k) => (k === 'canvas' ? {} : stub), apply: () => stub, set: () => true });
@@ -57,11 +59,11 @@ function testHook(world, p, m) {
   if (Array.isArray(m.items)) for (const [id, n] of m.items) p.api.addItem(id, n);
   if (Number.isInteger(m.loot) && m.loot > 0) { const I = require('./items'); world.gear.give(p, Array.from({ length: Math.min(12, m.loot) }, () => I.randomItem(P.lvl, 2))); }
   if (typeof m.leg === 'string') { const I = require('./items'); if (I.PXD.LEG.some((d) => d.id === m.leg)) world.gear.give(p, [I.makeLeg(m.leg)]); }
-  if (m.heal) { P.hp = p.api.maxHp(); P.mp = 9999; }
+  if (m.heal) { P.hp = p.api.maxHp(); P.mp = 9999; if (p.partyId) for (const o of world.players.values()) if (o.bot && o.partyId === p.partyId) { const Q = o.api.P(); Q.hp = o.api.maxHp(); Q.mp = 9999; } }
   if (Number.isInteger(m.wear) && m.wear > 0) { const I = require('./items'); for (const it of Object.values(P.gear || {}).concat(P.gbag || [])) if (it) I.wear(it, m.wear); }
   if (m.dgLock && typeof m.dgLock === 'object') { P.dgLock = P.dgLock || {}; for (const k of Object.keys(m.dgLock)) P.dgLock[k] = Date.now() - m.dgLock[k]; }
   if (m.dqdone && P.daily) { const q = P.daily.q[0]; q.have = q.need; q.done = true; p.dqDirty = true; }
-  p.srv.dirty = true; world.gear.changed(p);
+  p.srv.dirty = true; p.tpAct = true; world.gear.changed(p);
 }
 
 class World {
@@ -83,6 +85,11 @@ class World {
     this.craft = this.use(createCraft(this));
     this.daily = this.use(createDaily(this));
     this.ach = this.use(createAch(this));
+    this.friends = this.use(createFriends(this));
+    this.looks = this.use(createLooks(this));
+    // admin logs (round 10): index.js plugs in server/logs.js; the demo keeps this no-op
+    this.log = () => {};
+    this.findChar = null;
     this.lastSave = Date.now();
     this.timer = null;
   }
@@ -150,17 +157,18 @@ class World {
   onMessage(p, data) {
     const now = Date.now();
     if (now - p.msgT > 1000) { p.msgT = now; p.msgN = 0; p.actBudget = 20; }
-    if (++p.msgN > 80) { if (p.msgN > 300) p.ws.close(4008, 'flood'); return; }
-    if (data.length > 4096) return;
-    let msg; try { msg = JSON.parse(data); } catch (e) { return; }
-    if (!msg || typeof msg !== 'object') return;
+    if (++p.msgN > 80) { if (p.msgN === 81) this.log('sus', 'flood', p, { detail: 'ponad 80 wiadomości na sekundę', throttle: 'flood' }); if (p.msgN > 300) { this.log('sus', 'flood', p, { detail: 'rozłączono (ponad 300 wiadomości/s)' }); p.ws.close(4008, 'flood'); } return; }
+    if (data.length > 4096) { this.log('sus', 'packet', p, { detail: `za duży pakiet (${data.length} B)`, throttle: 'big' }); return; }
+    let msg; try { msg = JSON.parse(data); } catch (e) { this.log('sus', 'packet', p, { detail: 'niepoprawny JSON', throttle: 'json' }); return; }
+    if (!msg || typeof msg !== 'object') { this.log('sus', 'packet', p, { detail: 'pakiet nie jest obiektem', throttle: 'obj' }); return; }
     if (msg.t === '__test') { if (TEST_HOOKS) testHook(this, p, msg); return; }
     if (msg.t === 'in') {
       const frozen = !!(p.battle || p.dg);
       p.mx = frozen ? 0 : dir1(msg.mx); p.my = frozen ? 0 : dir1(msg.my);
       if (Array.isArray(msg.acts)) for (const a of msg.acts.slice(0, 8)) {
         const s = sanitizeAct(a);
-        if (!s || p.actBudget-- <= 0) continue;
+        if (!s) { this.log('sus', 'packet', p, { detail: 'niedozwolona akcja: ' + JSON.stringify(a).slice(0, 120), throttle: 'act' }); continue; }
+        if (p.actBudget-- <= 0) continue;
         // in a dungeon only potions (between rooms – never during a battle) are allowed; no teleport scrolls
         if (p.dg && !(!p.battle && (s.a === 'pot' || s.a === 'mpot' || (s.a === 'use' && s.id && p.api.items[s.id] && p.api.items[s.id].t !== 's')))) continue;
         if (s.a === 'talk' && !p.battle && (this.craft.interceptTalk(p) || this.gather.useNear(p))) continue;
@@ -170,6 +178,24 @@ class World {
     } else if (msg.t === 'chat') this.chat.handle(p, msg);
     else if (msg.t === 'ping') this.send(p, { t: 'pong', ts: msg.ts, online: this.players.size });
     else if (typeof msg.t === 'string') { for (const f of this.features) if (typeof f.onMsg === 'function' && f.onMsg(p, msg)) break; }
+  }
+
+  // suspicious behaviour (round 10): big wealth jumps within a minute, impossible movement on the same map
+  watch(p, P) {
+    if (p.bot) return;
+    const now = Date.now(), pl = p.api.pl;
+    if (!p.wMark) p.wMark = { g: P.gold, t: now };
+    else if (now - p.wMark.t >= 60e3) {
+      const gain = P.gold - p.wMark.g, lim = Math.max(25000, (P.lvl | 0) * 2000);
+      if (gain >= lim) this.log('sus', 'wealth', p, { amount: gain, detail: `+${gain} zł w ${Math.round((now - p.wMark.t) / 1000)} s (z ${p.wMark.g} do ${P.gold}), próg ${lim}` });
+      p.wMark = { g: P.gold, t: now };
+    }
+    const lp = p.lastPos, dead = pl.dead > 0;
+    if (lp && lp.a === P.area && !lp.dead && !dead && !p.tpAct && !p.battle && !p.dg) {
+      const d = cheb(lp.x, lp.y, P.x, P.y);
+      if (d > 3) this.log('sus', 'speed', p, { amount: d, detail: `skok o ${d} pól w jednym ticku (${P.area} ${lp.x},${lp.y} → ${P.x},${P.y})`, throttle: 'speed' });
+    }
+    p.lastPos = { a: P.area, x: P.x, y: P.y, dead }; p.tpAct = false;
   }
 
   // Assign every monster to the player whose engine instance simulates it (nearest / current aggro target).
@@ -203,8 +229,16 @@ class World {
 
   tick(dt) {
     for (const p of this.players.values()) {
-      try { if (p.battle || p.dg) { p.acts.length = 0; p.api.tick(dt, { mx: 0, my: 0, acts: [] }); } else p.api.tick(dt, { mx: p.mx, my: p.my, acts: p.acts.splice(0, 6) }); }
-      catch (e) { console.error('[ARDAN] player tick', p.nick, e); }
+      try {
+        if (p.battle || p.dg) { p.acts.length = 0; p.api.tick(dt, { mx: 0, my: 0, acts: [] }); }
+        else {
+          const batch = p.acts.splice(0, 6), P0 = p.api.P(), g0 = P0.gold;
+          p.api.tick(dt, { mx: p.mx, my: p.my, acts: batch });
+          // NPC shop (engine buy / sell / junk): log the gold that changed hands
+          if (P0.gold !== g0 && batch.length) { const sh = batch.find((a) => a.a === 'buy' || a.a === 'sell' || a.a === 'junk'); if (sh) this.log('trade', P0.gold < g0 ? 'npc_buy' : 'npc_sell', p, { amount: P0.gold - g0, detail: `${sh.a === 'buy' ? 'kupno' : 'sprzedaż'}${sh.id ? ' ' + sh.id : ''} u NPC (${P0.area})` }); }
+          if (batch.some((a) => a.a === 'use')) p.tpAct = true;
+        }
+      } catch (e) { console.error('[ARDAN] player tick', p.nick, e); }
     }
     this.mobOwnership(dt);
     this.emit('onTick', dt);
@@ -212,7 +246,11 @@ class World {
     for (const p of this.players.values()) {
       const P = p.api.P(), a = P.area; p.area = a;
       // anti-cheat sanity: gold is always a finite integer in [0, MAX_GOLD]
-      if (!Number.isFinite(P.gold) || P.gold < 0) P.gold = 0; else if (P.gold > MAX_GOLD) P.gold = MAX_GOLD; else if (P.gold % 1) P.gold = Math.floor(P.gold);
+      if (!Number.isFinite(P.gold) || P.gold < 0 || P.gold > MAX_GOLD || P.gold % 1) {
+        this.log('sus', 'goldfix', p, { amount: Number.isFinite(P.gold) ? Math.round(P.gold) : null, detail: `złoto poprawione z ${String(P.gold).slice(0, 24)}` });
+        if (!Number.isFinite(P.gold) || P.gold < 0) P.gold = 0; else if (P.gold > MAX_GOLD) P.gold = MAX_GOLD; else P.gold = Math.floor(P.gold);
+      }
+      this.watch(p, P);
       (groups[a] = groups[a] || []).push(p);
       const ev = areaEv[a] = areaEv[a] || [];
       const d = p.api.drain();
@@ -232,7 +270,7 @@ class World {
       const mp = ml.map((m) => [m.x, m.y, Math.max(0, Math.round(m.hp)), (m.dead ? 1 : 0) | (m.aggro ? 2 : 0) | (m.frz > 0 ? 4 : 0) | (m.hit > 0 ? 8 : 0) | (m.anim > 0 ? 16 : 0) | (m.inB ? 32 : 0), m.dir | 0]);
       const plist = groups[a].map((p) => {
         const P = p.api.P(), pl = p.api.pl;
-        return { i: p.pid, n: p.nick, c: P.cls, l: P.lvl, x: P.x, y: P.y, d: pl.dir | 0, hp: Math.max(0, Math.round(P.hp)), mh: p.api.maxHp(), w: P.eq.w, a: P.eq.a, an: r2(pl.anim), ht: r2(pl.hit), dd: pl.dead > 0 ? 1 : 0, bd: pl.buffDef > 0 ? 1 : 0, gt: p.guildTag || undefined, fb: p.battle ? 1 : undefined, dg: p.dg ? 1 : undefined, ti: p.title || undefined };
+        return { i: p.pid, n: p.nick, c: P.cls, l: P.lvl, x: P.x, y: P.y, d: pl.dir | 0, hp: Math.max(0, Math.round(P.hp)), mh: p.api.maxHp(), w: P.eq.w, a: P.eq.a, an: r2(pl.anim), ht: r2(pl.hit), dd: pl.dead > 0 ? 1 : 0, bd: pl.buffDef > 0 ? 1 : 0, gt: p.guildTag || undefined, fb: p.battle ? 1 : undefined, dg: p.dg ? 1 : undefined, ti: p.title || undefined, sk: p.api.skinTier ? p.api.skinTier() || undefined : undefined };
       });
       for (const p of groups[a]) {
         const P = p.api.P(), pl = p.api.pl;
