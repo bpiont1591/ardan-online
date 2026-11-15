@@ -31,6 +31,10 @@ services:
         sync: false
       - key: SNAPSHOT_MINUTES      # co ile minut kopia do Postgresa (10 = mieści się w darmowym limicie Neon)
         value: "10"
+      - key: BREVO_API_KEY         # reset hasła – ZALECANE na darmowym Renderze: API HTTPS Brevo (klucz xkeysib-...)
+        sync: false
+      - key: RESEND_API_KEY        # alternatywa: API HTTPS Resend (klucz re_...)
+        sync: false
       - key: SMTP_HOST             # opcjonalnie (reset hasła): smtp-relay.brevo.com
         sync: false
       - key: SMTP_PORT             # darmowy Render blokuje porty 25/465/587 – Brevo działa na 2525

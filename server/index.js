@@ -113,7 +113,8 @@ setInterval(() => { for (const p of world.players.values()) if (p.sid && !auth.s
 process.on('unhandledRejection', (e) => console.error('[ARDAN] unhandled', e));
 server.listen(cfg.port, cfg.host, () => {
   console.log(`[ARDAN] Serwer działa: ${cfg.baseUrl} (port ${cfg.port}, tryb: ${cfg.isProd ? 'produkcja' : 'deweloperski'})`);
-  if (!mail.configured()) console.log(cfg.isProd ? '[ARDAN] SMTP nieskonfigurowane – e-maile z resetem hasła są wyłączone (opcjonalne: SMTP_HOST/SMTP_USER/SMTP_PASS).' : '[ARDAN] SMTP nieskonfigurowane – linki resetu hasła będą wypisywane w konsoli (tylko tryb deweloperski).');
+  if (!mail.configured()) console.log(cfg.isProd ? '[ARDAN] Poczta nieskonfigurowana – e-maile z resetem hasła są wyłączone (ustaw RESEND_API_KEY lub BREVO_API_KEY albo SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS oraz MAIL_FROM).' : '[ARDAN] Poczta nieskonfigurowana – linki resetu hasła będą wypisywane w konsoli (tylko tryb deweloperski).');
+  else console.log(`[ARDAN] Poczta: ${mail.transportName()}`);
   if (cfg.isProd && !cfg.sessionSecret) console.log('[ARDAN] Uwaga: ustaw SESSION_SECRET (długi losowy ciąg) – dodatkowa ochrona sesji.');
 });
 let closing = false;

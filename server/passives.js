@@ -1,9 +1,10 @@
 'use strict';
 // Item passives (round 5): rolled on unique / heroic items, hand-picked on legendaries.
 // Every passive is implemented in turn-based combat (server/battle.js) and described on the item card.
+// Round 8: no passive heals in combat – old heal keys (ls, hregen, soul, phoenix) now deal damage or give a barrier.
 // v ranges: [unique, heroic]; legendary items carry fixed values.
 const PX = {
-  ls: { n: 'Wampiryzm', d: '{v}% zadanych obrażeń przywraca życie', u: [3, 5], h: [6, 9], cap: 30 },
+  ls: { n: 'Rozdarcie', d: 'cel krwawi: dodatkowe {v}% zadanych obrażeń', u: [3, 5], h: [6, 9], cap: 30 },
   stun: { n: 'Ogłuszenie', d: '{v}% szans na ogłuszenie celu przy trafieniu', u: [4, 6], h: [7, 10], cap: 30 },
   thorns: { n: 'Ciernie', d: '{v}% otrzymanych obrażeń wraca do atakującego', u: [8, 12], h: [14, 20], cap: 60 },
   xturn: { n: 'Pośpiech', d: '{v}% szans na dodatkowy atak w turze', u: [4, 6], h: [7, 10], cap: 30 },
@@ -12,16 +13,16 @@ const PX = {
   boss: { n: 'Pogromca', d: '+{v}% obrażeń przeciw bossom i elitom', u: [8, 12], h: [14, 20], cap: 60 },
   poison: { n: 'Trucizna', d: '{v}% szans na zatrucie celu (3 tury, 15% ataku na turę)', u: [10, 15], h: [18, 25], cap: 60 },
   shield: { n: 'Bariera', d: 'na start walki tarcza pochłaniająca {v} obrażeń', u: [2, 3], h: [4, 5], lvl: true, cap: 9999 },
-  hregen: { n: 'Odnowa', d: '+{v}% maks. życia co turę', u: [1, 2], h: [2, 3], cap: 8 },
+  hregen: { n: 'Runiczny pancerz', d: 'co turę bariera +{v}% maks. życia (maks. 4× tyle)', u: [1, 2], h: [2, 3], cap: 8 },
   exec: { n: 'Egzekucja', d: '+{v}% obrażeń przeciw wrogom poniżej 30% życia', u: [15, 25], h: [30, 40], cap: 120 },
   block: { n: 'Blok', d: '{v}% szans na zablokowanie połowy obrażeń', u: [6, 9], h: [10, 14], cap: 40 },
   first: { n: 'Inicjatywa', d: '+{v}% obrażeń w pierwszej rundzie walki', u: [30, 50], h: [60, 90], cap: 200 },
   // legendary-only
-  phoenix: { n: 'Feniks', d: 'raz na walkę powstajesz z {v}% życia po śmierci', leg: 1, cap: 60 },
+  phoenix: { n: 'Feniks', d: 'raz na walkę przetrwasz śmiertelny cios (1 pż) i dostajesz barierę {v}% maks. życia', leg: 1, cap: 60 },
   chain: { n: 'Łańcuch', d: '{v}% szans, że atak trafi także drugiego wroga (60%)', leg: 1, cap: 80 },
   echo: { n: 'Echo mocy', d: '{v}% szans, że umiejętność nie zużyje many / energii', leg: 1, cap: 60 },
   frost: { n: 'Lodowy dotyk', d: '{v}% szans na zamrożenie celu (nie działa na bossy)', leg: 1, cap: 40 },
-  soul: { n: 'Żniwiarz dusz', d: 'zabicie wroga przywraca {v}% życia', leg: 1, cap: 60 },
+  soul: { n: 'Żniwiarz dusz', d: 'zabicie wroga daje barierę {v}% maks. życia', leg: 1, cap: 60 },
   berserk: { n: 'Szał', d: '+1% obrażeń za każde 2% brakującego życia (maks. +{v}%)', leg: 1, cap: 80 },
   mirror: { n: 'Lustro', d: '{v}% szans na odbicie całego ciosu w atakującego', leg: 1, cap: 25 },
 };

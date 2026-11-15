@@ -179,7 +179,8 @@ function createBattles(world) {
   // death with the legendary "Feniks" passive (once per fight)
   function down(f, ev) {
     if (f.hp > 0) return;
-    if (f.px && f.px.phoenix && !f.phx) { f.phx = true; f.hp = Math.max(1, Math.round(f.mhp * f.px.phoenix / 100)); pxEv(ev, f, `Feniks: ${f.n} powstaje z popiołów (${Math.round(f.hp)} pż)!`, { t: f.id, hp: Math.round(f.hp) }); return; }
+    // round 8: no healing in combat – Feniks keeps you alive at 1 HP and wraps you in a barrier instead
+    if (f.px && f.px.phoenix && !f.phx) { f.phx = true; f.hp = 1; const w = Math.round(f.mhp * f.px.phoenix / 100); f.absorb = (f.absorb || 0) + w; pxEv(ev, f, `Feniks: ${f.n} przetrwa śmiertelny cios (1 pż) i otacza się barierą (${w})!`, { t: f.id, hp: 1 }); return; }
     f.hp = 0; f.alive = false; ev.push({ t: f.id, k: 'die', txt: `${f.n} pada!` });
   }
   function hit(b, a, t, mult, ev, how, noProc) {
@@ -207,12 +208,14 @@ function createBattles(world) {
     down(t, ev);
     if (d > 0 && T.thorns && active(a)) { const r = Math.max(1, Math.round(d * T.thorns / 100)); a.hp -= r; pxEv(ev, t, `Ciernie: ${a.n} traci ${r} pż.`, { t: a.id, v: r, hp: Math.max(0, Math.round(a.hp)) }); down(a, ev); }
     if (!noProc && d > 0) {
-      if (A.ls && active(a) && a.hp < a.mhp) { const h = Math.max(1, Math.round(d * A.ls / 100)); a.hp = Math.min(a.mhp, a.hp + h); pxEv(ev, a, `Wampiryzm: ${a.n} +${h} pż.`, { t: a.id, hp: Math.round(a.hp) }); }
+      // round 8: "Rozdarcie" (old lifesteal key ls) – extra bleeding damage, no healing
+      if (A.ls && t.alive) { const x = Math.max(1, Math.round(d * A.ls / 100)); t.hp -= x; pxEv(ev, a, `Rozdarcie: ${t.n} krwawi – traci ${x} pż.`, { t: t.id, v: x, hp: Math.max(0, Math.round(t.hp)) }); down(t, ev); }
       if (t.alive) {
         if (A.stun && R() < A.stun / 100 * (t.boss ? 0.5 : 1)) { t.stun = 1; pxEv(ev, a, `Ogłuszenie: ${t.n} jest ogłuszony!`); }
         if (A.frost && !t.boss && R() < A.frost / 100) { t.frz = 1; pxEv(ev, a, `Lodowy dotyk: ${t.n} zamarza!`); }
         if (A.poison && R() < A.poison / 100) { t.poison = 3; t.poisonD = Math.max(1, Math.round(a.atk * 0.15)); pxEv(ev, a, `Trucizna: ${t.n} jest zatruty.`); }
-      } else if (A.soul && active(a)) { const h = Math.round(a.mhp * A.soul / 100); a.hp = Math.min(a.mhp, a.hp + h); pxEv(ev, a, `Żniwiarz dusz: ${a.n} +${h} pż.`, { t: a.id, hp: Math.round(a.hp) }); }
+      }
+      if (!t.alive && A.soul && active(a)) { const w = Math.round(a.mhp * A.soul / 100); ward(a, w, ev, 'Żniwiarz dusz'); }
     }
     return d;
   }
@@ -221,6 +224,15 @@ function createBattles(world) {
     hit(b, f, t, mult, ev, how);
     const A = f.px || {};
     if (A.chain && R() < A.chain / 100) { const o = enemiesOf(b, f).filter((x) => x !== t); if (o.length) { pxEv(ev, f, `Łańcuch: atak przeskakuje na ${o[0].n}!`); hit(b, f, o[Math.floor(R() * o.length)], mult * 0.6, ev, how, true); } }
+  }
+  // barrier (absorbs damage before HP) – the only in-combat defence besides potions; HP itself never goes up in a fight
+  function ward(f, amount, ev, how) {
+    // barriers from skills do not stack forever: at most 60% of max HP in total
+    const cap = Math.round(f.mhp * 0.6), cur = f.absorb || 0;
+    const w = Math.max(0, Math.min(Math.round(amount), cap - cur));
+    if (w <= 0) { ev.push({ a: f.id, t: f.id, k: 'info', txt: `${f.n} – ${how}: bariera jest już pełna (${Math.round(cur)}).` }); return; }
+    f.absorb = cur + w;
+    ev.push({ a: f.id, t: f.id, k: 'info', txt: `${f.n} – ${how}: bariera +${w} (pochłania obrażenia).` });
   }
   function heal(f, amount, ev, how) {
     const before = f.hp; f.hp = Math.min(f.mhp, f.hp + Math.round(amount));
@@ -259,22 +271,22 @@ function createBattles(world) {
         const k = f.cls + i;
         if (k === 'war0') { hit(b, f, t, 2.2, ev, nm); if (t.alive && (!t.boss || R() < 0.4)) { t.stun = 1; ev.push({ t: t.id, k: 'info', txt: `${t.n} jest ogłuszony!` }); } }
         else if (k === 'war1') for (const e of en) hit(b, f, e, 1.6, ev, nm);
-        else if (k === 'war2') { heal(f, f.mhp * 0.25, ev, nm); f.buf.def = 3; }
+        else if (k === 'war2') { ward(f, f.mhp * 0.3, ev, nm); f.buf.def = 3; }
         else if (k === 'arc0') hit(b, f, t, 2.6, ev, nm);
         else if (k === 'arc1') for (const e of en) hit(b, f, e, 1.3, ev, nm);
         else if (k === 'arc2') { f.buf.crit = 3; hit(b, f, t, 1, ev, 'strzał'); }
         else if (k === 'mag0') { hit(b, f, t, 2.4, ev, nm); if (t.alive) { t.burn = 2; t.burnD = Math.max(1, Math.round(f.atk * 0.3)); } for (const e of en) if (e !== t) hit(b, f, e, 0.5, ev, 'odłamki ognia'); }
         else if (k === 'mag1') for (const e of en) { hit(b, f, e, 1.3, ev, nm); if (e.alive && !e.boss) e.frz = 1; }
-        else if (k === 'mag2') heal(f, f.mhp * 0.4, ev, nm);
+        else if (k === 'mag2') ward(f, f.mhp * 0.45, ev, nm);
         else if (k === 'war3') { hit(b, f, t, 3, ev, nm); if (t.alive && (!t.boss || R() < 0.35)) { t.stun = 1; ev.push({ t: t.id, k: 'info', txt: `${t.n} jest ogłuszony!` }); } }
         else if (k === 'war4') for (const e of en) { hit(b, f, e, 2, ev, nm); if (e.alive) { e.burn = 2; e.burnD = Math.max(1, Math.round(f.atk * 0.35)); } }
-        else if (k === 'war5') { hit(b, f, t, 3.5, ev, nm); if (f.hp < f.mhp) heal(f, f.mhp * 0.3, ev, nm); f.buf.def = 3; }
+        else if (k === 'war5') { hit(b, f, t, 3.5, ev, nm); if (active(f)) ward(f, f.mhp * 0.3, ev, nm); f.buf.def = 3; }
         else if (k === 'arc3') for (const e of en) hit(b, f, e, 1.9, ev, nm);
         else if (k === 'arc4') for (let n = 0; n < 5; n++) { const al = en.filter((e) => e.alive); if (!al.length) break; hit(b, f, al[Math.floor(R() * al.length)], 1.3, ev, nm); }
         else if (k === 'arc5') { const c0 = f.crit; f.crit = 1; hit(b, f, t, 4.2, ev, nm); f.crit = c0; }
         else if (k === 'mag3') for (const e of en) hit(b, f, e, 1.9, ev, nm);
         else if (k === 'mag4') { hit(b, f, t, 3.8, ev, nm); if (t.alive) { t.burn = 3; t.burnD = Math.max(1, Math.round(f.atk * 0.4)); } for (const e of en) if (e !== t) hit(b, f, e, 1.5, ev, nm); }
-        else if (k === 'mag5') { for (const e of en) { hit(b, f, e, 2.2, ev, nm); if (e.alive && !e.boss) e.frz = 1; } if (f.hp < f.mhp) heal(f, f.mhp * 0.35, ev, nm); }
+        else if (k === 'mag5') { for (const e of en) { hit(b, f, e, 2.2, ev, nm); if (e.alive && !e.boss) e.frz = 1; } if (active(f)) ward(f, f.mhp * 0.35, ev, nm); }
         return;
       }
     }
@@ -345,7 +357,8 @@ function createBattles(world) {
       if (!active(f)) continue;
       if (f.burn > 0) { f.burn--; f.hp -= f.burnD; ev.push({ t: f.id, k: 'burn', v: f.burnD, txt: `${f.n} płonie: -${f.burnD} pż.`, hp: Math.max(0, Math.round(f.hp)) }); down(f, ev); if (!f.alive) continue; }
       if (f.poison > 0) { f.poison--; f.hp -= f.poisonD; ev.push({ t: f.id, k: 'burn', v: f.poisonD, txt: `${f.n} – trucizna: -${f.poisonD} pż.`, hp: Math.max(0, Math.round(f.hp)) }); down(f, ev); if (!f.alive) continue; }
-      if (f.px && f.px.hregen && f.hp < f.mhp) { const h = Math.max(1, Math.round(f.mhp * f.px.hregen / 100)); f.hp = Math.min(f.mhp, f.hp + h); pxEv(ev, f, `Odnowa: ${f.n} +${h} pż.`, { t: f.id, hp: Math.round(f.hp) }); }
+      // round 8: "Runiczny pancerz" (old regen key hregen) – renews a barrier every turn instead of healing
+      if (f.px && f.px.hregen) { const w = Math.max(1, Math.round(f.mhp * f.px.hregen / 100)), cap = w * 4; if ((f.absorb || 0) < cap) { const add = Math.min(w, cap - (f.absorb || 0)); f.absorb = (f.absorb || 0) + add; pxEv(ev, f, `Runiczny pancerz: ${f.n} – bariera +${add}.`); } }
       if (f.px && f.px.regen) f.mp = Math.min(f.mmp, f.mp + f.px.regen);
       for (const k of Object.keys(f.buf)) { f.buf[k]--; if (f.buf[k] <= 0) delete f.buf[k]; }
       if (f.cds) f.cds = f.cds.map((c) => Math.max(0, c - 1));

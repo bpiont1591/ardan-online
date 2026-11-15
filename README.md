@@ -13,14 +13,16 @@ npm start                 # http://localhost:3000
 
 Baza danych tworzy się sama w pliku `data/ardan.db`.
 
-Jeśli SMTP nie jest skonfigurowane, a serwer działa w trybie deweloperskim (`NODE_ENV` ≠ `production`), **link do resetu hasła jest wypisywany w konsoli serwera**, np.:
+Jeśli poczta nie jest skonfigurowana, a serwer działa w trybie deweloperskim (`NODE_ENV` ≠ `production`), **link do resetu hasła jest wypisywany w konsoli serwera**, np.:
 
 ```
-[ARDAN] SMTP nie jest skonfigurowane – link resetu hasła (tryb deweloperski):
+[ARDAN] Poczta nie jest skonfigurowana – link resetu hasła (tryb deweloperski):
 [ARDAN] dla gracz1 <gracz1@example.com>: http://localhost:3000/nowe-haslo?token=...
 ```
 
-W trybie produkcyjnym bez SMTP link nie jest nigdzie wypisywany, a w logu pojawia się błąd. Dlatego na produkcji SMTP jest wymagane.
+W trybie produkcyjnym bez poczty link nie jest nigdzie wypisywany, a w logu pojawia się błąd. Dlatego na produkcji poczta jest wymagana.
+
+**Poczta na darmowym Renderze:** Render (plan Free) blokuje wychodzące porty SMTP 25, 465 i 587. Najprościej użyć API HTTPS: ustaw `BREVO_API_KEY` (Brevo → SMTP & API → API Keys) **albo** `RESEND_API_KEY` oraz `MAIL_FROM` z adresem zweryfikowanym u dostawcy. Alternatywnie SMTP Brevo na porcie 2525: `SMTP_HOST=smtp-relay.brevo.com`, `SMTP_PORT=2525`, `SMTP_USER` (login SMTP z panelu Brevo), `SMTP_PASS` (klucz SMTP). Wybór transportu jest automatyczny (Resend API → Brevo API → SMTP) lub wymuszony przez `MAIL_TRANSPORT`.
 
 ### Testy end-to-end
 
@@ -71,6 +73,7 @@ npm run build:engine      # wymaga python3 i TypeScript (tsc)
 | `BCRYPT_COST` | `12` (zakres 10–15) | Koszt hashowania haseł. |
 | `MAX_CHARACTERS` | `3` | Limit postaci na konto. |
 | `API_PER_MIN`, `WS_PER_MIN`, `WS_PER_IP` | `240`, `30`, `8` | Limity nadużyć na adres IP. |
+| `BREVO_API_KEY` / `RESEND_API_KEY` | – | Poczta przez API HTTPS (działa na darmowym Renderze). `MAIL_TRANSPORT` = `auto` (domyślnie) / `brevo` / `resend` / `smtp`. |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` | – | Poczta do resetu hasła, np. Brevo: `smtp-relay.brevo.com`, port `2525` (darmowy Render blokuje porty 25/465/587). |
 
 Lokalnie można użyć pliku `.env` w katalogu projektu (wzór: `.env.example`). Zmienne ustawione w systemie mają pierwszeństwo.

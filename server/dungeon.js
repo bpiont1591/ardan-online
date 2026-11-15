@@ -183,7 +183,7 @@ function createDungeons(world) {
       if (msg.a === 'enter' && typeof msg.id === 'string') enter(p, msg.id);
       else if (msg.a === 'leave') { if (!p.battle) leave(p, 'Opuszczasz loch.'); }
       else if (msg.a === 'fight' && Number.isInteger(msg.g)) fight(p, msg.g);
-      else if (msg.a === 'next' && p.dg && !p.battle) { const x = p.dg; if (x.done[x.room].every(Boolean) && x.room < x.D.rooms.length - 1) { x.room++; for (const q of members(x)) { const Q = P(q), mh = q.api.maxHp(); if (q.api.pl.dead <= 0) { Q.hp = Math.min(mh, Math.round(Q.hp + (mh - Q.hp) * 0.6)); Q.mp = Math.max(Q.mp, 9999); q.srv.dirty = true; } sys(q, `Krótki odpoczynek przy pochodni (odzyskujesz siły). Wchodzicie do sali: ${x.D.rooms[x.room].n}.`); } push(x); } }
+      else if (msg.a === 'next' && p.dg && !p.battle) { const x = p.dg; if (x.done[x.room].every(Boolean) && x.room < x.D.rooms.length - 1) { x.room++; for (const q of members(x)) { const Q = P(q); if (q.api.pl.dead <= 0) { Q.mp = Math.max(Q.mp, 9999); q.srv.dirty = true; } sys(q, `Krótki odpoczynek przy pochodni (odzyskujesz manę – życie tylko z mikstur). Wchodzicie do sali: ${x.D.rooms[x.room].n}.`); } push(x); } }
       else if (msg.a === 'get' && p.dg) world.send(p, state(p.dg, p));
       return true;
     },

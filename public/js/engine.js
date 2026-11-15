@@ -1991,7 +1991,7 @@ function createArdan(canvas, opts) {
         skel: { n: "Szkielet", lvl: 9, hp: 125, atk: 22, def: 9, xp: 72, gold: [10, 22], spd: 2.7, aggro: 5, cd: 1.3, resp: 34, drops: [["bone", 0.6], ["bigpot", 0.1], ["$a3", 0.04], ["$w3", 0.03]] },
         boss: { n: "Upiór Mgieł", lvl: 12, hp: 560, atk: 30, def: 12, xp: 420, gold: [150, 250], spd: 2.5, aggro: 6, cd: 1.5, resp: 120, boss: true, slam: 8, drops: [["gem", 1], ["bigpot", 0.7], ["$a4", 0.2]] },
         drowner: { n: "Topielec", lvl: 10, hp: 170, atk: 27, def: 10, xp: 125, gold: [10, 22], spd: 3, aggro: 5, cd: 1.3, resp: 30, drops: [["slime", 0.5], ["bigpot", 0.1], ["mpot", 0.1]] },
-        wisp: { n: "Błędny ognik", lvl: 11, hp: 130, atk: 25, def: 8, xp: 135, gold: [8, 18], spd: 3.4, aggro: 6, cd: 1.6, rng: 4, pc: "#c8ff7a", resp: 30, drops: [["essence", 0.55], ["mpot", 0.12]] },
+        wisp: { n: "Błędny ognik", lvl: 11, hp: 130, atk: 25, def: 8, xp: 135, gold: [8, 18], spd: 3.4, aggro: 6, cd: 1.6, rng: 4, pc: "#ff9a2a", resp: 30, drops: [["essence", 0.55], ["mpot", 0.12]] },
         troll: { n: "Bagienny troll", lvl: 13, hp: 280, atk: 34, def: 14, xp: 200, gold: [15, 30], spd: 2.6, aggro: 4, cd: 1.5, resp: 36, sc: 1.25, drops: [["slime", 0.4], ["bigpot", 0.15], ["$a3", 0.05]] },
         witch: { n: "Wiedźma Moczarów", lvl: 16, hp: 1300, atk: 40, def: 16, xp: 1400, gold: [300, 450], spd: 2.6, aggro: 6, cd: 1.6, rng: 5, pc: "#9dff7a", resp: 180, boss: true, slam: 7, drops: [["$w4", 0.5], ["elix", 0.6], ["relic", 0.3]] },
         swolf: { n: "Śnieżny wilk", lvl: 14, hp: 260, atk: 37, def: 15, xp: 230, gold: [12, 26], spd: 3.8, aggro: 5, cd: 1.1, resp: 30, drops: [["fur", 0.5], ["bigpot", 0.1]] },
@@ -2139,7 +2139,7 @@ function createArdan(canvas, opts) {
         if (z.area === area && x >= z.x0 && x <= z.x1 && y >= z.y0 && y <= z.y1)
             return z; return null; };
     const SHOPN = { smith: "Kuźnia Bogumiła", herbs: "Chata Zielarki", swamp: "Zapasy Rybaka", armory: "Zbrojownia Wojsława", alch: "Pracownia Alchemiczki", nomad: "Kram Nomady", portm: "Kram Mewiej Przystani", portsmith: "Kuźnia mistrzów", fortm: "Zaopatrzenie Żarogrodu", citm: "Skarbiec Świtu", starm: "Gwiezdny skarbiec" };
-    const SHOPS = { smith: ["$w2", "$w3", "$a2", "$a3", "$a4"], herbs: ["pot", "bigpot", "mpot"], swamp: ["pot", "bigpot", "mpot"], armory: ["$w4", "$w5", "$a4", "$a5"], alch: ["bigpot", "elix", "mpot"], nomad: ["bigpot", "elix", "mpot"], portm: ["bigpot", "elix", "gpot", "mpot"], portsmith: ["$w5", "$w6", "$a5", "$a6"], fortm: ["elix", "gpot", "selix", "mpot"], citm: ["gpot", "selix", "spot", "mpot", "gmpot"], starm: ["selix", "spot", "dpot", "mpot", "gmpot"] };
+    const SHOPS = { smith: ["$w2", "$w3", "$a2", "$a3", "$a4"], herbs: ["pot", "bigpot", "elix", "mpot"], swamp: ["pot", "bigpot", "mpot"], armory: ["$w4", "$w5", "$a4", "$a5"], alch: ["pot", "bigpot", "elix", "mpot"], nomad: ["bigpot", "elix", "mpot"], portm: ["pot", "bigpot", "elix", "gpot", "mpot"], portsmith: ["$w5", "$w6", "$a5", "$a6"], fortm: ["bigpot", "elix", "gpot", "selix", "mpot"], citm: ["elix", "gpot", "selix", "spot", "mpot", "gmpot"], starm: ["gpot", "selix", "spot", "dpot", "mpot", "gmpot"] };
     const QORDER = ["rats", "wolves", "tusks", "wraith", "letter", "drown", "wisps", "witchq", "swolves", "hearts", "dragonq", "stings", "mummies", "kingq", "crabs", "pirates", "pearls", "leviq", "imps", "embers", "golemsq", "ignarq", "shades", "voidq", "knights", "morgq", "bandits", "bwolves", "bearpaws", "kielq", "kobolds", "crawlers", "runes", "grimq", "frwraiths", "mtusks", "szroniaq", "hyenas", "nomads", "bscales", "burzanq", "delves", "bark", "wolfmen", "moranaq", "nagas", "drowned", "corals", "thalq", "cspiders", "starsh", "kolosq", "bmages", "souls", "bdrakes", "valgarq", "drakons", "dkins", "dscales", "valdrakq"];
     const QUESTS = {
         rats: { n: "Szczury w spiżarni", giver: "soltys", kill: "rat", need: 4, area: "village", desc: "Ubij 4 szczury w Osadzie Brzozowej.",
@@ -2282,7 +2282,7 @@ function createArdan(canvas, opts) {
         war: [
             { n: "Potężny cios", lvl: 1, cost: 25, cd: 5, ic: "smash", d: "Cios za 220% obrażeń, ogłusza na 1 s." },
             { n: "Wir ostrzy", lvl: 3, cost: 35, cd: 9, ic: "whirl", d: "Rani wszystkich wrogów wokół (160%)." },
-            { n: "Okrzyk bojowy", lvl: 5, cost: 40, cd: 22, ic: "shout", d: "Leczy 25% życia, +60% obrony na 8 s." }
+            { n: "Okrzyk bojowy", lvl: 5, cost: 40, cd: 22, ic: "shout", d: "Bariera 30% maks. życia (pochłania obrażenia) i +60% obrony." }
         ],
         arc: [
             { n: "Celny strzał", lvl: 1, cost: 25, cd: 6, ic: "aim", d: "Strzała za 260% obrażeń, zasięg 8." },
@@ -2292,7 +2292,7 @@ function createArdan(canvas, opts) {
         mag: [
             { n: "Kula ognia", lvl: 1, cost: 18, cd: 4, ic: "fire", d: "Ognista kula za 240%, rani też sąsiadów." },
             { n: "Nova mrozu", lvl: 3, cost: 30, cd: 10, ic: "frost", d: "Lodowy wybuch wokół (130%), zamraża 2,5 s." },
-            { n: "Odnowa", lvl: 5, cost: 35, cd: 16, ic: "heal", d: "Przywraca 40% życia." }
+            { n: "Lodowa bariera", lvl: 5, cost: 35, cd: 16, ic: "frost", d: "Bariera 45% maks. życia – pochłania obrażenia (nie leczy)." }
         ],
     };
     const MAXLVL = 80;
@@ -2300,7 +2300,7 @@ function createArdan(canvas, opts) {
         war: [
             { n: "Szarża tytana", lvl: 15, cost: 45, cd: 3, ic: "smash", d: "Cios za 300% obrażeń, ogłusza (bossa rzadziej)." },
             { n: "Krwawy wir", lvl: 30, cost: 55, cd: 4, ic: "whirl", d: "Rani wszystkich wrogów za 200% i wywołuje krwawienie." },
-            { n: "Gniew bogów", lvl: 45, cost: 70, cd: 6, ic: "shout", d: "Cios za 350%, leczy 30% życia i wzmacnia obronę." }
+            { n: "Gniew bogów", lvl: 45, cost: 70, cd: 6, ic: "shout", d: "Cios za 350%, bariera 30% maks. życia i +60% obrony." }
         ],
         arc: [
             { n: "Strzała przebijająca", lvl: 15, cost: 40, cd: 3, ic: "aim", d: "Przebija wszystkich wrogów, każdy dostaje 190%." },
@@ -2310,7 +2310,7 @@ function createArdan(canvas, opts) {
         mag: [
             { n: "Łańcuch błyskawic", lvl: 15, cost: 40, cd: 3, ic: "frost", d: "Błyskawica skacze po wszystkich wrogach (190%)." },
             { n: "Meteor", lvl: 30, cost: 60, cd: 4, ic: "fire", d: "Meteor za 380% w cel i 150% w pozostałych, podpala." },
-            { n: "Zatrzymanie czasu", lvl: 45, cost: 75, cd: 6, ic: "frost", d: "Zamraża wrogów (poza bossami), rani za 220% i leczy 35%." }
+            { n: "Zatrzymanie czasu", lvl: 45, cost: 75, cd: 6, ic: "frost", d: "Zamraża wrogów (poza bossami), rani za 220% i daje barierę 35% maks. życia." }
         ],
     };
     // ---------- STATE ----------
@@ -3149,7 +3149,6 @@ function createArdan(canvas, opts) {
         }
         else if (cl === "war" && i === 2) {
             pl.buffDef = 8;
-            heal(maxHp() * 0.25);
             fx.push({ k: "ring", x: pp[0] + 16, y: pp[1] + 18, life: 0.9, max: 0.9, c: "255,140,60" });
             ftext(pp[0] + 16, pp[1] - 18, "Okrzyk bojowy!", "#ffb347", 14);
         }
@@ -3203,8 +3202,8 @@ function createArdan(canvas, opts) {
             ms.forEach((m) => applyHit(m, Math.round(dmgCalc(a0, m.d.def) * 1.3), false, { frz: 2.5, col: "#9fe6ff" }));
         }
         else if (cl === "mag" && i === 2) {
-            heal(maxHp() * 0.4);
-            fx.push({ k: "ring", x: pp[0] + 16, y: pp[1] + 18, life: 0.9, max: 0.9, c: "120,255,160" });
+            pl.buffDef = 8;
+            fx.push({ k: "ring", x: pp[0] + 16, y: pp[1] + 18, life: 0.9, max: 0.9, c: "140,220,255" });
         }
         P.mp -= sk.cost;
         pl.skcd[i] = sk.cd;
@@ -3587,8 +3586,8 @@ function createArdan(canvas, opts) {
         for (const ac of it.acts)
             applyAct(ac);
         if (!pl.dead) {
-            if (pl.combat <= 0 && P.hp < maxHp())
-                P.hp = Math.min(maxHp(), P.hp + maxHp() * 0.02 * dt);
+            if (pl.combat <= 0 && P.hp < maxHp() && CITY[P.area] && !pvpAt(P.area, P.x, P.y))
+                P.hp = Math.min(maxHp(), P.hp + maxHp() * 0.01 * dt);
             const rg = (C().reg + (P.cls === "mag" ? P.lvl * 0.12 : 0)) * (pl.combat > 0 ? 1 : 2.2);
             if (P.mp < maxMp())
                 P.mp = Math.min(maxMp(), P.mp + rg * dt);
@@ -4640,20 +4639,53 @@ function createArdan(canvas, opts) {
                 g.fillRect(x + 29, yy + 18, 5, 3);
             }
             else if (k === "wisp") {
-                const yy = y + 10 + Math.sin(time * 3 + m.hx) * 4, fl2 = 0.7 + Math.sin(time * 13 + m.hy) * 0.2;
-                glow(x + 16, yy, 22, "rgba(200,255,120," + (0.5 * fl2).toFixed(3) + ")");
-                g.fillStyle = "#e8ffb0";
+                const bob = Math.sin(time * 3 + m.hx) * 3, yy = y + 13 + bob, fl2 = 0.75 + Math.sin(time * 13 + m.hy) * 0.25;
+                // light pool on the ground + outer glow
+                g.fillStyle = "rgba(255,150,40,0.28)";
                 g.beginPath();
-                g.arc(x + 16, yy, 5 + fl2 * 2, 0, Math.PI * 2);
+                g.ellipse(x + 16, y + 28, 11, 3.5, 0, 0, Math.PI * 2);
                 g.fill();
-                g.fillStyle = "#ffffff";
+                glow(x + 16, yy, 26, "rgba(255,140,30," + (0.55 * fl2).toFixed(3) + ")");
+                const flame = (sc2, ph) => {
+                    const t1 = Math.sin(time * 9 + ph) * 2.2, t2 = Math.sin(time * 11 + ph + 2) * 2.2, t3 = Math.sin(time * 7 + ph + 4) * 1.6;
+                    g.beginPath();
+                    g.moveTo(x + 16, yy + 9 * sc2);
+                    g.bezierCurveTo(x + 16 + 11 * sc2, yy + 9 * sc2, x + 16 + 11 * sc2, yy - 2 * sc2, x + 16 + 6 * sc2 + t2, yy - 8 * sc2);
+                    g.quadraticCurveTo(x + 16 + 4 * sc2, yy - 3 * sc2, x + 16 + 2 * sc2 + t1, yy - 15 * sc2);
+                    g.quadraticCurveTo(x + 16 - 2 * sc2, yy - 5 * sc2, x + 16 - 6 * sc2 + t3, yy - 10 * sc2);
+                    g.bezierCurveTo(x + 16 - 11 * sc2, yy - 2 * sc2, x + 16 - 11 * sc2, yy + 9 * sc2, x + 16, yy + 9 * sc2);
+                    g.closePath();
+                };
+                flame(1.08, 0);
+                g.fillStyle = "#3a0e04";
+                g.fill(); // dark outline
+                flame(1, 0);
+                g.fillStyle = flash ? "#ffffff" : "#e8401a";
+                g.fill(); // red body
+                flame(0.74, 1.3);
+                g.fillStyle = flash ? "#ffffff" : "#ff9a1e";
+                g.fill(); // orange
+                flame(0.46, 2.6);
+                g.fillStyle = "#ffe25a";
+                g.fill(); // yellow core
+                g.fillStyle = "#fff8d0";
                 g.beginPath();
-                g.arc(x + 15, yy - 1, 2.5, 0, Math.PI * 2);
+                g.arc(x + 16, yy + 3, 2.6 * fl2, 0, Math.PI * 2);
                 g.fill();
-                g.fillStyle = "rgba(0,0,0,0.18)";
-                g.beginPath();
-                g.ellipse(x + 16, y + 28, 6, 2, 0, 0, Math.PI * 2);
-                g.fill();
+                // eyes
+                const ex2 = left ? -2 : 2;
+                g.fillStyle = "#2a0800";
+                g.fillRect(x + 12 + ex2, yy - 1, 3, 3);
+                g.fillRect(x + 18 + ex2, yy - 1, 3, 3);
+                g.fillStyle = "#fff3a0";
+                g.fillRect(x + 12 + ex2, yy - 1, 1, 1);
+                g.fillRect(x + 18 + ex2, yy - 1, 1, 1);
+                // sparks
+                for (let i = 0; i < 3; i++) {
+                    const sp = (time * 1.6 + i / 3 + (m.hx % 7) * 0.13) % 1;
+                    g.fillStyle = "rgba(255," + (200 - i * 40) + ",60," + (1 - sp).toFixed(3) + ")";
+                    g.fillRect(x + 10 + i * 6 + Math.sin(time * 5 + i) * 2, yy - 10 - sp * 14, 2, 2);
+                }
             }
             else if (k === "troll" || k === "yeti") {
                 const ye = k === "yeti";
@@ -4682,32 +4714,48 @@ function createArdan(canvas, opts) {
                 }
             }
             else if (k === "ielem") {
-                const yy = y + Math.sin(time * 2 + m.hx) * 3;
-                glow(x + 16, yy + 14, 24, "rgba(160,230,255,0.4)");
-                g.save();
-                g.translate(x + 16, yy + 14);
-                g.rotate(Math.sin(time) * 0.2);
-                const sh = [[0, -14, 5], [-8, -2, 4], [8, -3, 4], [-3, 8, 4], [5, 7, 3]];
-                for (const s of sh) {
-                    g.fillStyle = "#8fd8f5";
-                    g.beginPath();
-                    g.moveTo(s[0], s[1] - s[2] * 1.6);
-                    g.lineTo(s[0] + s[2], s[1]);
-                    g.lineTo(s[0], s[1] + s[2] * 1.6);
-                    g.lineTo(s[0] - s[2], s[1]);
-                    g.closePath();
-                    g.fill();
-                    g.fillStyle = "rgba(255,255,255,0.7)";
-                    g.fillRect(s[0] - 1, s[1] - s[2], 1.5, s[2]);
-                }
-                g.fillStyle = "#1a5a8a";
-                g.fillRect(-4, -4, 2, 2);
-                g.fillRect(2, -4, 2, 2);
-                g.restore();
-                g.fillStyle = "rgba(0,0,0,0.15)";
+                const yy = y + Math.sin(time * 2 + m.hx) * 2.5;
+                g.fillStyle = "rgba(20,50,90,0.35)";
                 g.beginPath();
-                g.ellipse(x + 16, y + 29, 8, 2, 0, 0, Math.PI * 2);
+                g.ellipse(x + 16, y + 29, 10, 3, 0, 0, Math.PI * 2);
                 g.fill();
+                glow(x + 16, yy + 14, 26, "rgba(80,190,255,0.45)");
+                const OUT = "#0e2a4a", D = flash ? "#ffffff" : "#2f7fc4", M = flash ? "#ffffff" : "#5fb8ec", L = flash ? "#ffffff" : "#bfeaff";
+                const poly = (pts, fill) => { g.beginPath(); g.moveTo(x + pts[0][0], yy + pts[0][1]); for (let i = 1; i < pts.length; i++)
+                    g.lineTo(x + pts[i][0], yy + pts[i][1]); g.closePath(); g.fillStyle = fill; g.fill(); g.strokeStyle = OUT; g.lineWidth = 1.6; g.stroke(); };
+                // orbiting shards
+                for (let i = 0; i < 3; i++) {
+                    const a2 = time * 1.8 + i * 2.09, ox = Math.cos(a2) * 15, oy = Math.sin(a2) * 5;
+                    if (oy < 0)
+                        poly([[16 + ox, 9 + oy], [19 + ox, 13 + oy], [16 + ox, 18 + oy], [13 + ox, 13 + oy]], M);
+                }
+                // arms
+                poly([[5, 11], [1, 17], [4, 23], [8, 16]], D);
+                poly([[27, 11], [31, 17], [28, 23], [24, 16]], D);
+                // torso (faceted crystal)
+                poly([[16, 4], [25, 11], [23, 23], [16, 28], [9, 23], [7, 11]], D);
+                poly([[16, 4], [25, 11], [16, 15], [7, 11]], L);
+                poly([[16, 15], [25, 11], [23, 23], [16, 28]], M);
+                // head crystal
+                poly([[16, -6], [21, 0], [19, 6], [13, 6], [11, 0]], M);
+                poly([[16, -6], [21, 0], [16, 2], [11, 0]], L);
+                // glowing core + eyes
+                const cg = 0.6 + 0.4 * Math.sin(time * 4 + m.hy);
+                glow(x + 16, yy + 16, 8, "rgba(200,250,255," + cg.toFixed(3) + ")");
+                g.fillStyle = "#e8fbff";
+                g.fillRect(x + 15, yy + 14, 3, 4);
+                const ex3 = left ? -1 : 1;
+                g.fillStyle = "#04121f";
+                g.fillRect(x + 13 + ex3, yy + 1, 2, 2);
+                g.fillRect(x + 17 + ex3, yy + 1, 2, 2);
+                g.fillStyle = "#9ff4ff";
+                g.fillRect(x + 13 + ex3, yy + 1, 1, 1);
+                g.fillRect(x + 17 + ex3, yy + 1, 1, 1);
+                for (let i = 0; i < 3; i++) {
+                    const a2 = time * 1.8 + i * 2.09, ox = Math.cos(a2) * 15, oy = Math.sin(a2) * 5;
+                    if (oy >= 0)
+                        poly([[16 + ox, 9 + oy], [19 + ox, 13 + oy], [16 + ox, 18 + oy], [13 + ox, 13 + oy]], M);
+                }
             }
             else if (k === "golem") {
                 g.fillStyle = "#7a6a4a";
@@ -6315,7 +6363,7 @@ function createArdan(canvas, opts) {
         if (it.t === "a")
             return "Obrona +" + it.def + ", HP +" + it.def * 2 + (it.mp ? ", mana +" + it.mp : "") + who;
         if (it.t === "p")
-            return "Leczy " + it.heal + " HP";
+            return "Leczy " + it.heal + " HP (także w walce)";
         if (it.t === "m")
             return "Przywraca " + it.mana + " " + (P.cls === "mag" ? "many" : "energii");
         if (it.t === "q")
@@ -6551,7 +6599,7 @@ function createArdan(canvas, opts) {
                 }
                 row(id, sub, it.price, "Kup", () => act({ a: "buy", id }), P.gold < it.price);
             }
-            text(shopId === "smith" || shopId === "armory" ? "Sprzęt dla klasy: " + C().n + ". Załóż go w torbie." : "Mikstury: H – leczenie, G – mana/energia.", x + 14, y + h - 22, 11, COL.mute);
+            text(shopId === "smith" || shopId === "armory" ? "Sprzęt dla klasy: " + C().n + ". Załóż go w torbie." : "Życie nie odnawia się samo – tylko mikstury (H, także w walce) i odpoczynek w mieście.", x + 14, y + h - 22, 11, COL.mute);
         }
         else {
             const inv = P.inv.map((s, i) => ({ s, i }));
@@ -7186,7 +7234,7 @@ function createArdan(canvas, opts) {
                 return shopId;
             } return null; },
             uiReq: () => { const u = uiReq; uiReq = ""; return u || null; },
-            quests: QUESTS, qorder: QORDER, maxLvl: MAXLVL,
+            quests: QUESTS, qorder: QORDER, maxLvl: MAXLVL, shops: SHOPS,
             mobIdx: (m) => mobs[P.area].indexOf(m),
             partyKill: (mk, mlvl, baseXp, from) => {
                 if (pl.dead > 0 || !P.cls)

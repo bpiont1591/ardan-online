@@ -627,7 +627,7 @@ async function main() {
       const el = await pa.$(`.ui-panel .bag .bi[data-bag="${krw.u}"]`);
       if (el) { await el.hover(); await W(300); }
       const lt = await pa.evaluate(() => { const t = document.getElementById('uiTip'); if (!t || t.hidden) return null; const r = (t.querySelector('.dcard') || t).getBoundingClientRect(); return { txt: t.textContent, in: r.left >= 0 && r.top >= 0 && r.right <= innerWidth + 0.5 && r.bottom <= innerHeight + 0.5, leg: !!t.querySelector('.dcard.r3') }; });
-      ok(!!lt && /Krwiopijca|Wampiryzm/.test(lt.txt) && /✦ Wampiryzm/.test(lt.txt) && /✦ Szał/.test(lt.txt) && lt.leg && lt.in, 'karta legendy: nazwa, pasywki, historia, złota ramka');
+      ok(!!lt && /Krwiopijca/.test(lt.txt) && /✦ Rozdarcie/.test(lt.txt) && /✦ Szał/.test(lt.txt) && lt.leg && lt.in, 'karta legendy: nazwa, pasywki, historia, złota ramka');
       await pa.screenshot({ path: `${SHOTS}/38_legendary_tooltip_desktop.png` });
       await pa.mouse.move(5, 5); await W(200);
     }
